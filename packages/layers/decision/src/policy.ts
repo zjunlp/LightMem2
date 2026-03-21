@@ -3,6 +3,7 @@ import {
   appendContextEvent,
   appendResultEvent,
   findRuntimeEventsByType,
+  resolveApiFamily,
   type RuntimeTurnContext,
   type RuntimeModule,
 } from "@ecoclaw/kernel";
@@ -15,6 +16,12 @@ export type PolicyModuleConfig = {
   cacheMissRateThreshold?: number;
   minTurnsBeforeJitter?: number;
   requestCooldownTurns?: number;
+  cacheProbeEnabled?: boolean;
+  cacheProbeIntervalSeconds?: number;
+  cacheProbeMaxPromptChars?: number;
+  cacheProbeHitMinTokens?: number;
+  cacheProbeMissesToCold?: number;
+  cacheProbeWarmSeconds?: number;
 };
 
 export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule {
@@ -25,6 +32,13 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
   const cacheMissRateThreshold = Math.min(1, Math.max(0, cfg.cacheMissRateThreshold ?? 0.5));
   const minTurnsBeforeJitter = Math.max(1, cfg.minTurnsBeforeJitter ?? 4);
   const requestCooldownTurns = Math.max(0, cfg.requestCooldownTurns ?? 2);
+  const cacheProbeEnabled = cfg.cacheProbeEnabled ?? true;
+  const cacheProbeIntervalSeconds = Math.max(30, cfg.cacheProbeIntervalSeconds ?? 1800);
+  const cacheProbeMaxPromptChars = Math.max(1, cfg.cacheProbeMaxPromptChars ?? 120);
+  const cacheProbeHitMinTokens = Math.max(0, cfg.cacheProbeHitMinTokens ?? 64);
+  const cacheProbeMissesToCold = Math.max(1, cfg.cacheProbeMissesToCold ?? 2);
+  const cacheProbeWarmSeconds = Math.max(30, cfg.cacheProbeWarmSeconds ?? 7200);
+  type ProbeMode = "warm" | "uncertain" | "cold";
   const stateBySession = new Map<
     string,
     {
@@ -32,6 +46,13 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
       lastSummaryRequestTurn?: number;
       recentCacheReadHit: number[];
       cumulativeInputTokens: number;
+      probe: {
+        mode: ProbeMode;
+        lastProbeAtMs?: number;
+        lastProbeHitAtMs?: number;
+        lastProbeReadTokens?: number;
+        consecutiveProbeMisses: number;
+      };
     }
   >();
 
@@ -54,11 +75,17 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
   return {
     name: "module-policy",
     async beforeBuild(ctx) {
+      const apiFamily = resolveApiFamily(ctx);
       const state = stateBySession.get(ctx.sessionId) ?? {
         turn: 0,
         recentCacheReadHit: [],
         cumulativeInputTokens: 0,
+        probe: {
+          mode: "uncertain" as ProbeMode,
+          consecutiveProbeMisses: 0,
+        },
       };
+      const nowMs = Date.now();
       const stableChars = ctx.segments
         .filter((s) => s.kind === "stable")
         .map((s) => s.text)
@@ -81,6 +108,28 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
         recent.length >= Math.min(cacheJitterWindowTurns, minTurnsBeforeJitter) &&
         missRate >= cacheMissRateThreshold;
 
+      const lastProbeAtMs = state.probe.lastProbeAtMs;
+      const probeSupported = apiFamily !== "openai-completions";
+      const probeDue =
+        cacheProbeEnabled &&
+        probeSupported &&
+        cacheEligible &&
+        (lastProbeAtMs == null || nowMs - lastProbeAtMs >= cacheProbeIntervalSeconds * 1000);
+      const promptChars = String(ctx.prompt ?? "").length;
+      const probePlanned = probeDue && promptChars <= cacheProbeMaxPromptChars;
+      const hitFresh =
+        typeof state.probe.lastProbeHitAtMs === "number" &&
+        nowMs - state.probe.lastProbeHitAtMs <= cacheProbeWarmSeconds * 1000;
+      let probeMode: ProbeMode = state.probe.mode;
+      if (hitFresh) {
+        probeMode = "warm";
+      } else if (state.probe.consecutiveProbeMisses >= cacheProbeMissesToCold) {
+        probeMode = "cold";
+      } else {
+        probeMode = "uncertain";
+      }
+      state.probe.mode = probeMode;
+
       const reasons: string[] = [];
       if (cacheEligible && summaryTriggerInputTokens > 0 && state.cumulativeInputTokens >= summaryTriggerInputTokens) {
         reasons.push("input_tokens_threshold");
@@ -94,6 +143,9 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
       if (cacheEligible && jitterTriggered) {
         reasons.push("cache_jitter");
       }
+      if (cacheEligible && probeSupported && probeMode === "cold" && !probePlanned) {
+        reasons.push("cache_probe_cold");
+      }
       const shouldRequestSummary = reasons.length > 0;
       const cooldownActive =
         typeof state.lastSummaryRequestTurn === "number" &&
@@ -105,6 +157,7 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
         metadata: {
           ...(ctx.metadata ?? {}),
           policy: {
+            apiFamily,
             summaryTriggerInputTokens,
             summaryTriggerStableChars,
             ttlSoonSeconds,
@@ -117,10 +170,45 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
             recentCacheMissRate: missRate,
             cacheExpiresSoon: expiresSoon,
             cooldownActive,
+            cacheProbe: {
+              enabled: cacheProbeEnabled,
+              supported: probeSupported,
+              mode: probeMode,
+              probeDue,
+              probePlanned,
+              probeIntervalSeconds: cacheProbeIntervalSeconds,
+              probeMaxPromptChars: cacheProbeMaxPromptChars,
+              probeHitMinTokens: cacheProbeHitMinTokens,
+              probeMissesToCold: cacheProbeMissesToCold,
+              probeWarmSeconds: cacheProbeWarmSeconds,
+              promptChars,
+              lastProbeAtMs: state.probe.lastProbeAtMs,
+              lastProbeReadTokens: state.probe.lastProbeReadTokens,
+              consecutiveProbeMisses: state.probe.consecutiveProbeMisses,
+              hitFresh,
+            },
           },
         },
       };
       let nextCtx: RuntimeTurnContext = withMeta;
+      if (cacheEligible && cacheProbeEnabled && probeSupported) {
+        nextCtx = appendContextEvent(nextCtx, {
+          type: ECOCLAW_EVENT_TYPES.POLICY_CACHE_PROBE_DECIDED,
+          source: "module-policy",
+          at: new Date().toISOString(),
+          payload: {
+            mode: probeMode,
+            probeDue,
+            probePlanned,
+            promptChars,
+            maxPromptChars: cacheProbeMaxPromptChars,
+            intervalSeconds: cacheProbeIntervalSeconds,
+            consecutiveProbeMisses: state.probe.consecutiveProbeMisses,
+            hitFresh,
+            apiFamily,
+          },
+        });
+      }
       if (jitterTriggered) {
         nextCtx = appendContextEvent(nextCtx, {
           type: ECOCLAW_EVENT_TYPES.POLICY_CACHE_JITTER_DETECTED,
@@ -131,6 +219,7 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
             missCount,
             recentWindowSize: recent.length,
             threshold: cacheMissRateThreshold,
+            apiFamily,
           },
         });
       }
@@ -151,23 +240,69 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
           threshold: summaryTriggerStableChars,
           ttlSoonSeconds,
           missRate,
+          apiFamily,
         },
       });
     },
     async afterCall(ctx, result) {
+      const apiFamily = resolveApiFamily(ctx);
       const state = stateBySession.get(ctx.sessionId) ?? {
         turn: 0,
         recentCacheReadHit: [],
         cumulativeInputTokens: 0,
+        probe: {
+          mode: "uncertain" as ProbeMode,
+          consecutiveProbeMisses: 0,
+        },
       };
       state.turn += 1;
-      const readTokens = result.usage?.cacheReadTokens ?? result.usage?.cachedTokens ?? 0;
+      const rawReadTokens = result.usage?.cacheReadTokens ?? result.usage?.cachedTokens;
+      const hasReadSignal = typeof rawReadTokens === "number" && Number.isFinite(rawReadTokens);
+      const readTokens = hasReadSignal ? Number(rawReadTokens) : 0;
       state.cumulativeInputTokens += readInputTokens(result.usage);
-      state.recentCacheReadHit.push(readTokens > 0 ? 1 : 0);
-      if (state.recentCacheReadHit.length > cacheJitterWindowTurns * 3) {
-        state.recentCacheReadHit = state.recentCacheReadHit.slice(-cacheJitterWindowTurns * 3);
+      if (hasReadSignal) {
+        state.recentCacheReadHit.push(readTokens > 0 ? 1 : 0);
+        if (state.recentCacheReadHit.length > cacheJitterWindowTurns * 3) {
+          state.recentCacheReadHit = state.recentCacheReadHit.slice(-cacheJitterWindowTurns * 3);
+        }
       }
       stateBySession.set(ctx.sessionId, state);
+
+      const policyMeta = (ctx.metadata?.policy as Record<string, unknown> | undefined) ?? {};
+      const probeMeta = (policyMeta.cacheProbe as Record<string, unknown> | undefined) ?? {};
+      const probePlanned = Boolean(probeMeta.probePlanned);
+      const probeSupported = Boolean(probeMeta.supported ?? true);
+      if (cacheProbeEnabled && probeSupported && probePlanned && hasReadSignal) {
+        const nowMs = Date.now();
+        const hit = readTokens >= cacheProbeHitMinTokens;
+        state.probe.lastProbeAtMs = nowMs;
+        state.probe.lastProbeReadTokens = readTokens;
+        if (hit) {
+          state.probe.lastProbeHitAtMs = nowMs;
+          state.probe.consecutiveProbeMisses = 0;
+          state.probe.mode = "warm";
+        } else {
+          state.probe.consecutiveProbeMisses += 1;
+          state.probe.mode =
+            state.probe.consecutiveProbeMisses >= cacheProbeMissesToCold ? "cold" : "uncertain";
+        }
+        stateBySession.set(ctx.sessionId, state);
+        result = appendResultEvent(result, {
+          type: ECOCLAW_EVENT_TYPES.POLICY_CACHE_PROBE_RESULT,
+          source: "module-policy",
+          at: new Date().toISOString(),
+          payload: {
+            planned: true,
+            hit,
+            readTokens,
+            hasReadSignal,
+            hitMinTokens: cacheProbeHitMinTokens,
+            mode: state.probe.mode,
+            consecutiveProbeMisses: state.probe.consecutiveProbeMisses,
+            apiFamily,
+          },
+        });
+      }
 
       const summaryEvents = findRuntimeEventsByType(result.metadata, ECOCLAW_EVENT_TYPES.SUMMARY_GENERATED);
       if (summaryEvents.length === 0) return result;
@@ -179,6 +314,7 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
         payload: {
           strategy: "fork_from_summary",
           targetBranch: (latest.payload as Record<string, unknown>)?.targetBranch,
+          apiFamily,
         },
       });
     },

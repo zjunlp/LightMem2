@@ -1,4 +1,4 @@
-import type { RuntimeModule } from "@ecoclaw/kernel";
+import { resolveApiFamily, type ApiFamily, type RuntimeModule } from "@ecoclaw/kernel";
 import type {
   LlmRouter,
   RoutingDecision,
@@ -46,10 +46,16 @@ function includesAny(text: string, hints: string[]): boolean {
   return hints.some((hint) => text.includes(hint));
 }
 
-function extractFeatures(prompt: string, segmentCount: number, stableSegmentCount: number): RoutingFeatures {
+function extractFeatures(
+  apiFamily: ApiFamily,
+  prompt: string,
+  segmentCount: number,
+  stableSegmentCount: number,
+): RoutingFeatures {
   const lower = prompt.toLowerCase();
   const promptWords = prompt.trim().split(/\s+/).filter(Boolean).length;
   return {
+    apiFamily,
     promptChars: prompt.length,
     promptWords,
     hasCodeIntent: includesAny(lower, CODE_HINTS),
@@ -62,6 +68,13 @@ function extractFeatures(prompt: string, segmentCount: number, stableSegmentCoun
 
 function defaultDecision(features: RoutingFeatures, defaultTier: RoutingTier): RoutingDecision {
   // Lightweight heuristic compatible with single-turn OpenClaw runtime.
+  if (features.apiFamily === "openai-responses" && features.hasReasoningIntent) {
+    return {
+      tier: "reasoning",
+      reason: "heuristic:responses_reasoning_priority",
+      confidence: 0.8,
+    };
+  }
   if (features.hasReasoningIntent || features.promptWords > 240) {
     return {
       tier: "reasoning",
@@ -95,6 +108,7 @@ export type {
   RoutingDecision,
   RoutingFeatures,
   RoutingTier,
+  TierRouteConfig,
   TaskRouterConfig,
 } from "./types.js";
 
@@ -111,7 +125,8 @@ export function createTaskRouterModule(cfg: TaskRouterConfig = {}): RuntimeModul
       if (!enabled) return ctx;
 
       const stableSegmentCount = ctx.segments.filter((s) => s.kind === "stable").length;
-      const features = extractFeatures(ctx.prompt, ctx.segments.length, stableSegmentCount);
+      const apiFamily = resolveApiFamily(ctx);
+      const features = extractFeatures(apiFamily, ctx.prompt, ctx.segments.length, stableSegmentCount);
       const baseDecision = router
         ? await router.resolve(ctx, features)
         : defaultDecision(features, defaultTier);
@@ -127,6 +142,7 @@ export function createTaskRouterModule(cfg: TaskRouterConfig = {}): RuntimeModul
         ...ctx,
         provider: nextProvider,
         model: nextModel,
+        apiFamily,
         metadata: {
           ...(ctx.metadata ?? {}),
           taskRouter: {

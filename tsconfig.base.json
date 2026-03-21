@@ -15,30 +15,6 @@
                                           "@ecoclaw/kernel":  [
                                                               "packages/kernel/src/index.ts"
                                                           ],
-                                          "@ecoclaw/module-cache":  [
-                                                                    "packages/modules/cache/src/index.ts"
-                                                                ],
-                                          "@ecoclaw/module-summary":  [
-                                                                      "packages/modules/summary/src/index.ts"
-                                                                  ],
-                                          "@ecoclaw/module-compression":  [
-                                                                          "packages/modules/compression/src/index.ts"
-                                                                      ],
-                                          "@ecoclaw/module-retrieval":  [
-                                                                        "packages/modules/retrieval/src/index.ts"
-                                                                    ],
-                                          "@ecoclaw/module-retrieval-qmd":  [
-                                                                            "packages/modules/retrieval/src/index.ts"
-                                                                        ],
-                                          "@ecoclaw/module-task-router":  [
-                                                                          "packages/modules/task-router/src/index.ts"
-                                                                      ],
-                                          "@ecoclaw/module-memory-state":  [
-                                                                            "packages/modules/memory-state/src/index.ts"
-                                                                        ],
-                                          "@ecoclaw/module-policy":  [
-                                                                      "packages/modules/policy/src/index.ts"
-                                                                      ],
                                           "@ecoclaw/provider-openai":  [
                                                                        "packages/providers/openai/src/index.ts"
                                                                    ],
@@ -48,9 +24,18 @@
                                           "@ecoclaw/provider-relay":  [
                                                                       "packages/providers/relay/src/index.ts"
                                                                   ],
-                                          "@ecoclaw/connector-openclaw":  [
-                                                                          "packages/connectors/openclaw/src/index.ts"
+                                          "@ecoclaw/layer-data": [
+                                                                      "packages/layers/data/src/index.ts"
+                                                                  ],
+                                          "@ecoclaw/layer-decision": [
+                                                                          "packages/layers/decision/src/index.ts"
                                                                       ],
+                                          "@ecoclaw/layer-execution": [
+                                                                          "packages/layers/execution/src/index.ts"
+                                                                      ],
+                                          "@ecoclaw/layer-orchestration": [
+                                                                              "packages/layers/orchestration/src/index.ts"
+                                                                          ],
                                           "@ecoclaw/observability":  [
                                                                      "packages/observability/src/index.ts"
                                                                  ],

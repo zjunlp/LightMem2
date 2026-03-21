@@ -1,9 +1,10 @@
-import type { RuntimeTurnContext } from "@ecoclaw/kernel";
+import type { ApiFamily, RuntimeTurnContext } from "@ecoclaw/kernel";
 
 export const ROUTING_TIERS = ["simple", "standard", "complex", "reasoning"] as const;
 export type RoutingTier = (typeof ROUTING_TIERS)[number];
 
 export type RoutingFeatures = {
+  apiFamily: ApiFamily;
   promptChars: number;
   promptWords: number;
   hasCodeIntent: boolean;

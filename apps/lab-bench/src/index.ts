@@ -1,11 +1,8 @@
-import { createCacheModule } from "@ecoclaw/module-cache";
-import { createSummaryModule } from "@ecoclaw/module-summary";
-import { createCompressionModule } from "@ecoclaw/module-compression";
-import { createTaskRouterModule } from "@ecoclaw/module-task-router";
-import { createMemoryStateModule } from "@ecoclaw/module-memory-state";
-import { createPolicyModule } from "@ecoclaw/module-policy";
+import { createCacheModule, createSummaryModule, createCompressionModule } from "@ecoclaw/layer-execution";
+import { createTaskRouterModule, createPolicyModule, createDecisionLedgerModule } from "@ecoclaw/layer-decision";
+import { createMemoryStateModule } from "@ecoclaw/layer-data";
 import { openaiAdapter } from "@ecoclaw/provider-openai";
-import { createOpenClawConnector } from "@ecoclaw/connector-openclaw";
+import { createOpenClawConnector } from "@ecoclaw/layer-orchestration";
 
 async function main() {
   const connector = createOpenClawConnector({
@@ -20,6 +17,7 @@ async function main() {
           reasoning: { provider: "openai", model: "o3" },
         },
       }),
+      createDecisionLedgerModule(),
       createMemoryStateModule({ maxSummaryChars: 600 }),
       createSummaryModule({ idleTriggerMinutes: 50 }),
       createCompressionModule({ maxToolChars: 300 }),

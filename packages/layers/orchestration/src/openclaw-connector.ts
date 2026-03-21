@@ -5,6 +5,7 @@ import {
   ECOCLAW_EVENT_TYPES,
   findRuntimeEventsByType,
   RuntimePipeline,
+  resolveApiFamily,
   type RuntimeEvent,
   type RuntimeModule,
   type RuntimeStateStore,
@@ -66,6 +67,7 @@ export function createOpenClawConnector(cfg: OpenClawConnectorConfig) {
   const appendEventTrace = async (
     logicalSessionId: string,
     physicalSessionId: string,
+    turnCtx: RuntimeTurnContext,
     result: RuntimeTurnResult,
   ) => {
     const eventTracePath = cfg.observability?.eventTracePath;
@@ -82,6 +84,40 @@ export function createOpenClawConnector(cfg: OpenClawConnectorConfig) {
       at: new Date().toISOString(),
       logicalSessionId,
       physicalSessionId,
+      provider: turnCtx.provider,
+      model: turnCtx.model,
+      apiFamily: turnCtx.apiFamily ?? resolveApiFamily(turnCtx),
+      prompt: turnCtx.prompt,
+      responsePreview: result.content,
+      usage: result.usage,
+      contextDetail: {
+        openclawPromptRoot:
+          (turnCtx.metadata as Record<string, unknown> | undefined)?.openclawPromptRoot ?? undefined,
+        turnTools:
+          (turnCtx.metadata as Record<string, unknown> | undefined)?.turnTools ?? undefined,
+        requestDetail: toSerializable(trace?.requestDetail) ?? {
+          renderedPromptText: "",
+          segments: [],
+          metadata: {},
+        },
+        initialContext: {
+          sessionId: trace?.initialContext?.sessionId ?? turnCtx.sessionId,
+          provider: trace?.initialContext?.provider ?? turnCtx.provider,
+          model: trace?.initialContext?.model ?? turnCtx.model,
+          prompt: trace?.initialContext?.prompt ?? turnCtx.prompt,
+          segments: toSerializable(trace?.initialContext?.segments ?? turnCtx.segments) ?? [],
+          metadata: toSerializable(trace?.initialContext?.metadata ?? turnCtx.metadata) ?? {},
+        },
+        finalContext: {
+          sessionId: trace?.finalContext?.sessionId ?? turnCtx.sessionId,
+          provider: trace?.finalContext?.provider ?? turnCtx.provider,
+          model: trace?.finalContext?.model ?? turnCtx.model,
+          prompt: trace?.finalContext?.prompt ?? turnCtx.prompt,
+          segments: toSerializable(trace?.finalContext?.segments ?? turnCtx.segments) ?? [],
+          metadata: toSerializable(trace?.finalContext?.metadata ?? turnCtx.metadata) ?? {},
+        },
+        moduleSteps: toSerializable(trace?.moduleSteps) ?? [],
+      },
       eventTypes: [...finalCtxEvents, ...resultEvents].map((e) => e.type),
       finalContextEvents: finalCtxEvents,
       resultEvents,
@@ -179,16 +215,17 @@ export function createOpenClawConnector(cfg: OpenClawConnectorConfig) {
         const result = await pipeline.run(routedCtx, invokeModel);
         await maybeForkAfterPolicy(logicalSessionId, physicalSessionId, routedCtx, result, invokeModel);
         const endedAt = new Date().toISOString();
-        await appendEventTrace(logicalSessionId, physicalSessionId, result);
+        await appendEventTrace(logicalSessionId, physicalSessionId, routedCtx, result);
         await stateStore?.appendTurn({
           turnId: randomUUID(),
           sessionId: routedCtx.sessionId,
           provider: routedCtx.provider,
           model: routedCtx.model,
+          apiFamily: routedCtx.apiFamily ?? resolveApiFamily(routedCtx),
           prompt: routedCtx.prompt,
           segments: routedCtx.segments,
           usage: result.usage,
-          responsePreview: result.content.slice(0, 800),
+          responsePreview: result.content,
           response: result.content,
           trace: toSerializable<RuntimeTurnTrace | undefined>(
             (result.metadata as Record<string, unknown> | undefined)?.ecoclawTrace as
@@ -208,6 +245,7 @@ export function createOpenClawConnector(cfg: OpenClawConnectorConfig) {
           sessionId: routedCtx.sessionId,
           provider: routedCtx.provider,
           model: routedCtx.model,
+          apiFamily: routedCtx.apiFamily ?? resolveApiFamily(routedCtx),
           prompt: routedCtx.prompt,
           segments: routedCtx.segments,
           responsePreview: "",

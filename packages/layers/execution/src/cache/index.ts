@@ -38,8 +38,24 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
       const cacheEligible = stable.length >= minPrefixChars;
       const cachePrefixSignature = signature(stable);
       const cachePrefixNormalizedSignature = signature(normalizeStableText(stable));
-      const candidates = cacheEligible ? tree.listCandidates(ctx.sessionId, ctx.provider, ctx.model) : [];
-      const selected = candidates[0];
+      const strictFilter = {
+        prefixSignature: cachePrefixSignature,
+        prefixSignatureNormalized: cachePrefixNormalizedSignature,
+      };
+      const parentCandidates = cacheEligible
+        ? tree.listCandidates(ctx.sessionId, ctx.provider, ctx.model, {
+            ...strictFilter,
+            includeExpired: true,
+          })
+        : [];
+      const liveCandidates = cacheEligible
+        ? tree.listCandidates(ctx.sessionId, ctx.provider, ctx.model, {
+            ...strictFilter,
+            includeExpired: false,
+          })
+        : [];
+      const selectedParent = parentCandidates[0];
+      const selectedLive = liveCandidates[0];
       const nextCtx = {
         ...ctx,
         metadata: {
@@ -51,9 +67,12 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
             prefixSignature: cachePrefixSignature,
             prefixSignatureNormalized: cachePrefixNormalizedSignature,
             tree: {
-              selectedNodeId: selected?.nodeId,
-              selectedBranch: selected?.branch,
-              candidates: candidates.slice(0, 5),
+              selectedNodeId: selectedParent?.nodeId,
+              selectedBranch: selectedParent?.branch,
+              selectedLiveNodeId: selectedLive?.nodeId,
+              selectedLiveBranch: selectedLive?.branch,
+              candidates: liveCandidates.slice(0, 5),
+              parentCandidates: parentCandidates.slice(0, 5),
             },
           },
         },
@@ -64,9 +83,12 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
         at: new Date().toISOString(),
         payload: {
           eligible: cacheEligible,
-          selectedNodeId: selected?.nodeId,
-          selectedBranch: selected?.branch,
-          candidateCount: candidates.length,
+          selectedNodeId: selectedParent?.nodeId,
+          selectedBranch: selectedParent?.branch,
+          selectedLiveNodeId: selectedLive?.nodeId,
+          selectedLiveBranch: selectedLive?.branch,
+          candidateCount: liveCandidates.length,
+          parentCandidateCount: parentCandidates.length,
         },
       });
     },
@@ -109,9 +131,14 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
             ? String((summaryHint?.payload as Record<string, unknown>)?.targetBranch)
             : undefined,
       });
-      const readTokens = result.usage?.cacheReadTokens ?? result.usage?.cachedTokens ?? 0;
-      if (readTokens > 0) {
-        tree.markHit(ctx.sessionId, node.id);
+      const readTokens = result.usage?.cacheReadTokens ?? result.usage?.cachedTokens;
+      if ((readTokens ?? 0) > 0) {
+        // Cache read hit should refresh the matched ancestor path, not the freshly appended node.
+        if (typeof selectedNodeId === "string") {
+          tree.markHitPath(ctx.sessionId, selectedNodeId);
+        } else {
+          tree.markHit(ctx.sessionId, node.id);
+        }
       }
       tree.pruneExpired(ctx.sessionId);
       const nextResult = {
@@ -133,10 +160,11 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
         at: new Date().toISOString(),
         payload: {
           nodeId: node.id,
+          parentId: node.parentId,
           branch: node.branch,
           expiresAt: node.expiresAt,
           hitCount: node.hitCount,
-          readTokens: readTokens,
+          readTokens: typeof readTokens === "number" ? readTokens : undefined,
         },
       });
     },
@@ -145,6 +173,7 @@ export function createCacheModule(cfg: CacheModuleConfig = {}): RuntimeModule {
 
 export { CacheTreeManager } from "./manager.js";
 export type {
+  CacheCandidateFilter,
   CacheBranchCandidate,
   CacheNode,
   CacheNodeId,

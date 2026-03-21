@@ -1,5 +1,5 @@
 {
-  "name": "@ecoclaw/module-memory-state",
+  "name": "@ecoclaw/layer-decision",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,4 +13,3 @@
     "@ecoclaw/kernel": "workspace:*"
   }
 }
-

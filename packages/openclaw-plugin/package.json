@@ -28,6 +28,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"
   },
+  "dependencies": {
+    "@ecoclaw/layer-data": "workspace:*",
+    "@ecoclaw/layer-decision": "workspace:*",
+    "@ecoclaw/layer-execution": "workspace:*",
+    "@ecoclaw/layer-orchestration": "workspace:*",
+    "@ecoclaw/provider-anthropic": "workspace:*",
+    "@ecoclaw/provider-openai": "workspace:*"
+  },
   "devDependencies": {
     "esbuild": "^0.25.10",
     "tsx": "^4.21.0",

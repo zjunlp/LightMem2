@@ -18,9 +18,11 @@ This avoids coupling cache stability to evolving cross-session memory too early.
 ## Package Layout
 
 - `packages/kernel`: pipeline, contracts, event bus
-- `packages/modules/*`: pluggable runtime modules
+- `packages/layers/data`: memory-state + retrieval layer
+- `packages/layers/decision`: policy + task-router + decision-ledger layer
+- `packages/layers/execution`: cache + summary + compression layer
+- `packages/layers/orchestration`: OpenClaw runtime orchestration connector
 - `packages/providers/*`: provider-specific cache + usage adapters
-- `packages/connectors/openclaw`: OpenClaw hook bridge
 - `packages/storage/fs`: filesystem-backed runtime state store
 - `packages/observability`: metrics sink primitives
 - `apps/lab-bench`: replay + A/B harness scaffold

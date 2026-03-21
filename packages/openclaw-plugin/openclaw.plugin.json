@@ -62,7 +62,7 @@
       },
       "summaryTriggerInputTokens": {
         "type": "number",
-        "default": 20000,
+        "default": 200000,
         "description": "Policy threshold (cumulative input tokens per session) for requesting summary."
       },
       "summaryTriggerStableChars": {
@@ -87,6 +87,45 @@
       "resumePrefixPrompt": {
         "type": "string",
         "description": "Prefix prompt used when seeding a forked session from summary."
+      },
+      "cacheProbeEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable passive cache probe policy state machine (warm/uncertain/cold)."
+      },
+      "cacheProbeIntervalSeconds": {
+        "type": "number",
+        "default": 1800,
+        "description": "Minimum interval between planned probe turns."
+      },
+      "cacheProbeMaxPromptChars": {
+        "type": "number",
+        "default": 120,
+        "description": "Only short prompts are allowed to be used as low-cost probe turns."
+      },
+      "cacheProbeHitMinTokens": {
+        "type": "number",
+        "default": 64,
+        "description": "cacheRead >= this value counts as probe hit."
+      },
+      "cacheProbeMissesToCold": {
+        "type": "number",
+        "default": 2,
+        "description": "Consecutive probe misses required to mark cache state as cold."
+      },
+      "cacheProbeWarmSeconds": {
+        "type": "number",
+        "default": 7200,
+        "description": "Probe hit freshness window for warm state."
+      },
+      "debugTapProviderTraffic": {
+        "type": "boolean",
+        "default": false,
+        "description": "Debug only: tap outbound provider fetch requests/responses and write JSONL records."
+      },
+      "debugTapPath": {
+        "type": "string",
+        "description": "Path for provider traffic tap JSONL output."
       }
     }
   },
@@ -137,6 +176,30 @@
     },
     "resumePrefixPrompt": {
       "label": "Resume Prefix Prompt"
+    },
+    "cacheProbeEnabled": {
+      "label": "Cache Probe Enabled"
+    },
+    "cacheProbeIntervalSeconds": {
+      "label": "Cache Probe Interval (s)"
+    },
+    "cacheProbeMaxPromptChars": {
+      "label": "Cache Probe Max Prompt Chars"
+    },
+    "cacheProbeHitMinTokens": {
+      "label": "Cache Probe Hit Min Tokens"
+    },
+    "cacheProbeMissesToCold": {
+      "label": "Cache Probe Misses To Cold"
+    },
+    "cacheProbeWarmSeconds": {
+      "label": "Cache Probe Warm Window (s)"
+    },
+    "debugTapProviderTraffic": {
+      "label": "Debug Tap Provider Traffic"
+    },
+    "debugTapPath": {
+      "label": "Debug Tap Path"
     }
   }
 }

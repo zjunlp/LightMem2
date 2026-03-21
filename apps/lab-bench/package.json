@@ -11,14 +11,11 @@
                     "build":  "tsc -p tsconfig.json"
                 },
     "dependencies":  {
-                         "@ecoclaw/kernel":  "workspace:*",
-                         "@ecoclaw/module-cache":  "workspace:*",
-                         "@ecoclaw/module-summary":  "workspace:*",
-                         "@ecoclaw/module-compression":  "workspace:*",
-                         "@ecoclaw/module-task-router":  "workspace:*",
-                         "@ecoclaw/module-memory-state": "workspace:*",
-                         "@ecoclaw/module-policy": "workspace:*",
+                         "@ecoclaw/layer-data": "workspace:*",
+                         "@ecoclaw/layer-decision": "workspace:*",
+                         "@ecoclaw/layer-execution": "workspace:*",
+                         "@ecoclaw/layer-orchestration": "workspace:*",
                          "@ecoclaw/provider-openai":  "workspace:*",
-                         "@ecoclaw/connector-openclaw":  "workspace:*"
+                         "@ecoclaw/kernel":  "workspace:*"
                      }
 }

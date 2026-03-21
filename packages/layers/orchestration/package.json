@@ -1,5 +1,5 @@
 {
-  "name": "@ecoclaw/module-policy",
+  "name": "@ecoclaw/layer-orchestration",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ecoclaw/kernel": "workspace:*"
+    "@ecoclaw/kernel": "workspace:*",
+    "@ecoclaw/storage-fs": "workspace:*"
   }
 }
-

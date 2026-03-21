@@ -5,6 +5,7 @@ import type {
   ProviderAdapter,
   RuntimeModule,
 } from "./interfaces.js";
+import { resolveApiFamily } from "./api-family.js";
 import type { RuntimeTurnContext, RuntimeTurnResult, RuntimeTurnTraceStep } from "./types.js";
 
 export type RuntimePipelineConfig = {
@@ -19,13 +20,17 @@ export class RuntimePipeline {
 
   async run(ctx: RuntimeTurnContext, invokeModel: (ctx: RuntimeTurnContext) => Promise<RuntimeTurnResult>) {
     const moduleSteps: RuntimeTurnTraceStep[] = [];
+    const seededCtx: RuntimeTurnContext = {
+      ...ctx,
+      apiFamily: resolveApiFamily(ctx),
+    };
     const defaultSchedule: ModuleScheduleDecision = {
       modules: this.cfg.modules,
       scheduleId: "static-all",
       reason: "pipeline-default-order",
     };
     const schedule = this.cfg.moduleScheduler
-      ? await this.cfg.moduleScheduler.selectModules(ctx, this.cfg.modules)
+      ? await this.cfg.moduleScheduler.selectModules(seededCtx, this.cfg.modules)
       : defaultSchedule;
     const activeModules = schedule.modules;
 
@@ -45,7 +50,7 @@ export class RuntimePipeline {
       });
     };
 
-    let current = ctx;
+    let current = seededCtx;
     for (const mod of activeModules) {
       if (mod.beforeBuild) {
         current = await mod.beforeBuild(current);
@@ -66,6 +71,17 @@ export class RuntimePipeline {
       }
     }
 
+    const requestSegments = current.segments.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      priority: s.priority,
+      source: s.source,
+      text: s.text,
+    }));
+    const renderedPromptText = requestSegments
+      .map((s) => `[${s.kind}|p${s.priority}|${s.id}]${s.source ? `(${s.source})` : ""}\n${s.text}`)
+      .join("\n\n");
+
     let result = await invokeModel(current);
     const usageRaw = result.usage?.providerRaw;
 
@@ -83,9 +99,14 @@ export class RuntimePipeline {
     result.metadata = {
       ...(result.metadata ?? {}),
       ecoclawTrace: {
-        initialContext: ctx,
+        initialContext: seededCtx,
         finalContext: current,
         moduleSteps,
+        requestDetail: {
+          renderedPromptText,
+          segments: requestSegments,
+          metadata: (current.metadata ?? {}) as Record<string, unknown>,
+        },
         scheduling: {
           scheduler: this.cfg.moduleScheduler?.name,
           scheduleId: schedule.scheduleId,
@@ -96,7 +117,7 @@ export class RuntimePipeline {
         },
         usageRaw,
         usageNormalized: result.usage,
-        responsePreview: result.content.slice(0, 800),
+        responsePreview: result.content,
       },
     };
 
@@ -104,6 +125,7 @@ export class RuntimePipeline {
       sessionId: current.sessionId,
       provider: current.provider,
       model: current.model,
+      apiFamily: current.apiFamily ?? resolveApiFamily(current),
       usage: result.usage ?? {},
     });
 

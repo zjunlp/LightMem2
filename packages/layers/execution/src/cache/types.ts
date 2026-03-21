@@ -55,3 +55,8 @@ export type CacheTreeOptions = {
   ttlSeconds?: number;
 };
 
+export type CacheCandidateFilter = {
+  includeExpired?: boolean;
+  prefixSignature?: string;
+  prefixSignatureNormalized?: string;
+};

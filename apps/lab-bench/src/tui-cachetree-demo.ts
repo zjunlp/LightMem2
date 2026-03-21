@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { createCacheModule } from "@ecoclaw/module-cache";
-import { createSummaryModule } from "@ecoclaw/module-summary";
-import { createCompressionModule } from "@ecoclaw/module-compression";
+import { createCacheModule, createSummaryModule, createCompressionModule } from "@ecoclaw/layer-execution";
 import { openaiAdapter } from "@ecoclaw/provider-openai";
-import { createOpenClawConnector } from "@ecoclaw/connector-openclaw";
+import { createOpenClawConnector } from "@ecoclaw/layer-orchestration";
 import type { RuntimeTurnContext, RuntimeTurnResult } from "@ecoclaw/kernel";
 
 type PhysicalSession = {
@@ -205,4 +203,3 @@ main().catch((err) => {
   console.error(err);
   process.exitCode = 1;
 });
-

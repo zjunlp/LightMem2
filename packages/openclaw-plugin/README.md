@@ -58,3 +58,24 @@ cd apps/lab-bench
 ECOCLAW_STATE_DIR=/tmp/ecoclaw-plugin-state npm run web:cachetree
 # open http://127.0.0.1:7777
 ```
+
+Task-cache / session controls (prefixed to avoid OpenClaw command conflicts):
+
+```text
+/ecoclaw status
+/ecoclaw cache new [task-id]
+/ecoclaw session new
+```
+
+You can also type inline text commands in chat:
+
+```text
+ecoclaw status
+ecoclaw cache new my-task
+ecoclaw session new
+```
+
+Model semantics:
+- One task-cache can contain multiple sessions.
+- `cache new` starts a new task-cache (session sequence resets to s1).
+- `session new` creates a new session in the current task-cache (s2, s3, ...).

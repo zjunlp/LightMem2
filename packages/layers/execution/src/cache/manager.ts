@@ -1,4 +1,5 @@
 import type {
+  CacheCandidateFilter,
   CacheBranchCandidate,
   CacheNode,
   CacheNodeId,
@@ -73,19 +74,42 @@ export class CacheTreeManager {
     const state = this.getState(sessionId);
     const node = state.nodes[nodeId];
     if (!node) return;
+    this.touchNode(node);
+  }
+
+  markHitPath(sessionId: string, nodeId: CacheNodeId): void {
+    const state = this.getState(sessionId);
+    let cur: CacheNode | undefined = state.nodes[nodeId];
+    const visited = new Set<CacheNodeId>();
+    while (cur && !visited.has(cur.id)) {
+      visited.add(cur.id);
+      this.touchNode(cur);
+      cur = cur.parentId ? state.nodes[cur.parentId] : undefined;
+    }
+  }
+
+  private touchNode(node: CacheNode): void {
     const now = this.clock();
     node.hitCount += 1;
     node.lastHitAt = toIso(now);
     node.expiresAt = toIso(addSeconds(now, node.ttlSeconds));
   }
 
-  listCandidates(sessionId: string, provider: string, model: string): CacheBranchCandidate[] {
+  listCandidates(
+    sessionId: string,
+    provider: string,
+    model: string,
+    filter: CacheCandidateFilter = {},
+  ): CacheBranchCandidate[] {
     const state = this.getState(sessionId);
     const now = this.clock().toISOString();
+    const includeExpired = Boolean(filter.includeExpired);
     const candidates: CacheBranchCandidate[] = [];
     for (const node of Object.values(state.nodes)) {
       if (node.provider !== provider || node.model !== model) continue;
-      if (node.expiresAt <= now) continue;
+      if (filter.prefixSignature && node.prefixSignature !== filter.prefixSignature) continue;
+      if (filter.prefixSignatureNormalized && node.prefixSignatureNormalized !== filter.prefixSignatureNormalized) continue;
+      if (!includeExpired && node.expiresAt <= now) continue;
       const freshness = Math.max(0, new Date(node.expiresAt).getTime() - Date.now()) / 1000;
       const score = node.hitCount * 2 + freshness / 60 - (node.contextChars ?? 0) / 5000;
       candidates.push({
@@ -125,9 +149,8 @@ export class CacheTreeManager {
     if (preferredParentId && state.nodes[preferredParentId]) {
       return state.nodes[preferredParentId];
     }
-    if (state.latestNodeId && state.nodes[state.latestNodeId]) {
-      return state.nodes[state.latestNodeId];
-    }
+    // Do not implicitly chain to latest node when no prefix candidate is selected.
+    // Otherwise unrelated turns (or post-/new turns) can be rendered as a false continuation.
     return undefined;
   }
 
@@ -136,4 +159,3 @@ export class CacheTreeManager {
     return `cache-node-${this.nodeCounter.toString().padStart(6, "0")}`;
   }
 }
-

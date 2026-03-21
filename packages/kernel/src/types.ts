@@ -1,5 +1,14 @@
 export type SessionMode = "single" | "cross";
 
+export const API_FAMILIES = [
+  "openai-responses",
+  "openai-completions",
+  "anthropic-messages",
+  "other",
+] as const;
+
+export type ApiFamily = (typeof API_FAMILIES)[number];
+
 export type ContextSegment = {
   id: string;
   kind: "stable" | "semi_stable" | "volatile";
@@ -37,6 +46,17 @@ export type RuntimeTurnTrace = {
   initialContext: RuntimeTurnContext;
   finalContext: RuntimeTurnContext;
   moduleSteps: RuntimeTurnTraceStep[];
+  requestDetail?: {
+    renderedPromptText: string;
+    segments: Array<{
+      id: string;
+      kind: "stable" | "semi_stable" | "volatile";
+      priority: number;
+      source?: string;
+      text: string;
+    }>;
+    metadata?: Record<string, unknown>;
+  };
   scheduling?: {
     scheduler?: string;
     scheduleId: string;
@@ -55,6 +75,7 @@ export type RuntimeTurnContext = {
   sessionMode: SessionMode;
   provider: string;
   model: string;
+  apiFamily?: ApiFamily;
   prompt: string;
   segments: ContextSegment[];
   budget: RuntimeBudget;
@@ -72,6 +93,7 @@ export type PersistedTurnRecord = {
   sessionId: string;
   provider: string;
   model: string;
+  apiFamily?: ApiFamily;
   prompt: string;
   segments: ContextSegment[];
   usage?: UsageSnapshot;
@@ -91,6 +113,27 @@ export type PersistedSessionMeta = {
   updatedAt: string;
   provider?: string;
   model?: string;
+  apiFamily?: ApiFamily;
   lastStatus?: "ok" | "error";
   turnCount: number;
+};
+
+export type DecisionConfidenceLevel = "low" | "medium" | "high";
+
+export type DecisionEvidence = {
+  source: string;
+  key: string;
+  value: string | number | boolean;
+};
+
+export type DecisionRecord = {
+  module: string;
+  decision: string;
+  reason: string;
+  confidence: number;
+  confidenceLevel: DecisionConfidenceLevel;
+  apiFamily: ApiFamily;
+  evidence: DecisionEvidence[];
+  at: string;
+  metadata?: Record<string, unknown>;
 };
