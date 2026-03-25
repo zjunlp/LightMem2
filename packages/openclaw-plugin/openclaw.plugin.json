@@ -33,120 +33,9 @@
         "description": "Optional API key used with proxyBaseUrl.",
         "sensitive": true
       },
-      "runtimeMode": {
-        "type": "string",
-        "enum": [
-          "off",
-          "shadow"
-        ],
-        "default": "shadow",
-        "description": "Plugin runtime mode. shadow = run EcoClaw pipeline side-by-side for tracing/fork simulation."
-      },
       "stateDir": {
         "type": "string",
-        "description": "Directory for EcoClaw runtime state and summaries (default: ~/.openclaw/ecoclaw-plugin-state)."
-      },
-      "eventTracePath": {
-        "type": "string",
-        "description": "JSONL output path for event trace export."
-      },
-      "autoForkOnPolicy": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable connector-level auto fork when policy emits fork recommendation."
-      },
-      "cacheTtlSeconds": {
-        "type": "number",
-        "default": 600,
-        "description": "CacheTree node TTL in seconds."
-      },
-      "summaryTriggerInputTokens": {
-        "type": "number",
-        "default": 200000,
-        "description": "Policy threshold (cumulative input tokens per session) for requesting summary."
-      },
-      "summaryTriggerStableChars": {
-        "type": "number",
-        "default": 0,
-        "description": "Optional policy threshold based on stable context chars (0 disables char-based trigger)."
-      },
-      "summaryRecentTurns": {
-        "type": "number",
-        "default": 8,
-        "description": "How many recent raw turns to include in summary payload."
-      },
-      "maxSummaryChars": {
-        "type": "number",
-        "default": 6000,
-        "description": "Maximum summary chars persisted into memory-state."
-      },
-      "compactionPrompt": {
-        "type": "string",
-        "description": "Prompt text for context checkpoint compaction style."
-      },
-      "resumePrefixPrompt": {
-        "type": "string",
-        "description": "Prefix prompt used when seeding a forked session from summary."
-      },
-      "cacheProbeEnabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable passive cache probe policy state machine (warm/uncertain/cold)."
-      },
-      "cacheProbeIntervalSeconds": {
-        "type": "number",
-        "default": 1800,
-        "description": "Minimum interval between planned probe turns."
-      },
-      "cacheProbeMaxPromptChars": {
-        "type": "number",
-        "default": 120,
-        "description": "Only short prompts are allowed to be used as low-cost probe turns."
-      },
-      "cacheProbeHitMinTokens": {
-        "type": "number",
-        "default": 64,
-        "description": "cacheRead >= this value counts as probe hit."
-      },
-      "cacheProbeMissesToCold": {
-        "type": "number",
-        "default": 2,
-        "description": "Consecutive probe misses required to mark cache state as cold."
-      },
-      "cacheProbeWarmSeconds": {
-        "type": "number",
-        "default": 7200,
-        "description": "Probe hit freshness window for warm state."
-      },
-      "compactionTriggerEnabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable static compaction trigger for openai-responses sessions."
-      },
-      "compactionTriggerInputTokens": {
-        "type": "number",
-        "default": 120000,
-        "description": "Compaction trigger threshold: cumulative input tokens."
-      },
-      "compactionTriggerTurnCount": {
-        "type": "number",
-        "default": 18,
-        "description": "Compaction trigger threshold: turn count."
-      },
-      "compactionTriggerMissRateThreshold": {
-        "type": "number",
-        "default": 0.7,
-        "description": "Compaction trigger threshold: cache miss rate in rolling window."
-      },
-      "compactionTriggerWindowTurns": {
-        "type": "number",
-        "default": 8,
-        "description": "Rolling window turns used for miss-rate based compaction trigger."
-      },
-      "compactionTriggerCooldownTurns": {
-        "type": "number",
-        "default": 6,
-        "description": "Minimum turns between two compaction trigger recommendations."
+        "description": "Directory for EcoClaw plugin state (default: ~/.openclaw/ecoclaw-plugin-state)."
       },
       "debugTapProviderTraffic": {
         "type": "boolean",
@@ -156,36 +45,6 @@
       "debugTapPath": {
         "type": "string",
         "description": "Path for provider traffic tap JSONL output."
-      },
-      "responseRootLinkEnabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable response root-link rewriting for openai-responses requests."
-      },
-      "responseRootFirstTurnOnly": {
-        "type": "boolean",
-        "default": true,
-        "description": "Only apply root-link rewrite on strict first-turn payload (developer+user)."
-      },
-      "responseRootPrimeEnabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Prime a developer-only root response when root-link cache is missing."
-      },
-      "responseRootMinInstructionChars": {
-        "type": "number",
-        "default": 1200,
-        "description": "Minimum stable prompt chars required to enable root-link/prime logic."
-      },
-      "responseRootPrefixMaxChars": {
-        "type": "number",
-        "default": 6000,
-        "description": "Max chars stored as root prefix sample."
-      },
-      "responseRootMatchMinRatio": {
-        "type": "number",
-        "default": 0.7,
-        "description": "Prefix match ratio threshold for root-link injection."
       },
       "proxyAutostart": {
         "type": "boolean",
@@ -214,98 +73,14 @@
       "label": "Proxy API Key",
       "sensitive": true
     },
-    "runtimeMode": {
-      "label": "Runtime Mode"
-    },
     "stateDir": {
       "label": "State Directory"
-    },
-    "eventTracePath": {
-      "label": "Event Trace Path"
-    },
-    "autoForkOnPolicy": {
-      "label": "Auto Fork On Policy"
-    },
-    "cacheTtlSeconds": {
-      "label": "Cache TTL (s)"
-    },
-    "summaryTriggerInputTokens": {
-      "label": "Summary Trigger Input Tokens"
-    },
-    "summaryTriggerStableChars": {
-      "label": "Summary Trigger Stable Chars"
-    },
-    "summaryRecentTurns": {
-      "label": "Summary Recent Turns"
-    },
-    "maxSummaryChars": {
-      "label": "Max Summary Chars"
-    },
-    "compactionPrompt": {
-      "label": "Compaction Prompt"
-    },
-    "resumePrefixPrompt": {
-      "label": "Resume Prefix Prompt"
-    },
-    "cacheProbeEnabled": {
-      "label": "Cache Probe Enabled"
-    },
-    "cacheProbeIntervalSeconds": {
-      "label": "Cache Probe Interval (s)"
-    },
-    "cacheProbeMaxPromptChars": {
-      "label": "Cache Probe Max Prompt Chars"
-    },
-    "cacheProbeHitMinTokens": {
-      "label": "Cache Probe Hit Min Tokens"
-    },
-    "cacheProbeMissesToCold": {
-      "label": "Cache Probe Misses To Cold"
-    },
-    "cacheProbeWarmSeconds": {
-      "label": "Cache Probe Warm Window (s)"
-    },
-    "compactionTriggerEnabled": {
-      "label": "Compaction Trigger Enabled"
-    },
-    "compactionTriggerInputTokens": {
-      "label": "Compaction Trigger Input Tokens"
-    },
-    "compactionTriggerTurnCount": {
-      "label": "Compaction Trigger Turn Count"
-    },
-    "compactionTriggerMissRateThreshold": {
-      "label": "Compaction Trigger Miss Rate"
-    },
-    "compactionTriggerWindowTurns": {
-      "label": "Compaction Trigger Window Turns"
-    },
-    "compactionTriggerCooldownTurns": {
-      "label": "Compaction Trigger Cooldown Turns"
     },
     "debugTapProviderTraffic": {
       "label": "Debug Tap Provider Traffic"
     },
     "debugTapPath": {
       "label": "Debug Tap Path"
-    },
-    "responseRootLinkEnabled": {
-      "label": "Response Root Link Enabled"
-    },
-    "responseRootFirstTurnOnly": {
-      "label": "Response Root First Turn Only"
-    },
-    "responseRootPrimeEnabled": {
-      "label": "Response Root Prime Enabled"
-    },
-    "responseRootMinInstructionChars": {
-      "label": "Response Root Min Chars"
-    },
-    "responseRootPrefixMaxChars": {
-      "label": "Response Root Prefix Max Chars"
-    },
-    "responseRootMatchMinRatio": {
-      "label": "Response Root Match Ratio"
     },
     "proxyAutostart": {
       "label": "Proxy Autostart"
