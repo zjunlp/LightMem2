@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { createServer } from "node:http";
@@ -253,6 +254,120 @@ function normalizeText(input: string): string {
   return input.replace(/\s+/g, " ").trim();
 }
 
+const OPENCLAW_TIMESTAMP_PREFIX_RE =
+  /^(\[[A-Za-z]{3}\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[+-]\d+\])\s*/;
+
+function normalizeTimestampPrefix(text: string): string {
+  const raw = String(text ?? "");
+  const match = raw.match(OPENCLAW_TIMESTAMP_PREFIX_RE);
+  if (!match) return raw;
+  const originalPrefix = match[1];
+  const rest = raw.slice(match[0].length);
+  const stableHead = rest.length > 0 ? `[<TS>] ${rest}` : "[<TS>]";
+  return `${stableHead}\n\n[ecoclaw original timestamp: ${originalPrefix}]`;
+}
+
+function normalizeContentValue(value: any): { value: any; changed: boolean } {
+  if (typeof value === "string") {
+    const next = normalizeTimestampPrefix(value);
+    return { value: next, changed: next !== value };
+  }
+  if (!Array.isArray(value)) {
+    return { value, changed: false };
+  }
+  let changed = false;
+  const next = value.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const clone = { ...item };
+    if (typeof clone.text === "string") {
+      const nextText = normalizeTimestampPrefix(clone.text);
+      if (nextText !== clone.text) {
+        clone.text = nextText;
+        changed = true;
+      }
+    }
+    if (typeof clone.content === "string") {
+      const nextContent = normalizeTimestampPrefix(clone.content);
+      if (nextContent !== clone.content) {
+        clone.content = nextContent;
+        changed = true;
+      }
+    }
+    return clone;
+  });
+  return { value: next, changed };
+}
+
+function summarizeToolsFingerprint(tools: any): string[] {
+  if (!Array.isArray(tools)) return [];
+  return tools.map((tool) => {
+    if (!tool || typeof tool !== "object") return "unknown";
+    const name = String((tool as any).name ?? (tool as any).type ?? "unknown");
+    const type = String((tool as any).type ?? "unknown");
+    const params = JSON.stringify((tool as any).parameters ?? {});
+    return `${type}:${name}:${params.length}`;
+  });
+}
+
+function findDeveloperPromptText(input: any): string {
+  if (!Array.isArray(input)) return "";
+  const developer = input.find((item) => item && typeof item === "object" && String(item.role) === "developer");
+  if (!developer) return "";
+  return extractInputText([developer]);
+}
+
+function computeStablePromptCacheKey(
+  model: string,
+  instructions: string,
+  developerText: string,
+  tools: any,
+): string {
+  const seed = JSON.stringify({
+    v: 2,
+    model: normalizeProxyModelId(model),
+    instructions: normalizeText(instructions),
+    developer: normalizeText(developerText),
+    tools: summarizeToolsFingerprint(tools),
+  });
+  const digest = createHash("sha256").update(seed).digest("hex").slice(0, 24);
+  return `ecoclaw-pfx-${digest}`;
+}
+
+function rewritePayloadForStablePrefix(payload: any, model: string): {
+  promptCacheKey: string;
+  userTimestampRewrites: number;
+  developerTextForKey: string;
+} {
+  let userTimestampRewrites = 0;
+  if (Array.isArray(payload?.input)) {
+    payload.input = payload.input.map((item: any) => {
+      if (!item || typeof item !== "object") return item;
+      if (String(item.role ?? "") !== "user") return item;
+      const normalized = normalizeContentValue(item.content);
+      if (!normalized.changed) return item;
+      userTimestampRewrites += 1;
+      return {
+        ...item,
+        content: normalized.value,
+      };
+    });
+  }
+
+  const developerTextForKey = findDeveloperPromptText(payload?.input);
+  const stablePromptCacheKey = computeStablePromptCacheKey(
+    model,
+    String(payload?.instructions ?? ""),
+    developerTextForKey,
+    payload?.tools,
+  );
+  payload.prompt_cache_key = stablePromptCacheKey;
+  return {
+    promptCacheKey: stablePromptCacheKey,
+    userTimestampRewrites,
+    developerTextForKey,
+  };
+}
+
 function extractInputText(input: any): string {
   if (typeof input === "string") return input;
   if (Array.isArray(input)) {
@@ -296,6 +411,7 @@ function getStrictDeveloperUserFirstTurn(input: any): { developerText: string; u
 type DeveloperRewrite = {
   canonicalDeveloperText: string;
   forwardedDeveloperText: string;
+  dynamicContextText: string;
   changed: boolean;
   workdir?: string;
   agentId?: string;
@@ -307,6 +423,7 @@ function rewriteDeveloperPromptForRootLink(developerText: string): DeveloperRewr
     return {
       canonicalDeveloperText: raw,
       forwardedDeveloperText: raw,
+      dynamicContextText: "",
       changed: false,
     };
   }
@@ -328,14 +445,44 @@ function rewriteDeveloperPromptForRootLink(developerText: string): DeveloperRewr
     dynamicLines.length > 0
       ? `\n\n## Dynamic Runtime Context\n${dynamicLines.join("\n")}`
       : "";
-  const forwarded = canonical + dynamicTail;
   return {
     canonicalDeveloperText: canonical,
-    forwardedDeveloperText: forwarded,
+    forwardedDeveloperText: canonical,
+    dynamicContextText: dynamicTail.trim(),
     changed: canonical !== raw || dynamicTail.length > 0,
     workdir,
     agentId,
   };
+}
+
+function appendTextToContent(content: any, extraText: string): any {
+  const extra = String(extraText ?? "").trim();
+  if (!extra) return content;
+  if (typeof content === "string") {
+    return content.trim().length > 0 ? `${content}\n\n${extra}` : extra;
+  }
+  if (Array.isArray(content)) {
+    const next = content.map((item) => (item && typeof item === "object" ? { ...item } : item));
+    for (let i = next.length - 1; i >= 0; i -= 1) {
+      const item = next[i];
+      if (!item || typeof item !== "object") continue;
+      if (typeof (item as any).text === "string") {
+        (item as any).text = (item as any).text.trim().length > 0
+          ? `${String((item as any).text)}\n\n${extra}`
+          : extra;
+        return next;
+      }
+      if (typeof (item as any).content === "string") {
+        (item as any).content = (item as any).content.trim().length > 0
+          ? `${String((item as any).content)}\n\n${extra}`
+          : extra;
+        return next;
+      }
+    }
+    next.push({ type: "input_text", text: extra });
+    return next;
+  }
+  return extra;
 }
 
 function normalizeProxyModelId(model: string): string {
@@ -506,15 +653,27 @@ async function startEmbeddedResponsesProxy(
       const developerForwardedText = normalizeText(
         developerRewrite?.forwardedDeveloperText ?? devAndUser?.developerText ?? "",
       );
+      const originalPromptCacheKey =
+        typeof payload?.prompt_cache_key === "string" && payload.prompt_cache_key.trim().length > 0
+          ? String(payload.prompt_cache_key)
+          : "";
       if (devAndUser && developerRewrite && Array.isArray(payload?.input) && payload.input.length >= 1) {
         payload.input[0] = {
           ...(devAndUser.developerItem ?? payload.input[0]),
           role: "developer",
           content: developerRewrite.forwardedDeveloperText,
         };
+        if (developerRewrite.dynamicContextText) {
+          payload.input[1] = {
+            ...(devAndUser.userItem ?? payload.input[1]),
+            role: "user",
+            content: appendTextToContent((devAndUser.userItem ?? payload.input[1])?.content, developerRewrite.dynamicContextText),
+          };
+        }
       }
+      const stableRewrite = rewritePayloadForStablePrefix(payload, model);
       logger.info(
-        `[ecoclaw] proxy request model=${model || "unknown"} upstreamModel=${upstreamModel || "unknown"} instrChars=${instructions.length}`,
+        `[ecoclaw] proxy request model=${model || "unknown"} upstreamModel=${upstreamModel || "unknown"} instrChars=${instructions.length} cacheKey=${stableRewrite.promptCacheKey} userTsRewrites=${stableRewrite.userTimestampRewrites}`,
       );
       if (cfg.debugTapProviderTraffic) {
         const debugRecord = {
@@ -531,6 +690,9 @@ async function startEmbeddedResponsesProxy(
           developerRewritten: Boolean(developerRewrite?.changed),
           developerRewriteWorkdir: developerRewrite?.workdir ?? "",
           developerRewriteAgentId: developerRewrite?.agentId ?? "",
+          originalPromptCacheKey,
+          rewrittenPromptCacheKey: stableRewrite.promptCacheKey,
+          userTimestampRewrites: stableRewrite.userTimestampRewrites,
           payload,
         };
         await mkdir(dirname(cfg.debugTapPath), { recursive: true });
@@ -553,6 +715,8 @@ async function startEmbeddedResponsesProxy(
           model,
           upstreamModel,
           forwardedHasPrev: typeof payload?.previous_response_id === "string" && payload.previous_response_id.length > 0,
+          forwardedPromptCacheKey:
+            typeof payload?.prompt_cache_key === "string" ? payload.prompt_cache_key : null,
           forwardedPromptCacheRetention:
             typeof payload?.prompt_cache_retention === "string" ? payload.prompt_cache_retention : null,
           forwardedInputCount: Array.isArray(payload?.input) ? payload.input.length : -1,
@@ -566,17 +730,50 @@ async function startEmbeddedResponsesProxy(
             typeof payload.input[0]?.content === "string"
               ? String(payload.input[0].content).length
               : 0,
+          payload,
         };
         await mkdir(dirname(cfg.debugTapPath), { recursive: true });
         await appendFile(cfg.debugTapPath, `${JSON.stringify(debugRecord)}\n`, "utf8");
       }
       if (cfg.debugTapProviderTraffic) {
+        let parsedResponse: any = null;
+        try {
+          parsedResponse = JSON.parse(txt);
+        } catch {}
         const debugRecord = {
           at: new Date().toISOString(),
           stage: "proxy_outbound",
           model,
           upstreamModel,
           status: upstreamResp.status,
+          responseId:
+            typeof parsedResponse?.id === "string"
+              ? parsedResponse.id
+              : typeof parsedResponse?.response?.id === "string"
+                ? parsedResponse.response.id
+                : null,
+          previousResponseId:
+            typeof parsedResponse?.previous_response_id === "string"
+              ? parsedResponse.previous_response_id
+              : typeof parsedResponse?.response?.previous_response_id === "string"
+                ? parsedResponse.response.previous_response_id
+                : null,
+          promptCacheKey:
+            typeof parsedResponse?.prompt_cache_key === "string"
+              ? parsedResponse.prompt_cache_key
+              : typeof parsedResponse?.response?.prompt_cache_key === "string"
+                ? parsedResponse.response.prompt_cache_key
+                : null,
+          promptCacheRetention:
+            typeof parsedResponse?.prompt_cache_retention === "string"
+              ? parsedResponse.prompt_cache_retention
+              : typeof parsedResponse?.response?.prompt_cache_retention === "string"
+                ? parsedResponse.response.prompt_cache_retention
+                : null,
+          usage:
+            parsedResponse?.usage ??
+            parsedResponse?.response?.usage ??
+            null,
           responseText: txt,
         };
         await mkdir(dirname(cfg.debugTapPath), { recursive: true });
@@ -625,34 +822,33 @@ function maybeInstallProviderTrafficTap(
 
   g.__ecoclaw_provider_tap_installed__ = true;
   g.fetch = async (input: any, init?: any) => {
+    let effectiveInput = input;
+    let effectiveInit = init;
     let url = "";
     try {
       url =
-        typeof input === "string"
-          ? input
-          : typeof input?.url === "string"
-            ? input.url
+        typeof effectiveInput === "string"
+          ? effectiveInput
+          : typeof effectiveInput?.url === "string"
+            ? effectiveInput.url
             : "";
     } catch {
       url = "";
     }
     const lower = url.toLowerCase();
     const isResponsesCall = lower.includes("/responses");
-    const isProviderCall =
-      lower.includes("api.openai.com") ||
-      lower.includes("api.anthropic.com") ||
-      lower.includes("dashscope") ||
-      lower.includes("openrouter.ai");
+    const isChatCompletionsCall = lower.includes("/chat/completions");
+    const isProviderCall = isResponsesCall || isChatCompletionsCall;
 
     let reqBody = "";
     let bodySource: "init" | "request" | "none" = "none";
     if (isProviderCall) {
       try {
-        if (typeof init?.body === "string") {
-          reqBody = init.body;
+        if (typeof effectiveInit?.body === "string") {
+          reqBody = effectiveInit.body;
           bodySource = "init";
-        } else if (input && typeof input.clone === "function") {
-          const clone = input.clone();
+        } else if (effectiveInput && typeof effectiveInput.clone === "function") {
+          const clone = effectiveInput.clone();
           reqBody = await clone.text();
           bodySource = reqBody ? "request" : "none";
         }
@@ -662,9 +858,86 @@ function maybeInstallProviderTrafficTap(
       }
     }
 
+    if (isProviderCall && reqBody) {
+      try {
+        const parsedBody = JSON.parse(reqBody);
+        const devAndUser = isResponsesCall ? getStrictDeveloperUserFirstTurn(parsedBody?.input) : null;
+        const developerRewrite = devAndUser
+          ? rewriteDeveloperPromptForRootLink(devAndUser.developerText)
+          : null;
+        if (
+          devAndUser &&
+          developerRewrite &&
+          Array.isArray(parsedBody?.input) &&
+          parsedBody.input.length >= 1 &&
+          developerRewrite.changed
+        ) {
+          parsedBody.input[0] = {
+            ...(devAndUser.developerItem ?? parsedBody.input[0]),
+            role: "developer",
+            content: developerRewrite.forwardedDeveloperText,
+          };
+          if (developerRewrite.dynamicContextText) {
+            parsedBody.input[1] = {
+              ...(devAndUser.userItem ?? parsedBody.input[1]),
+              role: "user",
+              content: appendTextToContent(
+                (devAndUser.userItem ?? parsedBody.input[1])?.content,
+                developerRewrite.dynamicContextText,
+              ),
+            };
+          }
+        }
+        const originalPromptCacheKey =
+          typeof parsedBody?.prompt_cache_key === "string" && parsedBody.prompt_cache_key.trim().length > 0
+            ? String(parsedBody.prompt_cache_key)
+            : "";
+        const stableRewrite = rewritePayloadForStablePrefix(parsedBody, String(parsedBody?.model ?? ""));
+        if (isResponsesCall) {
+          parsedBody.prompt_cache_retention = "24h";
+        }
+        const rewrittenBody = JSON.stringify(parsedBody);
+        reqBody = rewrittenBody;
+        if (bodySource === "init") {
+          effectiveInit = {
+            ...(effectiveInit ?? {}),
+            body: rewrittenBody,
+          };
+        } else if (bodySource === "request" && effectiveInput && typeof Request !== "undefined" && effectiveInput instanceof Request) {
+          effectiveInput = new Request(effectiveInput, {
+            method: effectiveInput.method,
+            headers: new Headers(effectiveInput.headers),
+            body: rewrittenBody,
+          });
+        }
+        if (cfg.debugTapProviderTraffic) {
+          const p = cfg.debugTapPath;
+          await mkdir(dirname(p), { recursive: true });
+          await appendFile(
+            p,
+            `${JSON.stringify({
+              at: new Date().toISOString(),
+              stage: "provider_rewrite",
+              url,
+              originalPromptCacheKey,
+              rewrittenPromptCacheKey: stableRewrite.promptCacheKey,
+              userTimestampRewrites: stableRewrite.userTimestampRewrites,
+              developerPromptRewritten: Boolean(developerRewrite?.changed),
+              developerRewriteWorkdir: developerRewrite?.workdir ?? "",
+              developerRewriteAgentId: developerRewrite?.agentId ?? "",
+              bodySource,
+            })}\n`,
+            "utf8",
+          );
+        }
+      } catch {
+        // Ignore non-JSON provider bodies.
+      }
+    }
+
     const startedAt = new Date().toISOString();
-    const method = String(init?.method ?? input?.method ?? "GET").toUpperCase();
-    const res = await origFetch(input, init);
+    const method = String(effectiveInit?.method ?? effectiveInput?.method ?? "GET").toUpperCase();
+    const res = await origFetch(effectiveInput, effectiveInit);
 
     if (isProviderCall) {
       void (async () => {

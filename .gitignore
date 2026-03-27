@@ -4,6 +4,7 @@ dist/
 coverage/
 .pnpm-store/
 *.tsbuildinfo
+packages/openclaw-plugin/.tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
