@@ -33,6 +33,7 @@
   },
   "scripts": {
     "build": "tsx build.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "pack:release": "bash ./scripts/pack_release.sh",
     "install:release": "bash ./scripts/install_release.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",

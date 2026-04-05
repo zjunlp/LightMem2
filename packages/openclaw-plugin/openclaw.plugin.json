@@ -56,6 +56,48 @@
         "default": 17667,
         "description": "Embedded responses proxy listen port."
       },
+      "modules": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Module-level switches for ablation and controlled experiments.",
+        "properties": {
+          "stabilizer": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable stabilizer telemetry module."
+          },
+          "policy": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable decision/policy module."
+          },
+          "summary": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable summary execution module."
+          },
+          "reduction": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable reduction execution module."
+          },
+          "compaction": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable compaction execution module."
+          },
+          "handoff": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable handoff execution module."
+          },
+          "decisionLedger": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable decision ledger reporting module."
+          }
+        }
+      },
       "compaction": {
         "type": "object",
         "additionalProperties": false,
@@ -106,6 +148,22 @@
           "compactionCooldownTurns": {
             "type": "number",
             "description": "Cooldown turns after a compaction request before another request is allowed."
+          },
+          "turnLocalCompaction": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Turn-local compaction settings for archiving tool results that have been consumed by subsequent writes.",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false,
+                "description": "Enable turn-local compaction."
+              },
+              "archiveDir": {
+                "type": "string",
+                "description": "Directory to store archived tool results."
+              }
+            }
           }
         }
       },
