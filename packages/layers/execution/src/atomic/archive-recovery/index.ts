@@ -1,23 +1,12 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   defaultArchiveDir,
   defaultArchiveLookupDirs,
-  defaultFaultStatePath,
   defaultPluginStateDir,
+  hashText,
   sanitizePathPart,
 } from "../../composer/compaction/archive.js";
-
-export type ArchiveRecoveryRequest = {
-  dataKey: string;
-  archivePath: string;
-  requestedAt: number;
-  turnId: string;
-};
-
-export type ArchiveRecoveryState = {
-  pendingRecoveries: ArchiveRecoveryRequest[];
-};
 
 export type GenericArchiveEntry = {
   schemaVersion: number;
@@ -61,8 +50,8 @@ export function buildRecoveryHint(params: {
   const { dataKey, originalSize, archivePath, sourceLabel } = params;
   return (
     `\n\n[${sourceLabel}] Full content omitted to save context (${originalSize.toLocaleString()} chars).\n` +
-    `If you need the full content, just say: memory_fault('${dataKey}')\n` +
-    `Do NOT call the tool again — the system will automatically recover this content for you.\n` +
+    `To recover it, call the tool memory_fault_recover with {\"dataKey\":\"${dataKey}\"}.\n` +
+    `This is an internal recovery read; do not call the original tool again for this content.\n` +
     `Archive: ${archivePath}`
   );
 }
@@ -109,6 +98,15 @@ export async function updateArchiveLookup(
   archivePath: string,
   archiveDir: string,
 ): Promise<void> {
+  const keyDir = join(archiveDir, "keys");
+  const keyPath = join(keyDir, `${hashText(dataKey)}.json`);
+  await mkdir(keyDir, { recursive: true });
+  await writeFile(
+    keyPath,
+    JSON.stringify({ dataKey, archivePath }, null, 2),
+    "utf8",
+  );
+
   const lookupPath = join(archiveDir, "key-lookup.json");
   let lookup: Record<string, string> = {};
   try {
@@ -144,6 +142,17 @@ export async function resolveArchivePathFromLookup(
     candidates.push(...defaultArchiveLookupDirs("proxy-session", stateDir));
   }
   for (const archiveDir of candidates) {
+    const keyPath = join(archiveDir, "keys", `${hashText(dataKey)}.json`);
+    try {
+      const raw = await readFile(keyPath, "utf8");
+      const parsed = JSON.parse(raw) as { dataKey?: string; archivePath?: string };
+      if (parsed?.dataKey === dataKey && typeof parsed.archivePath === "string" && parsed.archivePath) {
+        return parsed.archivePath;
+      }
+    } catch {
+      // Try next lookup strategy.
+    }
+
     const lookupPath = join(archiveDir, "key-lookup.json");
     try {
       const raw = await readFile(lookupPath, "utf8");
@@ -151,49 +160,27 @@ export async function resolveArchivePathFromLookup(
       const found = lookup[dataKey];
       if (found) return found;
     } catch {
+      // Try next lookup strategy.
+    }
+
+    try {
+      const entries = await readdir(archiveDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".json") || entry.name === "key-lookup.json") {
+          continue;
+        }
+        const archivePath = join(archiveDir, entry.name);
+        const archive = await readArchive(archivePath);
+        if (archive?.dataKey === dataKey) {
+          await updateArchiveLookup(dataKey, archivePath, archiveDir);
+          return archivePath;
+        }
+      }
+    } catch {
       // Try next candidate.
     }
   }
   return null;
-}
-
-export async function readRecoveryState(
-  stateDir: string,
-  sessionId: string,
-): Promise<ArchiveRecoveryState> {
-  const path = defaultFaultStatePath(sessionId, stateDir);
-  try {
-    const content = await readFile(path, "utf8");
-    const parsed = JSON.parse(content) as ArchiveRecoveryState;
-    if (!Array.isArray(parsed.pendingRecoveries)) {
-      return { pendingRecoveries: [] };
-    }
-    return parsed;
-  } catch {
-    return { pendingRecoveries: [] };
-  }
-}
-
-export async function writeRecoveryState(
-  stateDir: string,
-  sessionId: string,
-  state: ArchiveRecoveryState,
-): Promise<void> {
-  const path = defaultFaultStatePath(sessionId, stateDir);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, JSON.stringify(state, null, 2), "utf8");
-}
-
-export async function clearRecoveryState(
-  stateDir: string,
-  sessionId: string,
-): Promise<void> {
-  const path = defaultFaultStatePath(sessionId, stateDir);
-  try {
-    await unlink(path);
-  } catch {
-    // Ignore missing files.
-  }
 }
 
 export function resolveRecoveryStateDir(stateDir?: string): string {

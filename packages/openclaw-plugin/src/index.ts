@@ -12,6 +12,13 @@ import {
   runReductionBeforeCall as runLayerReductionBeforeCall,
   runReductionAfterCall as runLayerReductionAfterCall,
 } from "../../layers/execution/src/composer/reduction/pipeline.js";
+import {
+  archiveContent,
+  buildRecoveryHint,
+  readArchive,
+  resolveArchivePathFromLookup,
+  resolveRecoveryStateDir,
+} from "../../layers/execution/src/atomic/archive-recovery/index.js";
 import { createCompactionModule } from "../../layers/execution/src/composer/compaction/index.js";
 import { createEvictionModule } from "../../layers/execution/src/composer/eviction/index.js";
 import { createPolicyModule, type PolicyModuleConfig } from "../../layers/decision/src/policy.js";
@@ -116,7 +123,6 @@ type EcoClawPluginConfig = {
       htmlSlimming?: boolean;
       execOutputTruncation?: boolean;
       agentsStartupOptimization?: boolean;
-      memoryFaultRecovery?: boolean;
     };
     passOptions?: {
       repeatedReadDedup?: Record<string, unknown>;
@@ -124,7 +130,6 @@ type EcoClawPluginConfig = {
       htmlSlimming?: Record<string, unknown>;
       execOutputTruncation?: Record<string, unknown>;
       agentsStartupOptimization?: Record<string, unknown>;
-      memoryFaultRecovery?: Record<string, unknown>;
       formatSlimming?: Record<string, unknown>;
       semanticLlmlingua2?: Record<string, unknown>;
       formatCleaning?: Record<string, unknown>;
@@ -524,7 +529,6 @@ function normalizeConfig(raw: unknown): Required<Omit<EcoClawPluginConfig, "prox
         htmlSlimming: reductionPasses.htmlSlimming ?? true,
         execOutputTruncation: reductionPasses.execOutputTruncation ?? true,
         agentsStartupOptimization: reductionPasses.agentsStartupOptimization ?? true,
-        memoryFaultRecovery: reductionPasses.memoryFaultRecovery ?? true,
       },
       passOptions: {
         repeatedReadDedup:
@@ -546,10 +550,6 @@ function normalizeConfig(raw: unknown): Required<Omit<EcoClawPluginConfig, "prox
         agentsStartupOptimization:
           reductionPassOptions.agentsStartupOptimization && typeof reductionPassOptions.agentsStartupOptimization === "object"
             ? { ...reductionPassOptions.agentsStartupOptimization }
-            : {},
-        memoryFaultRecovery:
-          reductionPassOptions.memoryFaultRecovery && typeof reductionPassOptions.memoryFaultRecovery === "object"
-            ? { ...reductionPassOptions.memoryFaultRecovery }
             : {},
         formatSlimming:
           reductionPassOptions.formatSlimming && typeof reductionPassOptions.formatSlimming === "object"
@@ -1040,7 +1040,6 @@ function buildLayeredReductionContext(
     htmlSlimming?: boolean;
     execOutputTruncation?: boolean;
     agentsStartupOptimization?: boolean;
-    memoryFaultRecovery?: boolean;
   },
   passOptions?: Record<string, Record<string, unknown>>,
 ): {
@@ -1389,7 +1388,6 @@ function isReductionPassEnabled(
     htmlSlimming?: boolean;
     execOutputTruncation?: boolean;
     agentsStartupOptimization?: boolean;
-    memoryFaultRecovery?: boolean;
   },
 ): boolean {
   if (!passToggles) return true;
@@ -1404,11 +1402,29 @@ function isReductionPassEnabled(
       return passToggles.execOutputTruncation ?? true;
     case "agents_startup_optimization":
       return passToggles.agentsStartupOptimization ?? true;
-    case "memory_fault_recovery":
-      return passToggles.memoryFaultRecovery ?? true;
     default:
       return true;
   }
+}
+
+const MEMORY_FAULT_RECOVER_TOOL_NAME = "memory_fault_recover";
+
+const MEMORY_FAULT_PROTOCOL_INSTRUCTIONS = [
+  "[EcoClaw Recovery Protocol]",
+  `If a prior tool result contains \`[Tool payload trimmed]\`, that notice gives you a dataKey for the internal tool \`${MEMORY_FAULT_RECOVER_TOOL_NAME}\`.`,
+  `When you need omitted content, call \`${MEMORY_FAULT_RECOVER_TOOL_NAME}\` with that dataKey instead of replying with plain text.`,
+  `\`${MEMORY_FAULT_RECOVER_TOOL_NAME}\` behaves like an internal read of archived content. Do not call the original tool again for the same content.`,
+  `After the recovery tool returns, continue your analysis normally in the next assistant step.`,
+].join("\n");
+
+function injectMemoryFaultProtocolInstructions(payload: any): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const current = typeof payload.instructions === "string" ? payload.instructions : "";
+  if (current.includes("[EcoClaw Recovery Protocol]")) return false;
+  payload.instructions = current
+    ? `${current}\n\n${MEMORY_FAULT_PROTOCOL_INSTRUCTIONS}`
+    : MEMORY_FAULT_PROTOCOL_INSTRUCTIONS;
+  return true;
 }
 
 type ProxyReductionResult = {
@@ -1472,7 +1488,6 @@ function applyLayeredReductionToInput(
     htmlSlimming?: boolean;
     execOutputTruncation?: boolean;
     agentsStartupOptimization?: boolean;
-    memoryFaultRecovery?: boolean;
   },
   passOptions?: Record<string, Record<string, unknown>>,
   beforeCallModules?: {
@@ -1656,7 +1671,6 @@ function applyProxyReductionToInput(
       htmlSlimming?: boolean;
       execOutputTruncation?: boolean;
       agentsStartupOptimization?: boolean;
-      memoryFaultRecovery?: boolean;
     };
     passOptions?: Record<string, Record<string, unknown>>;
     beforeCallModules?: {
@@ -1806,6 +1820,31 @@ function collectSseOutputText(rawSse: string): string {
   return deltaText.trim();
 }
 
+function extractCompletedResponseFromSse(rawSse: string): any | null {
+  let completedResponse: any = null;
+  rewriteSseJsonEvents(rawSse, (event) => {
+    if (!event || typeof event !== "object") return false;
+    const type = String(event.type ?? "").toLowerCase();
+    if (type !== "response.completed" || !event.response || typeof event.response !== "object") return false;
+    completedResponse = event.response;
+    return false;
+  });
+  return completedResponse;
+}
+
+function responseContainsToolCalls(value: unknown): boolean {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.some((item) => responseContainsToolCalls(item));
+  if (typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  const type = String(obj.type ?? "").toLowerCase();
+  if (type === "function_call" || type === "tool_call" || type === "toolcall") return true;
+  if (String(obj.role ?? "").toLowerCase() === "assistant") {
+    return responseContainsToolCalls(obj.content ?? obj.output ?? obj.message);
+  }
+  return responseContainsToolCalls(obj.response ?? obj.output ?? obj.item ?? obj.content);
+}
+
 function patchSseEventForReducedText(event: any, nextText: string): boolean {
   if (!event || typeof event !== "object") return false;
   const type = String(event.type ?? "").toLowerCase();
@@ -1834,61 +1873,6 @@ function patchSseEventForReducedText(event: any, nextText: string): boolean {
 // Memory Fault Detection & Persistence
 // ============================================================================
 
-const MEMORY_FAULT_PATTERN = /memory_fault\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
-type MemoryFaultEntry = {
-  dataKey: string;
-  archivePath: string;
-  requestedAt: number;
-  turnId: string;
-};
-
-async function persistMemoryFaultRequestsFromText(
-  text: string,
-  sessionId: string,
-  stateDir: string,
-): Promise<number> {
-  if (!text || typeof text !== "string") return 0;
-  const matches: string[] = [];
-  let match: RegExpExecArray | null;
-  const regex = new RegExp(MEMORY_FAULT_PATTERN);
-  while ((match = regex.exec(text)) !== null) {
-    matches.push(match[1]);
-  }
-  if (matches.length === 0) return 0;
-
-  const faultDir = join(stateDir, "ecoclaw", "fault-recovery");
-  const faultPath = join(faultDir, `${sessionId}.json`);
-  try {
-    let existing: MemoryFaultEntry[] = [];
-    try {
-      const raw = readFileSync(faultPath, "utf8");
-      const parsed = JSON.parse(raw);
-      existing = Array.isArray(parsed) ? parsed : (parsed?.pendingRecoveries ?? []);
-    } catch {
-      existing = [];
-    }
-    const existingKeys = new Set(existing.map((e: MemoryFaultEntry) => e.dataKey));
-    const turnId = `turn-${Date.now()}`;
-    for (const dataKey of matches) {
-      if (!existingKeys.has(dataKey)) {
-        existing.push({
-          dataKey,
-          archivePath: "", // resolved lazily by recovery pass using its own session context
-          requestedAt: Date.now(),
-          turnId,
-        });
-        existingKeys.add(dataKey);
-      }
-    }
-    mkdirSync(dirname(faultPath), { recursive: true });
-    writeFileSync(faultPath, JSON.stringify({ pendingRecoveries: existing }, null, 2), "utf8");
-    return matches.length;
-  } catch {
-    return 0;
-  }
-}
-
 async function applyLayeredReductionAfterCallToSse(
   requestPayload: any,
   rawSse: string,
@@ -1900,7 +1884,6 @@ async function applyLayeredReductionAfterCallToSse(
     htmlSlimming?: boolean;
     execOutputTruncation?: boolean;
     agentsStartupOptimization?: boolean;
-    memoryFaultRecovery?: boolean;
   },
   passOptions?: Record<string, Record<string, unknown>>,
 ): Promise<{ text: string; reduction: ProxyAfterCallReductionResult }> {
@@ -1987,7 +1970,6 @@ async function applyLayeredReductionAfterCall(
     htmlSlimming?: boolean;
     execOutputTruncation?: boolean;
     agentsStartupOptimization?: boolean;
-    memoryFaultRecovery?: boolean;
   },
   passOptions?: Record<string, Record<string, unknown>>,
 ): Promise<ProxyAfterCallReductionResult> {
@@ -2675,6 +2657,9 @@ async function startEmbeddedResponsesProxy(
       const proxyPureForward = cfg.proxyMode.pureForward;
       const reductionTriggerMinChars = Math.max(256, cfg.reduction.triggerMinChars ?? 2200);
       const reductionMaxToolChars = Math.max(256, cfg.reduction.maxToolChars ?? 1200);
+      if (!proxyPureForward && cfg.modules.reduction) {
+        injectMemoryFaultProtocolInstructions(payload);
+      }
       const instructions = normalizeText(String(payload?.instructions ?? ""));
       const devAndUser = !proxyPureForward ? findDeveloperAndPrimaryUser(payload?.input) : null;
       const firstTurnCandidate = Boolean(devAndUser);
@@ -2731,7 +2716,6 @@ async function startEmbeddedResponsesProxy(
             html_slimming: cfg.reduction.passOptions.htmlSlimming,
             exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
             agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-            memory_fault_recovery: cfg.reduction.passOptions.memoryFaultRecovery,
             format_slimming: cfg.reduction.passOptions.formatSlimming,
             semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
             format_cleaning: cfg.reduction.passOptions.formatCleaning,
@@ -2856,27 +2840,33 @@ async function startEmbeddedResponsesProxy(
         await appendFile(cfg.debugTapPath, `${JSON.stringify(debugRecord)}\n`, "utf8");
       }
       payload.prompt_cache_retention = "24h";
-      const upstreamResp = await requestUpstreamResponses(upstream, payload, logger);
-      let txt = upstreamResp.text;
+      let activePayload = payload;
+      let upstreamResp: UpstreamHttpResponse | null = null;
+      let txt = "";
       let parsedResponseForMirror: any = null;
-      const responseContentType = upstreamResp.headers["content-type"] ?? "";
+      let responseContentType = "";
+      let memoryFaultAutoReplayCount = 0;
+      upstreamResp = await requestUpstreamResponses(upstream, activePayload, logger);
+      txt = upstreamResp.text;
+      responseContentType = upstreamResp.headers["content-type"] ?? "";
       try {
         parsedResponseForMirror = JSON.parse(txt);
       } catch {
         parsedResponseForMirror = null;
       }
+      // Legacy plain-text memory_fault detection is intentionally disabled while
+      // recovery flows through the internal memory_fault_recover tool. Keep the
+      // old helper code in-tree for one validation cycle before deleting it.
+      // NOTE: proxy-side auto replay is intentionally disabled while migrating recovery
+      // to the internal memory_fault_recover tool. Keep the plumbing visible for now so
+      // we can re-enable or delete it after the tool path is fully validated.
+      const upstreamRespFinal = upstreamResp!;
       let afterCallReduction: ProxyAfterCallReductionResult | null = null;
-      // Detect memory_fault(...) in the raw response text and persist to fault state
-      // so that the next turn's before_call can recover the archived content
-      const faultCount = await persistMemoryFaultRequestsFromText(txt, "proxy-session", cfg.stateDir);
-      if (faultCount > 0) {
-        logger.info(`[ecoclaw] memory_fault: detected ${faultCount} fault request(s) in LLM response, persisted for next turn recovery`);
-      }
       if (!proxyPureForward && cfg.modules.reduction && cfg.reduction.engine === "layered") {
         if (parsedResponseForMirror) {
           try {
             afterCallReduction = await applyLayeredReductionAfterCall(
-              payload,
+              activePayload,
               parsedResponseForMirror,
               reductionMaxToolChars,
               reductionTriggerMinChars,
@@ -2887,7 +2877,6 @@ async function startEmbeddedResponsesProxy(
                 html_slimming: cfg.reduction.passOptions.htmlSlimming,
                 exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
                 agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-                memory_fault_recovery: cfg.reduction.passOptions.memoryFaultRecovery,
                 format_slimming: cfg.reduction.passOptions.formatSlimming,
                 semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
                 format_cleaning: cfg.reduction.passOptions.formatCleaning,
@@ -2912,7 +2901,7 @@ async function startEmbeddedResponsesProxy(
         } else if (isSseContentType(responseContentType)) {
           try {
             const sseResult = await applyLayeredReductionAfterCallToSse(
-              payload,
+              activePayload,
               txt,
               reductionMaxToolChars,
               reductionTriggerMinChars,
@@ -2923,7 +2912,6 @@ async function startEmbeddedResponsesProxy(
                 html_slimming: cfg.reduction.passOptions.htmlSlimming,
                 exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
                 agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-                memory_fault_recovery: cfg.reduction.passOptions.memoryFaultRecovery,
                 format_slimming: cfg.reduction.passOptions.formatSlimming,
                 semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
                 format_cleaning: cfg.reduction.passOptions.formatCleaning,
@@ -2952,12 +2940,12 @@ async function startEmbeddedResponsesProxy(
           };
         }
       } else if (proxyPureForward) {
-        afterCallReduction = {
-          changed: false,
-          savedChars: 0,
-          passCount: 0,
-          skippedReason: "proxy_pure_forward",
-        };
+          afterCallReduction = {
+            changed: false,
+            savedChars: 0,
+            passCount: 0,
+            skippedReason: "proxy_pure_forward",
+          };
       }
       {
         const parsedResponse = parsedResponseForMirror;
@@ -2967,9 +2955,9 @@ async function startEmbeddedResponsesProxy(
             responseAt,
             model,
             upstreamModel,
-            payload?.prompt_cache_key ?? "",
+            activePayload?.prompt_cache_key ?? "",
             parsedResponse?.id ?? "",
-            upstreamResp.status,
+            upstreamRespFinal.status,
           ]))
           .digest("hex")
           .slice(0, 16);
@@ -2980,16 +2968,17 @@ async function startEmbeddedResponsesProxy(
           stage: "proxy_response",
           model,
           upstreamModel,
-          status: upstreamResp.status,
-          transport: upstreamResp.transport,
-          promptCacheKey: payload?.prompt_cache_key,
-          promptCacheRetention: payload?.prompt_cache_retention,
+          status: upstreamRespFinal.status,
+          transport: upstreamRespFinal.transport,
+          promptCacheKey: activePayload?.prompt_cache_key,
+          promptCacheRetention: activePayload?.prompt_cache_retention,
           responseId: parsedResponse?.id ?? null,
           previousResponseId: parsedResponse?.previous_response_id ?? null,
           responsePromptCacheKey: parsedResponse?.prompt_cache_key ?? null,
           responsePromptCacheRetention: parsedResponse?.prompt_cache_retention ?? null,
           usage: parsedResponse?.usage ?? null,
           afterCallReduction: afterCallReduction ?? null,
+          memoryFaultAutoReplayCount,
         };
         await mkdir(dirname(proxyRespLogPath), { recursive: true });
         await appendFile(proxyRespLogPath, `${JSON.stringify(respRecord)}\n`, "utf8");
@@ -2998,15 +2987,16 @@ async function startEmbeddedResponsesProxy(
           stage: "proxy_response",
           model,
           upstreamModel,
-          promptCacheKey: String(payload?.prompt_cache_key ?? ""),
+          promptCacheKey: String(activePayload?.prompt_cache_key ?? ""),
           requestId: responseRequestId,
           report: afterCallReduction?.report ?? [],
           extra: {
-            status: upstreamResp.status,
-            transport: upstreamResp.transport,
+            status: upstreamRespFinal.status,
+            transport: upstreamRespFinal.transport,
             responseId: parsedResponse?.id ?? "",
             responseReductionChanged: Boolean(afterCallReduction?.changed),
             responseReductionSavedChars: Number(afterCallReduction?.savedChars ?? 0),
+            memoryFaultAutoReplayCount,
           },
         });
       }
@@ -3016,29 +3006,30 @@ async function startEmbeddedResponsesProxy(
           stage: "proxy_forwarded",
           model,
           upstreamModel,
-          upstreamTransport: upstreamResp.transport,
-          forwardedHasPrev: typeof payload?.previous_response_id === "string" && payload.previous_response_id.length > 0,
+          upstreamTransport: upstreamRespFinal.transport,
+          forwardedHasPrev: typeof activePayload?.previous_response_id === "string" && activePayload.previous_response_id.length > 0,
           forwardedPromptCacheKey:
-            typeof payload?.prompt_cache_key === "string" ? payload.prompt_cache_key : null,
+            typeof activePayload?.prompt_cache_key === "string" ? activePayload.prompt_cache_key : null,
           forwardedPromptCacheRetention:
-            typeof payload?.prompt_cache_retention === "string" ? payload.prompt_cache_retention : null,
-          forwardedInputCount: Array.isArray(payload?.input) ? payload.input.length : -1,
-          forwardedInputRoles: Array.isArray(payload?.input)
-            ? payload.input.map((x: any) => String(x?.role ?? ""))
+            typeof activePayload?.prompt_cache_retention === "string" ? activePayload.prompt_cache_retention : null,
+          forwardedInputCount: Array.isArray(activePayload?.input) ? activePayload.input.length : -1,
+          forwardedInputRoles: Array.isArray(activePayload?.input)
+            ? activePayload.input.map((x: any) => String(x?.role ?? ""))
             : [],
           forwardedReductionChangedItems: reductionApplied.changedItems,
           forwardedReductionChangedBlocks: reductionApplied.changedBlocks,
           forwardedReductionSavedChars: reductionApplied.savedChars,
           forwardedReductionReport: reductionApplied.report ?? null,
           afterCallReduction: afterCallReduction ?? null,
+          memoryFaultAutoReplayCount,
           forwardedDeveloperChars:
-            Array.isArray(payload?.input) &&
-            payload.input.length > 0 &&
-            String(payload.input[0]?.role) === "developer" &&
-            typeof payload.input[0]?.content === "string"
-              ? String(payload.input[0].content).length
+            Array.isArray(activePayload?.input) &&
+            activePayload.input.length > 0 &&
+            String(activePayload.input[0]?.role) === "developer" &&
+            typeof activePayload.input[0]?.content === "string"
+              ? String(activePayload.input[0].content).length
               : 0,
-          payload,
+          payload: activePayload,
         };
         await appendJsonl(cfg.debugTapPath, forwardedRecord);
       }
@@ -3052,8 +3043,8 @@ async function startEmbeddedResponsesProxy(
           stage: "proxy_outbound",
           model,
           upstreamModel,
-          status: upstreamResp.status,
-          transport: upstreamResp.transport,
+          status: upstreamRespFinal.status,
+          transport: upstreamRespFinal.transport,
           responseId:
             typeof parsedResponse?.id === "string"
               ? parsedResponse.id
@@ -3084,12 +3075,13 @@ async function startEmbeddedResponsesProxy(
             null,
           afterCallReduction,
           responseText: txt,
+          memoryFaultAutoReplayCount,
         };
         await mkdir(dirname(cfg.debugTapPath), { recursive: true });
         await appendFile(cfg.debugTapPath, `${JSON.stringify(debugRecord)}\n`, "utf8");
       }
-      res.statusCode = upstreamResp.status;
-      res.setHeader("content-type", upstreamResp.headers["content-type"] ?? "application/json");
+      res.statusCode = upstreamRespFinal.status;
+      res.setHeader("content-type", upstreamRespFinal.headers["content-type"] ?? "application/json");
       res.end(txt);
     } catch (err) {
       res.statusCode = 500;
@@ -3555,11 +3547,11 @@ function createEcoClawContextEngine(
   };
 }
 
-function applyToolResultPersistPolicy(
+async function applyToolResultPersistPolicy(
   event: any,
   cfg: ReturnType<typeof normalizeConfig>,
   logger: Required<PluginLogger>,
-): { message: Record<string, unknown> } | undefined {
+): Promise<{ message: Record<string, unknown> } | undefined> {
   const message = event?.message;
   if (!message || typeof message !== "object") return undefined;
   const rawMessage = message as Record<string, unknown>;
@@ -3580,30 +3572,26 @@ function applyToolResultPersistPolicy(
   }
 
   const digest = createHash("sha256").update(text).digest("hex").slice(0, 16);
-  const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const callId = String(event?.toolCallId ?? event?.tool_call_id ?? "").trim();
   const toolPart = safeId(toolName || "tool");
-  const artifactFile = `${ts}-${toolPart}${callId ? `-${safeId(callId)}` : ""}-${digest}.json`;
-  const artifactPath = join(cfg.stateDir, "ecoclaw", "artifacts", toolPart, artifactFile);
+  const dataKey = `tool_result_persist:${toolPart}:${callId ? safeId(callId) : digest}`;
 
   let outputFile: string | undefined;
   try {
-    mkdirSync(dirname(artifactPath), { recursive: true });
-    writeFileSync(
-      artifactPath,
-      JSON.stringify(
-        {
-          at: new Date().toISOString(),
-          toolName: toolName || undefined,
-          toolCallId: callId || undefined,
-          message: rawMessage,
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
-    outputFile = artifactPath;
+    const archived = await archiveContent({
+      sessionId: "proxy-session",
+      segmentId: callId || `${toolPart}-${digest}`,
+      sourcePass: "tool_result_persist",
+      toolName: toolName || "tool",
+      dataKey,
+      originalText: text,
+      archiveDir: join(cfg.stateDir, "ecoclaw", "artifacts", toolPart),
+      metadata: {
+        toolCallId: callId || undefined,
+        persistedBy: "ecoclaw.tool_result_persist",
+      },
+    });
+    outputFile = archived.archivePath;
   } catch (err) {
     logger.warn(`[ecoclaw] tool_result_persist artifact write failed: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -3612,17 +3600,27 @@ function applyToolResultPersistPolicy(
   const notice = outputFile
     ? `[ecoclaw persisted tool_result] full output moved to: ${outputFile}`
     : "[ecoclaw persisted tool_result] artifact write failed, using inline preview fallback";
+  const recoveryHint = outputFile
+    ? buildRecoveryHint({
+      dataKey,
+      originalSize: text.length,
+      archivePath: outputFile,
+      sourceLabel: "tool_result_persist",
+    })
+    : "";
 
   return {
     message: {
       ...rawMessage,
-      content: `${notice}\n\n${preview}`,
+      content: `${notice}\n\n${preview}${recoveryHint}`,
       details: ensureContextSafeDetails(rawMessage.details, {
         resultMode: outputFile ? "artifact" : "inline-fallback",
         excludedFromContext: true,
         outputFile,
+        dataKey,
         originalChars: text.length,
         previewChars: limit,
+        sourcePass: "tool_result_persist",
         persistedBy: "ecoclaw.tool_result_persist",
       }),
     },
@@ -4072,12 +4070,86 @@ module.exports = {
     if (cfg.hooks.beforeToolCall) {
       hookOn(api, "before_tool_call", (event: any) => {
         return { params: applyBeforeToolCallDefaults(event) };
-      });
-    }
+  });
+}
+
+function registerMemoryFaultRecoverTool(
+  api: any,
+  cfg: ReturnType<typeof normalizeConfig>,
+  logger: Required<PluginLogger>,
+): void {
+  if (typeof api.registerTool !== "function") {
+    logger.warn("[ecoclaw] registerTool unavailable in this OpenClaw version.");
+    return;
+  }
+
+  api.registerTool((toolCtx: any) => ({
+    label: "Memory Fault Recover",
+    name: MEMORY_FAULT_RECOVER_TOOL_NAME,
+    description:
+      "Recover archived content that was trimmed from a prior tool result. Use this internal tool with the provided dataKey instead of re-running the original tool.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        dataKey: {
+          type: "string",
+          description: "Archive dataKey from a prior [Tool payload trimmed] notice.",
+        },
+      },
+      required: ["dataKey"],
+    },
+    execute: async (_toolCallId: string, args: Record<string, unknown>) => {
+      const dataKey = typeof args?.dataKey === "string" ? args.dataKey.trim() : "";
+      if (!dataKey) {
+        return {
+          content: [{ type: "text", text: "Missing required parameter: dataKey" }],
+          details: { error: "missing_data_key" },
+        };
+      }
+      const stateDir = resolveRecoveryStateDir(cfg.stateDir);
+      const sessionId =
+        typeof toolCtx?.sessionId === "string" && toolCtx.sessionId.trim().length > 0
+          ? toolCtx.sessionId.trim()
+          : "proxy-session";
+      const archivePath =
+        (await resolveArchivePathFromLookup(dataKey, stateDir, sessionId))
+        ?? (await resolveArchivePathFromLookup(dataKey, stateDir, "proxy-session"))
+        ?? "";
+      const archive = archivePath ? await readArchive(archivePath) : null;
+      if (!archive) {
+        return {
+          content: [{ type: "text", text: `No archived content found for dataKey: ${dataKey}` }],
+          details: { error: "archive_not_found", dataKey, archivePath },
+        };
+      }
+
+      const recoveredText =
+        `[Memory Fault Recovery] Recovered content for: ${dataKey}\n` +
+        `Original size: ${archive.originalSize.toLocaleString()} chars\n` +
+        `Archived by: ${archive.sourcePass}\n` +
+        `--- Recovered Content ---\n` +
+        `${archive.originalText}\n` +
+        `--- End Recovered Content ---`;
+
+      return {
+        content: [{ type: "text", text: recoveredText }],
+        details: {
+          dataKey,
+          archivePath,
+          originalSize: archive.originalSize,
+          sourcePass: archive.sourcePass,
+          toolName: archive.toolName,
+          recovered: true,
+        },
+      };
+    },
+  }), { name: MEMORY_FAULT_RECOVER_TOOL_NAME });
+}
 
     if (cfg.hooks.toolResultPersist) {
-      hookOn(api, "tool_result_persist", (event: any) => {
-        const out = applyToolResultPersistPolicy(event, cfg, logger);
+      hookOn(api, "tool_result_persist", async (event: any) => {
+        const out = await applyToolResultPersistPolicy(event, cfg, logger);
         return out ?? { message: event?.message };
       });
     }
@@ -4087,6 +4159,8 @@ module.exports = {
     } else if (cfg.contextEngine.enabled) {
       logger.warn("[ecoclaw] registerContextEngine unavailable in this OpenClaw version.");
     }
+
+    registerMemoryFaultRecoverTool(api, cfg, logger);
 
     const topology = createSessionTopologyManager();
     const recentTurnBindings: Array<{

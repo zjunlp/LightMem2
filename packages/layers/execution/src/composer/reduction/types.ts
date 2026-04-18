@@ -11,8 +11,7 @@ export type BuiltinReductionPassId =
   | "path_truncation"
   | "image_downsample"
   | "line_number_strip"
-  | "agents_startup_optimization"
-  | "memory_fault_recovery";
+  | "agents_startup_optimization";
 
 export type ReductionPassId = BuiltinReductionPassId | (string & {});
 export type ReductionPhase = "before_call" | "after_call";

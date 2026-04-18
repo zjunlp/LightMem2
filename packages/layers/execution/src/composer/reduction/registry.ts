@@ -9,7 +9,6 @@ import { pathTruncationPass } from "../../atomic/passes/pass-path-truncation.js"
 import { imageDownsamplePass } from "../../atomic/passes/pass-image-downsample.js";
 import { lineNumberStripPass } from "../../atomic/passes/pass-line-number-strip.js";
 import { agentsStartupOptimizationPass } from "../../atomic/passes/pass-agents-startup-optimization.js";
-import { memoryFaultRecoveryPass } from "../../atomic/passes/pass-memory-fault-recovery.js";
 import type {
   BuiltinReductionPassId,
   ReductionPassId,
@@ -29,7 +28,6 @@ const BUILTIN_PASSES: Record<BuiltinReductionPassId, ReductionPassHandler> = {
   image_downsample: imageDownsamplePass,
   line_number_strip: lineNumberStripPass,
   agents_startup_optimization: agentsStartupOptimizationPass,
-  memory_fault_recovery: memoryFaultRecoveryPass,
 };
 
 // Passes that need both beforeCall and afterCall handlers

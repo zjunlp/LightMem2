@@ -85,16 +85,6 @@ export function resolveReductionPasses(
       },
     },
     {
-      id: "memory_fault_recovery",
-      phase: "before_call",
-      target: "context_segment",
-      options: {
-        enabled: true,
-        maxRecoveriesPerTurn: 10,
-        ...(passOptions.memory_fault_recovery ?? {}),
-      },
-    },
-    {
       id: "format_slimming",
       phase: "after_call",
       target: "result_content",

@@ -167,14 +167,18 @@ Responsibilities:
 - Runtime bridge into the live OpenClaw process
 - Intercept request/response traffic through the embedded proxy
 - Build the current `RuntimeTurnContext`
-- Call reduction bridges today
+- Bridge the current live layer pipeline into OpenClaw
 - Persist traces and reports for benchmark/debugging
 
 Important nuance:
-- The plugin is currently both a transport bridge and a temporary layer-integration bridge
-- Some decisions are still assembled inside the plugin rather than coming from the full online policy module
+- The plugin is currently both a transport bridge and a layer-integration bridge
+- `compaction` / `eviction` already use the real `history -> decision -> execution` path through the plugin
+- `reduction` still keeps some plugin-side bridge logic for online compatibility
 
-That is acceptable for the current reduction stage, but should not be the long-term pattern for compaction/eviction
+This means:
+- the plugin is still heavier than the final ideal shape
+- but the main architectural risk now is no longer “compaction / eviction are not wired”
+- the real next task is validation and iteration, not another large rewrite
 
 ## Data Flow
 
@@ -194,7 +198,7 @@ This means:
 - but reduction is not yet fully driven by the online `decision` runtime module
 - the plugin currently acts as a bridge that assembles compatible reduction decisions
 
-### Target compaction / eviction path
+### Current live compaction / eviction path
 1. OpenClaw/plugin builds `RuntimeTurnContext`
 2. `history` derives `HistoryBlock[]` from segments
 3. `history` derives rule-visible signals and lifecycle state from `HistoryBlock[]`
@@ -206,7 +210,7 @@ This means:
 7. `execution` uses `atomic/archive-recovery` to materialize stubs / pointers / recovery handles
 8. `orchestration` applies topology-level effects only if/when such effects are actually needed
 
-This is the intended clean direction:
+This is already the active runtime direction for compaction / eviction:
 - decision decides
 - execution acts
 - orchestration applies topology effects
@@ -240,7 +244,8 @@ Status:
   - `compaction.beforeCall`
 - Execution already performs real archive + stub replacement for turn-local compaction
 - This is no longer a placeholder-only path
-- Future work is about richer strategies, not first-time wiring
+- Current compaction is still mostly rule-based
+- The next work is validation under shared-session benchmark plus richer strategies
 
 ### Eviction
 Status:
@@ -255,6 +260,20 @@ Status:
   - cached-pointer eviction is implemented
   - hard-drop eviction is intentionally deferred
 - Eviction should still evolve together with compaction because both depend on the same history representation and lifecycle semantics
+
+## Current Project Focus
+
+The project is currently in this state:
+- `reduction` is stage-complete enough for ongoing experiments
+- `compaction` and `eviction` are live, but still need stronger validation under long/shared-session workloads
+- OpenClaw remains the only source of truth for session/request assembly
+- EcoClaw optimizes each live request rather than trying to overwrite OpenClaw's internal persistent truth
+
+This is the practical priority order now:
+1. Keep reduction stable and configurable
+2. Validate compaction / eviction in single-session benchmark runs
+3. Add better traces and reports for compaction / eviction behavior
+4. Iterate on policy strength and execution semantics only after those measurements are trustworthy
 
 ## Why `history` Was Added
 
@@ -286,14 +305,16 @@ Current exports:
 - `HistorySignal`
 - `buildHistoryBlocks(...)`
 - `collectRuleSignals(...)`
+- `deriveHistoryLifecycle(...)`
 - `scoreHistoryBlocks(...)`
+- `buildHistoryView(...)`
 
 This first version is enough to:
 - avoid mixing optimization IR into `context` or `execution`
 - give compaction/eviction a shared starting point
-- prepare decision analyzers to consume block-oriented inputs later
+- provide a real shared input for live decision analyzers today
 
-It is not yet the full final lifecycle engine, but lifecycle ownership belongs here.
+It is not yet the final lifecycle engine, but lifecycle ownership already belongs here.
 
 ## Compaction / Eviction Direction
 
@@ -318,34 +339,69 @@ They should still execute separately:
 Both should reuse:
 - `execution/atomic/archive-recovery`
 
-This prevents duplication of:
-- archive writes
-- pointer/placeholder generation
-- deferred recovery wiring
-
 ## Current Architectural Gaps
 
-These are the main known gaps that still need cleanup:
+The main remaining gaps are now narrower and more concrete:
 
-1. Reduction still relies on plugin-side bridge logic to assemble policy-compatible metadata
-- acceptable for now
-- should not be copied into compaction/eviction
+1. Reduction still relies on plugin-side bridge logic to assemble online policy-compatible metadata
+2. Compaction is live, but current strategies are still mostly heuristic and need shared-session validation
+3. Eviction currently implements only the recoverable cached-pointer path, not stronger dropped semantics
+4. Compaction / eviction still need richer structured trace/report output for benchmark analysis
 
-2. Eviction currently implements only the recoverable cached-pointer path, not stronger dropped semantics
+## Current Recovery Path
 
-3. Full online policy module is not yet the sole source of all live optimization decisions
+Recovery is now intentionally narrowed to one live mechanism:
+
+1. A reduction/compaction/eviction action archives large content and emits a stub with a `dataKey`
+2. The model may call the internal tool `memory_fault_recover`
+3. That tool resolves the archive by `dataKey` and returns the recovered full content as a normal tool result
+4. The agent continues from that recovered content in the ordinary OpenClaw tool loop
+
+Important non-goals now:
+- EcoClaw no longer relies on plain-text `memory_fault('...')` replies
+- EcoClaw no longer relies on a before-call `memory_fault_recovery` pass
+- EcoClaw no longer relies on proxy-side replay as the primary recovery path
+
+This means the current recovery design is aligned with normal agent semantics:
+- archive/stub is execution-layer behavior
+- recovery is a tool call
+- continuation happens through the standard OpenClaw `toolCall -> toolResult -> next step` loop
+
+Latest validated status:
+- legacy recovery chain has been removed from live code paths
+- latest full benchmark run (`10049`) recorded `7` real `memory_fault_recover` executions
+- all `7` succeeded
+- `archive_not_found = 0`
+
+So the current practical interpretation is:
+- recovery infrastructure is working
+- remaining benchmark issues should usually be treated as downstream agent behavior or task-specific parsing quality, not as recovery-path instability
 
 ## Immediate Implementation Direction
 
-The next clean steps are:
-1. Keep `history` as the shared lifecycle-aware IR for compaction and eviction
-2. Add decision-owned model detectors only where semantic judgment is actually needed
-3. Evolve eviction beyond cached-pointer apply only after the v1 path is stable
-4. Keep reduction stable; do not do a risky reduction re-architecture before compaction/eviction experience is complete
+Near-term direction should be:
+
+1. Wait for the benchmark flow that runs multiple tasks inside one shared session
+2. Add compaction / eviction trace/report fields:
+   - candidate count
+   - instruction count
+   - applied count
+   - archived chars / saved chars
+   - recovery trigger count
+3. Run small shared-session regressions first
+4. Use those results to choose between:
+   - policy/threshold tuning
+   - richer compaction actions such as checkpoint/summary-style seeds
+   - stronger eviction semantics
+
+Things that are explicitly not the current priority:
+- another large reduction rewrite
+- forcing orchestration into the critical path early
+- trying again to directly rewrite OpenClaw's internal long-term history truth
 
 ## Summary
 
-The intended long-term dependency direction is:
+The dependency direction that EcoClaw should continue to preserve is:
 
 - `context` -> `history` -> `decision` -> `execution` -> `orchestration`
 
@@ -353,4 +409,7 @@ with:
 - `kernel` as shared runtime types
 - `openclaw-plugin` as the current live integration bridge
 
-This is the architecture we should preserve while finishing compaction and eviction.
+Current practical meaning:
+- keep reduction stable
+- validate compaction / eviction under shared-session workloads
+- then iterate on policy and execution semantics from measured results
