@@ -1,3 +1,5 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import {
   ECOCLAW_EVENT_TYPES,
   appendContextEvent,
@@ -28,8 +30,30 @@ import {
   analyzeCompactionFromHistory,
   type CompactionDecision,
 } from "./compaction/index.js";
-import { analyzeEvictionFromHistory, type EvictionPolicy } from "./eviction/index.js";
-import { buildHistoryView } from "@ecoclaw/layer-history";
+import {
+  analyzeEvictionFromTaskRegistry,
+  type EvictionBlock,
+  type EvictionInstruction,
+  type EvictionPolicy,
+} from "./eviction/index.js";
+import {
+  applySessionTaskRegistryPatch,
+  buildDeltaViewFromRawSemanticSnapshot,
+  deriveCompletedSummaryPlusActiveTurnsWindow,
+  buildHistoryView,
+  type HistoryView,
+  loadRawSemanticSnapshotWindow,
+  loadSessionTaskRegistry,
+  listRawSemanticTurnSeqs,
+  persistSessionTaskRegistry,
+  SessionTaskRegistryVersionMismatchError,
+  type SessionTaskRegistryPatch,
+  type SessionTaskRegistry,
+  type TaskLifecycle,
+  type TaskState,
+} from "@ecoclaw/layer-history";
+import { createApiTaskStateEstimator } from "./task-state-estimator.js";
+import type { SemanticTaskUpdate, TaskStateEstimator, TaskStateEstimatorApiConfig, TaskStateTransition } from "./types.js";
 
 export type PolicyModuleConfig = {
   localityEnabled?: boolean;
@@ -69,6 +93,8 @@ export type PolicyModuleConfig = {
   cacheHealthHitMinTokens?: number;
   cacheHealthMissesToCold?: number;
   cacheHealthWarmSeconds?: number;
+  taskStateEstimator?: TaskStateEstimatorApiConfig;
+  stateDir?: string;
 };
 
 export type PolicyCacheHealthMode = "warm" | "uncertain" | "cold";
@@ -245,10 +271,34 @@ export type PolicyCompactionDecision = {
 export type PolicyEvictionDecision = {
   enabled: boolean;
   policy: EvictionPolicy;
-  blocks: number;
-  instructions: number;
+  blocks: EvictionBlock[];
+  instructions: EvictionInstruction[];
   estimatedSavedChars: number;
   reasons: string[];
+};
+
+export type PolicyTaskStateDecision = {
+  enabled: boolean;
+  attempted: boolean;
+  applied: boolean;
+  baseVersion?: number;
+  nextVersion?: number;
+  coveredTurnAbsIds: string[];
+  touchedTaskIds: string[];
+  transitionCount: number;
+  transitions?: Array<{
+    taskId: string;
+    from?: string;
+    to: string;
+    rationale: string;
+  }>;
+  rejectedUpdates?: Array<{
+    taskId: string;
+    from?: string;
+    to: string;
+    reason: string;
+  }>;
+  note?: string;
 };
 
 export type PolicyCacheHealthDecision = {
@@ -311,6 +361,7 @@ export type PolicyOnlineDecisions = {
     instructions: CompactionInstruction[];
   };
   eviction: PolicyEvictionDecision;
+  taskState?: PolicyTaskStateDecision;
   locality: PolicyLocalityDecision;
   cacheHealth: PolicyCacheHealthDecision;
   semantic: PolicySemanticBudgetDecision;
@@ -375,9 +426,292 @@ type NormalizedPolicyConfig = {
   turnLocalCompactionEnabled: boolean;
   turnLocalCompactionDelayTurns: number;
   turnLocalCompactionMinChars: number;
+  stateDir?: string;
+  taskStateEstimator: Required<TaskStateEstimatorApiConfig>;
 };
 
+type LifecycleMode = "coupled" | "decoupled";
+
+type TaskStateRunResult = {
+  registry: SessionTaskRegistry;
+  decision: PolicyTaskStateDecision;
+};
+
+async function appendTaskStateTrace(stateDir: string, payload: Record<string, unknown>): Promise<void> {
+  const path = join(stateDir, "task-state", "trace.jsonl");
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await appendFile(
+      path,
+      `${JSON.stringify({
+        at: new Date().toISOString(),
+        ...payload,
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    // best-effort trace only
+  }
+}
+
+function titleFromTaskId(taskId: string): string {
+  return taskId
+    .replace(/^task[-_]/i, "")
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function lifecycleBucketIds(tasks: Record<string, TaskState>, lifecycle: TaskLifecycle): string[] {
+  return Object.values(tasks)
+    .filter((task) => task.lifecycle === lifecycle)
+    .map((task) => task.taskId);
+}
+
+type RejectedTaskUpdate = {
+  taskId: string;
+  from?: TaskLifecycle;
+  to: TaskLifecycle;
+  reason: string;
+};
+
+function hasCompletionEvidence(task: Pick<TaskState, "completionEvidence"> | undefined): boolean {
+  return Array.isArray(task?.completionEvidence) && task.completionEvidence.some((item) => item.trim().length > 0);
+}
+
+function buildPatchFromTaskUpdates(
+  registry: SessionTaskRegistry,
+  updates: SemanticTaskUpdate[],
+  coveredTurnAbsIds: string[],
+  toTurnSeqInclusive: number,
+): {
+  patch: SessionTaskRegistryPatch;
+  transitions: TaskStateTransition[];
+  touchedTaskIds: string[];
+  rejectedUpdates: RejectedTaskUpdate[];
+} {
+  const upsertTasks: Record<string, TaskState> = {};
+  const upsertTurnToTaskIds: Record<string, string[]> = {};
+  const transitions: TaskStateTransition[] = [];
+  const rejectedUpdates: RejectedTaskUpdate[] = [];
+
+  for (const update of updates) {
+    const taskId = String(update.taskId ?? "").trim();
+    const previous = registry.tasks[taskId];
+    const objective =
+      typeof update.objective === "string" && update.objective.trim().length > 0
+        ? update.objective.trim()
+        : previous?.objective ?? "";
+    const covered = uniqueStrings(update.coveredTurnAbsIds ?? []);
+    if (!taskId || !objective) continue;
+    if (covered.length === 0 && !previous) continue;
+    const supportingTurnAbsIds = uniqueStrings([
+      ...(previous?.span.supportingTurnAbsIds ?? []),
+      ...covered,
+    ]);
+    if (supportingTurnAbsIds.length === 0) continue;
+    const firstTurnAbsId = previous?.span.firstTurnAbsId ?? supportingTurnAbsIds[0]!;
+    const lastTurnAbsId = supportingTurnAbsIds[supportingTurnAbsIds.length - 1]!;
+    const mergedCompletionEvidence = uniqueStrings([
+      ...(previous?.completionEvidence ?? []),
+      ...(update.completionEvidence ?? []),
+    ]);
+    const mergedUnresolvedQuestions = uniqueStrings(update.unresolvedQuestions ?? previous?.unresolvedQuestions ?? []);
+    const fromLifecycle = previous?.lifecycle;
+    const toLifecycle = update.lifecycle;
+    const fromHasCompletionEvidence = hasCompletionEvidence(previous);
+    const toHasCompletionEvidence = mergedCompletionEvidence.length > 0;
+
+    if (toLifecycle === "completed" && !toHasCompletionEvidence) {
+      rejectedUpdates.push({
+        taskId,
+        ...(fromLifecycle ? { from: fromLifecycle } : {}),
+        to: toLifecycle,
+        reason: "completed_requires_completion_evidence",
+      });
+      continue;
+    }
+    if (toLifecycle === "evictable") {
+      if (fromLifecycle === "active" || !previous) {
+        rejectedUpdates.push({
+          taskId,
+          ...(fromLifecycle ? { from: fromLifecycle } : {}),
+          to: toLifecycle,
+          reason: "active_to_evictable_forbidden",
+        });
+        continue;
+      }
+      if (fromLifecycle !== "completed" && fromLifecycle !== "evictable") {
+        rejectedUpdates.push({
+          taskId,
+          ...(fromLifecycle ? { from: fromLifecycle } : {}),
+          to: toLifecycle,
+          reason: "evictable_requires_completed_state",
+        });
+        continue;
+      }
+      if (!fromHasCompletionEvidence && !toHasCompletionEvidence) {
+        rejectedUpdates.push({
+          taskId,
+          ...(fromLifecycle ? { from: fromLifecycle } : {}),
+          to: toLifecycle,
+          reason: "evictable_requires_completion_evidence",
+        });
+        continue;
+      }
+      if (mergedUnresolvedQuestions.length > 0) {
+        rejectedUpdates.push({
+          taskId,
+          ...(fromLifecycle ? { from: fromLifecycle } : {}),
+          to: toLifecycle,
+          reason: "evictable_forbidden_with_unresolved_questions",
+        });
+        continue;
+      }
+    }
+
+    const task: TaskState = {
+      taskId,
+      title:
+        typeof update.title === "string" && update.title.trim().length > 0
+          ? update.title.trim()
+          : previous?.title ?? titleFromTaskId(taskId),
+      objective,
+      lifecycle: update.lifecycle,
+      ...(typeof update.currentSubgoal === "string" && update.currentSubgoal.trim().length > 0
+        ? { currentSubgoal: update.currentSubgoal.trim() }
+        : previous?.currentSubgoal
+          ? { currentSubgoal: previous.currentSubgoal }
+          : {}),
+      ...(typeof update.evictableReason === "string" && update.evictableReason.trim().length > 0
+        ? { evictableReason: update.evictableReason.trim() }
+        : previous?.evictableReason
+          ? { evictableReason: previous.evictableReason }
+          : {}),
+      completionEvidence: mergedCompletionEvidence,
+      unresolvedQuestions: mergedUnresolvedQuestions,
+      span: {
+        firstTurnAbsId,
+        lastTurnAbsId,
+        supportingTurnAbsIds,
+        lastEstimatorTurnAbsId:
+          covered[covered.length - 1] ??
+          previous?.span.lastEstimatorTurnAbsId ??
+          lastTurnAbsId,
+      },
+    };
+    upsertTasks[taskId] = task;
+    for (const turnAbsId of covered) {
+      const existing = upsertTurnToTaskIds[turnAbsId] ?? registry.turnToTaskIds[turnAbsId] ?? [];
+      upsertTurnToTaskIds[turnAbsId] = uniqueStrings([...existing, taskId]);
+    }
+    transitions.push({
+      taskId,
+      ...(previous ? { from: previous.lifecycle } : {}),
+      to: update.lifecycle,
+      rationale:
+        covered.length > 0
+          ? `task update applied from covered turns: ${covered.join(", ")}`
+          : `lifecycle-only task update applied for ${taskId}`,
+    });
+  }
+
+  const nextTasks = {
+    ...registry.tasks,
+    ...upsertTasks,
+  };
+
+  return {
+    patch: {
+      upsertTasks,
+      upsertTurnToTaskIds,
+      activeTaskIds: lifecycleBucketIds(nextTasks, "active"),
+      completedTaskIds: lifecycleBucketIds(nextTasks, "completed"),
+      evictableTaskIds: lifecycleBucketIds(nextTasks, "evictable"),
+      lastProcessedTurnSeq: toTurnSeqInclusive,
+    },
+    transitions,
+    touchedTaskIds: Object.keys(upsertTasks),
+    rejectedUpdates,
+  };
+}
+
+function normalizeTaskUpdatesForLifecycleMode(
+  updates: SemanticTaskUpdate[],
+  lifecycleMode: LifecycleMode,
+): SemanticTaskUpdate[] {
+  if (lifecycleMode === "coupled") return updates;
+  return updates.map((update) =>
+    update.lifecycle === "evictable"
+      ? {
+          ...update,
+          lifecycle: "completed",
+        }
+      : update);
+}
+
+function sortTaskIdsByLastTurnAscending(registry: SessionTaskRegistry, taskIds: string[]): string[] {
+  const rank = (taskId: string): number => {
+    const lastTurnAbsId = registry.tasks[taskId]?.span.lastTurnAbsId;
+    if (typeof lastTurnAbsId !== "string") return Number.MAX_SAFE_INTEGER;
+    const parsed = Number(lastTurnAbsId.split(":t").at(-1) ?? Number.NaN);
+    return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+  };
+  return [...taskIds].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+function buildDecoupledFifoPromotionPatch(
+  registry: SessionTaskRegistry,
+  hotTailSize: number,
+): {
+  patch: SessionTaskRegistryPatch;
+  promotedTaskIds: string[];
+  preservedCompletedTaskIds: string[];
+} {
+  const completedTaskIds = sortTaskIdsByLastTurnAscending(registry, registry.completedTaskIds ?? []);
+  if (completedTaskIds.length === 0) {
+    return {
+      patch: {},
+      promotedTaskIds: [],
+      preservedCompletedTaskIds: [],
+    };
+  }
+
+  const safeHotTailSize = Math.max(0, hotTailSize);
+  const preservedCompletedTaskIds =
+    safeHotTailSize > 0 ? completedTaskIds.slice(-safeHotTailSize) : [];
+  const promotedTaskIds = completedTaskIds.slice(0, Math.max(0, completedTaskIds.length - preservedCompletedTaskIds.length));
+  const upsertTasks: Record<string, TaskState> = {};
+  for (const taskId of promotedTaskIds) {
+    const task = registry.tasks[taskId];
+    if (!task || task.lifecycle === "evictable") continue;
+    upsertTasks[taskId] = {
+      ...task,
+      lifecycle: "evictable",
+      evictableReason: task.evictableReason ?? "fifo promotion from completed backlog",
+    };
+  }
+
+  const nextCompletedTaskIds = completedTaskIds.filter((taskId) => !promotedTaskIds.includes(taskId));
+  const nextEvictableTaskIds = sortTaskIdsByLastTurnAscending(
+    registry,
+    uniqueStrings([...(registry.evictableTaskIds ?? []), ...promotedTaskIds]),
+  );
+
+  return {
+    patch: {
+      ...(Object.keys(upsertTasks).length > 0 ? { upsertTasks } : {}),
+      completedTaskIds: nextCompletedTaskIds,
+      evictableTaskIds: nextEvictableTaskIds,
+    },
+    promotedTaskIds,
+    preservedCompletedTaskIds,
+  };
+}
+
 type PolicyAnalysis = {
+  historyView: HistoryView;
   stableChars: number;
   recentCacheMissRate: number;
   recentMissCount: number;
@@ -393,12 +727,7 @@ type PolicyAnalysis = {
   compactionReasons: string[];
   compactionInstructions: CompactionInstruction[];
   evictionReasons: string[];
-  evictionDecision: {
-    policy: EvictionPolicy;
-    blocks: number;
-    instructions: number;
-    estimatedSavedChars: number;
-  };
+  evictionDecision: PolicyEvictionDecision;
   locality: PolicyLocalityAnalysis;
   roi: PolicyOnlineRoiSnapshot;
   summaryCooldownActive: boolean;
@@ -610,6 +939,23 @@ function normalizeConfig(cfg: PolicyModuleConfig): NormalizedPolicyConfig {
     turnLocalCompactionEnabled: cfg.turnLocalCompactionEnabled ?? true,
     turnLocalCompactionDelayTurns: cfg.turnLocalCompactionDelayTurns ?? 0,
     turnLocalCompactionMinChars: cfg.turnLocalCompactionMinChars ?? 500,
+    stateDir: typeof cfg.stateDir === "string" && cfg.stateDir.trim().length > 0 ? cfg.stateDir : undefined,
+    taskStateEstimator: {
+      enabled: cfg.taskStateEstimator?.enabled ?? false,
+      baseUrl: cfg.taskStateEstimator?.baseUrl ?? "",
+      apiKey: cfg.taskStateEstimator?.apiKey ?? "",
+      model: cfg.taskStateEstimator?.model ?? "",
+      requestTimeoutMs: Math.max(1000, cfg.taskStateEstimator?.requestTimeoutMs ?? 60_000),
+      batchTurns: Math.max(1, cfg.taskStateEstimator?.batchTurns ?? 5),
+      evictionLookaheadTurns: Math.max(1, cfg.taskStateEstimator?.evictionLookaheadTurns ?? 3),
+      inputMode:
+        cfg.taskStateEstimator?.inputMode === "completed_summary_plus_active_turns"
+          ? "completed_summary_plus_active_turns"
+          : "sliding_window",
+      lifecycleMode: cfg.taskStateEstimator?.lifecycleMode === "decoupled" ? "decoupled" : "coupled",
+      evictionPromotionPolicy: cfg.taskStateEstimator?.evictionPromotionPolicy === "fifo" ? "fifo" : "fifo",
+      evictionPromotionHotTailSize: Math.max(0, cfg.taskStateEstimator?.evictionPromotionHotTailSize ?? 1),
+    },
   };
 }
 
@@ -699,12 +1045,6 @@ function analyzePolicyBeforeBuild(
   // Analyze segments for compaction opportunities
   const historyView = buildHistoryView(ctx);
   const compactionDecision = analyzeCompactionFromHistory(historyView.blocks);
-  const evictionDecision = analyzeEvictionFromHistory(historyView.blocks, {
-    enabled: config.evictionEnabled,
-    policy: config.evictionPolicy,
-    minBlockChars: config.evictionMinBlockChars,
-  });
-
   const stableTokens = estimateTokensFromChars(stableChars);
   const promptTokensEstimate = estimateTokensFromChars(promptChars);
   const reductionTargetTokens = estimateTokensFromChars(locality.reductionCandidateChars);
@@ -858,15 +1198,9 @@ function analyzePolicyBeforeBuild(
   const compactionSupported = apiFamily === "openai-responses";
   const compactionReasons =
     compactionSupported && config.compactionEnabled ? collectSignalReasons(locality, "compaction") : [];
-  const evictionReasons: string[] = [];
-  if (config.evictionEnabled) {
-    evictionReasons.push(`eviction_policy=${evictionDecision.policy}`);
-    evictionReasons.push(`eviction_blocks=${evictionDecision.blocks.length}`);
-    evictionReasons.push(`eviction_instructions=${evictionDecision.instructions.length}`);
-    if ((evictionDecision.notes?.length ?? 0) > 0) {
-      evictionReasons.push(...(evictionDecision.notes ?? []));
-    }
-  }
+  const evictionReasons: string[] = config.evictionEnabled
+    ? [`eviction_policy=${config.evictionPolicy}`]
+    : [];
 
   const reductionReasons: string[] = [];
   const reductionBeforeCallPassIds: string[] = [];
@@ -1094,6 +1428,7 @@ function analyzePolicyBeforeBuild(
   }
 
   return {
+    historyView,
     stableChars,
     recentCacheMissRate,
     recentMissCount,
@@ -1110,10 +1445,12 @@ function analyzePolicyBeforeBuild(
     compactionInstructions: compactionDecision.instructions,
     evictionReasons: uniqueStrings(evictionReasons),
     evictionDecision: {
-      policy: evictionDecision.policy,
-      blocks: evictionDecision.blocks.length,
-      instructions: evictionDecision.instructions.length,
-      estimatedSavedChars: evictionDecision.estimatedSavedChars,
+      enabled: config.evictionEnabled,
+      policy: config.evictionPolicy,
+      blocks: [],
+      instructions: [],
+      estimatedSavedChars: 0,
+      reasons: uniqueStrings(evictionReasons),
     },
     locality,
     roi,
@@ -1330,9 +1667,250 @@ function buildPolicyMetadata(
   };
 }
 
+async function maybeRunTaskStateEstimator(
+  ctx: RuntimeTurnContext,
+  config: NormalizedPolicyConfig,
+  estimator: TaskStateEstimator | null,
+): Promise<TaskStateRunResult | null> {
+  if (!config.taskStateEstimator.enabled || !config.stateDir || !estimator) return null;
+
+  const registry = await loadSessionTaskRegistry(config.stateDir, ctx.sessionId);
+  const turnSeqs = await listRawSemanticTurnSeqs(config.stateDir, ctx.sessionId);
+  const pendingTurnSeqs = turnSeqs.filter((turnSeq) => turnSeq > registry.lastProcessedTurnSeq);
+  await appendTaskStateTrace(config.stateDir, {
+    stage: "estimator_window_check",
+    sessionId: ctx.sessionId,
+    registryVersion: registry.version,
+    lastProcessedTurnSeq: registry.lastProcessedTurnSeq,
+    availableTurnSeqs: turnSeqs,
+    pendingTurnSeqs,
+    batchTurns: config.taskStateEstimator.batchTurns,
+    inputMode: config.taskStateEstimator.inputMode,
+  });
+  if (pendingTurnSeqs.length < config.taskStateEstimator.batchTurns) {
+    await appendTaskStateTrace(config.stateDir, {
+      stage: "estimator_skipped",
+      sessionId: ctx.sessionId,
+      reason: "insufficient_pending_turns",
+      pendingTurnCount: pendingTurnSeqs.length,
+    });
+    return {
+      registry,
+      decision: {
+        enabled: true,
+        attempted: false,
+        applied: false,
+        baseVersion: registry.version,
+        nextVersion: registry.version,
+        coveredTurnAbsIds: [],
+        touchedTaskIds: [],
+        transitionCount: 0,
+        transitions: [],
+        rejectedUpdates: [],
+        note: "insufficient_pending_turns",
+      },
+    };
+  }
+
+  const slidingWindowToTurnSeqInclusive = pendingTurnSeqs[config.taskStateEstimator.batchTurns - 1]!;
+  const estimatorWindow =
+    config.taskStateEstimator.inputMode === "completed_summary_plus_active_turns"
+      ? deriveCompletedSummaryPlusActiveTurnsWindow(
+          registry,
+          pendingTurnSeqs,
+          config.taskStateEstimator.batchTurns,
+        )
+      : {
+          fromTurnSeqExclusive: registry.lastProcessedTurnSeq,
+          toTurnSeqInclusive: slidingWindowToTurnSeqInclusive,
+          completedTaskSummaries: [],
+        };
+  const snapshot = await loadRawSemanticSnapshotWindow(
+    config.stateDir,
+    ctx.sessionId,
+    estimatorWindow.fromTurnSeqExclusive,
+    estimatorWindow.toTurnSeqInclusive,
+  );
+  const delta = buildDeltaViewFromRawSemanticSnapshot(snapshot, {
+    fromTurnSeqExclusive: estimatorWindow.fromTurnSeqExclusive,
+    toTurnSeqInclusive: estimatorWindow.toTurnSeqInclusive,
+    inputMode: config.taskStateEstimator.inputMode,
+    completedTaskSummaries: estimatorWindow.completedTaskSummaries,
+  });
+
+  if (delta.coveredTurnAbsIds.length === 0) {
+    await appendTaskStateTrace(config.stateDir, {
+      stage: "estimator_skipped",
+      sessionId: ctx.sessionId,
+      reason: "empty_delta_window",
+      fromTurnSeqExclusive: estimatorWindow.fromTurnSeqExclusive,
+      toTurnSeqInclusive: estimatorWindow.toTurnSeqInclusive,
+    });
+    return {
+      registry,
+      decision: {
+        enabled: true,
+        attempted: false,
+        applied: false,
+        baseVersion: registry.version,
+        nextVersion: registry.version,
+        coveredTurnAbsIds: [],
+        touchedTaskIds: [],
+        transitionCount: 0,
+        transitions: [],
+        rejectedUpdates: [],
+        note: "empty_delta_window",
+      },
+    };
+  }
+
+  const output = await estimator.estimate({
+    registry,
+    delta,
+  });
+  const normalizedTaskUpdates = normalizeTaskUpdatesForLifecycleMode(
+    output.taskUpdates,
+    config.taskStateEstimator.lifecycleMode,
+  );
+  await appendTaskStateTrace(config.stateDir, {
+    stage: "estimator_output",
+    sessionId: ctx.sessionId,
+    baseVersion: output.baseVersion,
+    lifecycleMode: config.taskStateEstimator.lifecycleMode,
+    taskUpdates: normalizedTaskUpdates.map((update) => ({
+      taskId: update.taskId,
+      lifecycle: update.lifecycle,
+      coveredTurnAbsIds: update.coveredTurnAbsIds ?? [],
+    })),
+  });
+  if (output.baseVersion !== registry.version) {
+    await appendTaskStateTrace(config.stateDir, {
+      stage: "estimator_skipped",
+      sessionId: ctx.sessionId,
+      reason: "base_version_mismatch",
+      outputBaseVersion: output.baseVersion,
+      registryVersion: registry.version,
+    });
+    return {
+      registry,
+      decision: {
+        enabled: true,
+        attempted: true,
+        applied: false,
+        baseVersion: output.baseVersion,
+        nextVersion: registry.version,
+        coveredTurnAbsIds: delta.coveredTurnAbsIds,
+        touchedTaskIds: normalizedTaskUpdates.map((update) => update.taskId),
+        transitionCount: normalizedTaskUpdates.length,
+        transitions: [],
+        rejectedUpdates: [],
+        note: "base_version_mismatch",
+      },
+    };
+  }
+
+  const built = buildPatchFromTaskUpdates(
+    registry,
+    normalizedTaskUpdates,
+    delta.coveredTurnAbsIds,
+    estimatorWindow.toTurnSeqInclusive,
+  );
+  if (built.rejectedUpdates.length > 0) {
+    await appendTaskStateTrace(config.stateDir, {
+      stage: "estimator_updates_rejected",
+      sessionId: ctx.sessionId,
+      rejectedUpdates: built.rejectedUpdates,
+    });
+  }
+  let nextRegistry = applySessionTaskRegistryPatch(registry, built.patch);
+  if (
+    config.taskStateEstimator.lifecycleMode === "decoupled"
+    && config.taskStateEstimator.evictionPromotionPolicy === "fifo"
+  ) {
+    const promotion = buildDecoupledFifoPromotionPatch(
+      nextRegistry,
+      config.taskStateEstimator.evictionPromotionHotTailSize,
+    );
+    if (promotion.promotedTaskIds.length > 0) {
+      nextRegistry = applySessionTaskRegistryPatch(nextRegistry, promotion.patch);
+      await appendTaskStateTrace(config.stateDir, {
+        stage: "eviction_promotion_applied",
+        sessionId: ctx.sessionId,
+        lifecycleMode: config.taskStateEstimator.lifecycleMode,
+        policy: config.taskStateEstimator.evictionPromotionPolicy,
+        hotTailSize: config.taskStateEstimator.evictionPromotionHotTailSize,
+        promotedTaskIds: promotion.promotedTaskIds,
+        preservedCompletedTaskIds: promotion.preservedCompletedTaskIds,
+        completedTaskIds: nextRegistry.completedTaskIds,
+        evictableTaskIds: nextRegistry.evictableTaskIds,
+      });
+    }
+  }
+  try {
+    await persistSessionTaskRegistry(config.stateDir, nextRegistry, {
+      expectedVersion: registry.version,
+    });
+  } catch (error) {
+    if (error instanceof SessionTaskRegistryVersionMismatchError) {
+      await appendTaskStateTrace(config.stateDir, {
+        stage: "estimator_skipped",
+        sessionId: ctx.sessionId,
+        reason: "persist_version_mismatch",
+        outputBaseVersion: output.baseVersion,
+        registryVersion: registry.version,
+      });
+      return {
+        registry,
+        decision: {
+          enabled: true,
+          attempted: true,
+          applied: false,
+          baseVersion: output.baseVersion,
+          nextVersion: registry.version,
+          coveredTurnAbsIds: delta.coveredTurnAbsIds,
+          touchedTaskIds: built.touchedTaskIds,
+          transitionCount: built.transitions.length,
+          transitions: built.transitions,
+          rejectedUpdates: built.rejectedUpdates,
+          note: "persist_version_mismatch",
+        },
+      };
+    }
+    throw error;
+  }
+  await appendTaskStateTrace(config.stateDir, {
+    stage: "registry_persisted",
+    sessionId: ctx.sessionId,
+    previousVersion: registry.version,
+    nextVersion: nextRegistry.version,
+    lastProcessedTurnSeq: nextRegistry.lastProcessedTurnSeq,
+    touchedTaskIds: built.touchedTaskIds,
+    transitionCount: built.transitions.length,
+  });
+
+  return {
+    registry: nextRegistry,
+    decision: {
+      enabled: true,
+      attempted: true,
+      applied: true,
+      baseVersion: output.baseVersion,
+      nextVersion: nextRegistry.version,
+      coveredTurnAbsIds: delta.coveredTurnAbsIds,
+      touchedTaskIds: built.touchedTaskIds,
+      transitionCount: built.transitions.length,
+      transitions: built.transitions,
+      rejectedUpdates: built.rejectedUpdates,
+    },
+  };
+}
+
 export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule {
   const config = normalizeConfig(cfg);
   const stateBySession = new Map<string, PolicySessionState>();
+  const taskStateEstimator = config.taskStateEstimator.enabled
+    ? createApiTaskStateEstimator(config.taskStateEstimator)
+    : null;
 
   return {
     name: "module-policy",
@@ -1348,7 +1926,48 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
       const state = stateBySession.get(ctx.sessionId) ?? createInitialPolicySessionState();
       const stabilizerEligible = readStabilizerEligible(ctx);
       const analysis = analyzePolicyBeforeBuild(ctx, state, apiFamily, config);
+      const taskStateRun = await maybeRunTaskStateEstimator(ctx, config, taskStateEstimator);
       const policy = buildPolicyMetadata(apiFamily, state, analysis, config, stabilizerEligible);
+      if (taskStateRun) {
+        policy.decisions.taskState = taskStateRun.decision;
+        if (config.evictionEnabled) {
+          const registryDrivenEviction = analyzeEvictionFromTaskRegistry(
+            analysis.historyView.blocks,
+            taskStateRun.registry,
+            {
+              enabled: config.evictionEnabled,
+              policy: config.evictionPolicy,
+              minBlockChars: config.evictionMinBlockChars,
+            },
+          );
+          if (config.stateDir) {
+            const blocksWithTurnAbsIds = analysis.historyView.blocks.filter(
+              (block) => Array.isArray(block.turnAbsIds) && block.turnAbsIds.length > 0,
+            ).length;
+            const blocksWithTaskIds = analysis.historyView.blocks.filter(
+              (block) => Array.isArray(block.taskIds) && block.taskIds.length > 0,
+            ).length;
+            await appendTaskStateTrace(config.stateDir, {
+              stage: "registry_driven_eviction_evaluated",
+              sessionId: ctx.sessionId,
+              evictableTaskIds: taskStateRun.registry.evictableTaskIds,
+              blockCount: registryDrivenEviction.blocks.length,
+              instructionCount: registryDrivenEviction.instructions.length,
+              blocksWithTurnAbsIds,
+              blocksWithTaskIds,
+              notes: registryDrivenEviction.notes ?? [],
+            });
+          }
+          policy.decisions.eviction = {
+            enabled: config.evictionEnabled,
+            policy: registryDrivenEviction.policy,
+            blocks: registryDrivenEviction.blocks,
+            instructions: registryDrivenEviction.instructions,
+            estimatedSavedChars: registryDrivenEviction.estimatedSavedChars,
+            reasons: registryDrivenEviction.notes ?? ["source=task_state_registry"],
+          };
+        }
+      }
 
       let nextCtx: RuntimeTurnContext = {
         ...ctx,
@@ -1371,22 +1990,6 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
             toolPayloadChars: policy.signals.reductionToolPayloadChars,
             localityReductionChars: policy.signals.locality.reductionCandidateChars,
             roi: policy.roi.reduction,
-            apiFamily,
-          },
-        });
-      }
-
-      if (policy.decisions.eviction.enabled) {
-        nextCtx = appendContextEvent(nextCtx, {
-          type: ECOCLAW_EVENT_TYPES.POLICY_EVICTION_DECIDED,
-          source: "module-policy",
-          at: new Date().toISOString(),
-          payload: {
-            policy: policy.decisions.eviction.policy,
-            blocks: policy.decisions.eviction.blocks,
-            instructions: policy.decisions.eviction.instructions,
-            estimatedSavedChars: policy.decisions.eviction.estimatedSavedChars,
-            reasons: policy.decisions.eviction.reasons,
             apiFamily,
           },
         });

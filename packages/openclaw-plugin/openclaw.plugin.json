@@ -278,6 +278,74 @@
           "minBlockChars": {
             "type": "number",
             "description": "Reserved minimum chars for a message/block to be considered by eviction planner."
+          },
+          "replacementMode": {
+            "type": "string",
+            "enum": ["pointer_stub", "drop"],
+            "default": "pointer_stub",
+            "description": "How canonical task eviction replaces archived content: keep a pointer stub or drop the task bundle entirely."
+          }
+        }
+      },
+      "taskStateEstimator": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Incremental task-state estimator settings used to maintain session task lifecycle and drive registry-backed eviction.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "OpenAI-compatible base URL for the task-state estimator model."
+          },
+          "apiKey": {
+            "type": "string",
+            "sensitive": true,
+            "description": "API key used for task-state estimator requests."
+          },
+          "model": {
+            "type": "string",
+            "description": "Model name used by the task-state estimator."
+          },
+          "requestTimeoutMs": {
+            "type": "number",
+            "default": 60000,
+            "description": "HTTP timeout for task-state estimator requests."
+          },
+          "batchTurns": {
+            "type": "number",
+            "default": 5,
+            "description": "Minimum pending raw turns required before running one estimator update."
+          },
+          "evictionLookaheadTurns": {
+            "type": "number",
+            "default": 3,
+            "description": "Hint horizon used when deciding whether a completed task can move to evictable."
+          },
+          "lifecycleMode": {
+            "type": "string",
+            "enum": ["coupled", "decoupled"],
+            "default": "coupled",
+            "description": "Whether the estimator directly predicts evictable or only predicts active/completed."
+          },
+          "evictionPromotionPolicy": {
+            "type": "string",
+            "enum": ["fifo"],
+            "default": "fifo",
+            "description": "Promotion policy used in decoupled mode for completed -> evictable."
+          },
+          "evictionPromotionHotTailSize": {
+            "type": "number",
+            "default": 1,
+            "description": "How many most-recently completed tasks remain hot in completed state before FIFO promotion moves older ones to evictable."
+          },
+          "inputMode": {
+            "type": "string",
+            "enum": ["sliding_window", "completed_summary_plus_active_turns"],
+            "default": "sliding_window",
+            "description": "Estimator input construction mode. sliding_window feeds only the pending turn window; completed_summary_plus_active_turns feeds summaries of completed tasks plus all turns for unresolved tasks."
           }
         }
       },
@@ -569,6 +637,9 @@
     },
     "compaction": {
       "label": "Compaction"
+    },
+    "taskStateEstimator": {
+      "label": "Task State Estimator"
     },
     "handoff": {
       "label": "Handoff"

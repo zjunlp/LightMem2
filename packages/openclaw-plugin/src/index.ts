@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { createServer } from "node:http";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
@@ -20,8 +20,16 @@ import {
   resolveRecoveryStateDir,
 } from "../../layers/execution/src/atomic/archive-recovery/index.js";
 import { createCompactionModule } from "../../layers/execution/src/composer/compaction/index.js";
-import { createEvictionModule } from "../../layers/execution/src/composer/eviction/index.js";
 import { createPolicyModule, type PolicyModuleConfig } from "../../layers/decision/src/policy.js";
+import {
+  buildTurnAbsId,
+  createTurnAnchor,
+  listRawSemanticTurnSeqs,
+  loadRawSemanticTurnRecord,
+  persistRawSemanticTurnRecord,
+} from "../../layers/history/src/raw-semantic.js";
+import type { RawSemanticTurnRecord } from "../../layers/history/src/types.js";
+import { loadSessionTaskRegistry } from "../../layers/history/src/registry.js";
 import type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "../../kernel/src/types.js";
 import type { RuntimeModule, RuntimeModuleRuntime } from "../../kernel/src/interfaces.js";
 import {
@@ -93,6 +101,20 @@ type EcoClawPluginConfig = {
     policy?: "noop" | "lru" | "lfu" | "gdsf" | "model_scored";
     maxCandidateBlocks?: number;
     minBlockChars?: number;
+    replacementMode?: "pointer_stub" | "drop";
+  };
+  taskStateEstimator?: {
+    enabled?: boolean;
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+    requestTimeoutMs?: number;
+    batchTurns?: number;
+    evictionLookaheadTurns?: number;
+    inputMode?: "sliding_window" | "completed_summary_plus_active_turns";
+    lifecycleMode?: "coupled" | "decoupled";
+    evictionPromotionPolicy?: "fifo";
+    evictionPromotionHotTailSize?: number;
   };
   semanticReduction?: {
     enabled?: boolean;
@@ -401,6 +423,7 @@ function normalizeConfig(raw: unknown): Required<Omit<EcoClawPluginConfig, "prox
   const compaction = cfg.compaction ?? {};
   const handoff = cfg.handoff ?? {};
   const eviction = cfg.eviction ?? {};
+  const taskStateEstimator = cfg.taskStateEstimator ?? {};
   const semantic = cfg.semanticReduction ?? {};
   const semanticEmbedding = semantic.embedding ?? {};
   const reduction = cfg.reduction ?? {};
@@ -409,6 +432,32 @@ function normalizeConfig(raw: unknown): Required<Omit<EcoClawPluginConfig, "prox
   const hooks = cfg.hooks ?? {};
   const contextEngine = cfg.contextEngine ?? {};
   const proxyMode = cfg.proxyMode ?? {};
+  const envTaskStateEstimatorEnabled =
+    String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_ENABLED ?? "").trim().toLowerCase();
+  const envTaskStateEstimatorBaseUrl = String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_BASE_URL ?? "").trim();
+  const envTaskStateEstimatorApiKey = String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_API_KEY ?? "").trim();
+  const envTaskStateEstimatorModel = String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_MODEL ?? "").trim();
+  const envTaskStateEstimatorTimeoutMs = Number.parseInt(
+    String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_TIMEOUT_MS ?? ""),
+    10,
+  );
+  const envTaskStateEstimatorBatchTurns = Number.parseInt(
+    String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_BATCH_TURNS ?? ""),
+    10,
+  );
+  const envTaskStateEstimatorEvictionLookaheadTurns = Number.parseInt(
+    String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_LOOKAHEAD_TURNS ?? ""),
+    10,
+  );
+  const envTaskStateEstimatorInputMode = String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_INPUT_MODE ?? "").trim();
+  const envTaskStateEstimatorLifecycleMode = String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_LIFECYCLE_MODE ?? "").trim();
+  const envTaskStateEstimatorEvictionPromotionPolicy = String(
+    process.env.ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_POLICY ?? "",
+  ).trim();
+  const envTaskStateEstimatorEvictionPromotionHotTailSize = Number.parseInt(
+    String(process.env.ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_HOT_TAIL_SIZE ?? ""),
+    10,
+  );
   return {
     enabled: cfg.enabled ?? true,
     logLevel: cfg.logLevel ?? "info",
@@ -487,7 +536,79 @@ function normalizeConfig(raw: unknown): Required<Omit<EcoClawPluginConfig, "prox
           ? eviction.policy
           : "noop",
       maxCandidateBlocks: Math.max(1, eviction.maxCandidateBlocks ?? 128),
-      minBlockChars: Math.max(16, eviction.minBlockChars ?? 256),
+      minBlockChars: Math.max(0, eviction.minBlockChars ?? 256),
+      replacementMode:
+        eviction.replacementMode === "drop"
+          ? "drop"
+          : "pointer_stub",
+    },
+    taskStateEstimator: {
+      enabled:
+        taskStateEstimator.enabled
+        ?? (envTaskStateEstimatorEnabled === "1"
+          || envTaskStateEstimatorEnabled === "true"
+          || envTaskStateEstimatorEnabled === "yes"
+          || envTaskStateEstimatorEnabled === "on"),
+      baseUrl:
+        typeof taskStateEstimator.baseUrl === "string" && taskStateEstimator.baseUrl.trim().length > 0
+          ? taskStateEstimator.baseUrl.replace(/\/+$/, "")
+          : envTaskStateEstimatorBaseUrl
+            ? envTaskStateEstimatorBaseUrl.replace(/\/+$/, "")
+          : undefined,
+      apiKey:
+        typeof taskStateEstimator.apiKey === "string" && taskStateEstimator.apiKey.trim().length > 0
+          ? taskStateEstimator.apiKey.trim()
+          : envTaskStateEstimatorApiKey
+            ? envTaskStateEstimatorApiKey
+          : undefined,
+      model:
+        typeof taskStateEstimator.model === "string" && taskStateEstimator.model.trim().length > 0
+          ? taskStateEstimator.model.trim()
+          : envTaskStateEstimatorModel
+            ? envTaskStateEstimatorModel
+          : undefined,
+      requestTimeoutMs: Math.max(
+        1000,
+        taskStateEstimator.requestTimeoutMs
+        ?? (Number.isFinite(envTaskStateEstimatorTimeoutMs) ? envTaskStateEstimatorTimeoutMs : 60_000),
+      ),
+      batchTurns: Math.max(
+        1,
+        taskStateEstimator.batchTurns
+        ?? (Number.isFinite(envTaskStateEstimatorBatchTurns) ? envTaskStateEstimatorBatchTurns : 5),
+      ),
+      evictionLookaheadTurns: Math.max(
+        1,
+        taskStateEstimator.evictionLookaheadTurns
+        ?? (Number.isFinite(envTaskStateEstimatorEvictionLookaheadTurns)
+          ? envTaskStateEstimatorEvictionLookaheadTurns
+          : 3),
+      ),
+      inputMode:
+        taskStateEstimator.inputMode === "completed_summary_plus_active_turns"
+          ? "completed_summary_plus_active_turns"
+          : envTaskStateEstimatorInputMode === "completed_summary_plus_active_turns"
+            ? "completed_summary_plus_active_turns"
+            : "sliding_window",
+      lifecycleMode:
+        taskStateEstimator.lifecycleMode === "decoupled"
+          ? "decoupled"
+          : envTaskStateEstimatorLifecycleMode === "decoupled"
+            ? "decoupled"
+            : "coupled",
+      evictionPromotionPolicy:
+        taskStateEstimator.evictionPromotionPolicy === "fifo"
+          ? "fifo"
+          : envTaskStateEstimatorEvictionPromotionPolicy === "fifo"
+            ? "fifo"
+            : "fifo",
+      evictionPromotionHotTailSize: Math.max(
+        0,
+        taskStateEstimator.evictionPromotionHotTailSize
+        ?? (Number.isFinite(envTaskStateEstimatorEvictionPromotionHotTailSize)
+          ? envTaskStateEstimatorEvictionPromotionHotTailSize
+          : 1),
+      ),
     },
     semanticReduction: {
       enabled: semantic.enabled ?? false,
@@ -596,7 +717,10 @@ function stripUntrustedSenderMetadata(text: string): string {
 }
 
 function normalizeUserMessageText(text: string): string {
-  return stripUntrustedSenderMetadata(String(text ?? ""));
+  return stripUntrustedSenderMetadata(String(text ?? ""))
+    .replace(/^\[[^\]\n]{6,}\]\s*/u, "")
+    .replace(/^(?:-\s*[A-Z][A-Z0-9_]*\s*:\s*[^\n]*\n)+/u, "")
+    .trim();
 }
 
 function normalizeTurnBindingMessage(text: string): string {
@@ -958,9 +1082,11 @@ const NULL_RUNTIME: RuntimeModuleRuntime = {
 function buildPolicyModuleConfigFromPluginConfig(
   cfg: ReturnType<typeof normalizeConfig>,
 ): PolicyModuleConfig {
+  const turnLocalCompaction = cfg.compaction.turnLocalCompaction ?? { enabled: false, archiveDir: undefined };
   return {
     localityEnabled: true,
-    turnLocalCompactionEnabled: cfg.modules.compaction && cfg.compaction.turnLocalCompaction.enabled,
+    stateDir: cfg.stateDir,
+    turnLocalCompactionEnabled: cfg.modules.compaction && turnLocalCompaction.enabled,
     compactionEnabled: cfg.modules.compaction && cfg.compaction.enabled,
     compactionCooldownTurns: cfg.compaction.compactionCooldownTurns,
     reductionEnabled: false,
@@ -970,6 +1096,23 @@ function buildPolicyModuleConfigFromPluginConfig(
     evictionEnabled: cfg.modules.eviction && cfg.eviction.enabled,
     evictionPolicy: cfg.eviction.policy,
     evictionMinBlockChars: cfg.eviction.minBlockChars,
+    taskStateEstimator: cfg.taskStateEstimator.enabled
+      ? {
+          enabled: true,
+          baseUrl: cfg.taskStateEstimator.baseUrl,
+          apiKey: cfg.taskStateEstimator.apiKey,
+          model: cfg.taskStateEstimator.model,
+          requestTimeoutMs: cfg.taskStateEstimator.requestTimeoutMs,
+          batchTurns: cfg.taskStateEstimator.batchTurns,
+          evictionLookaheadTurns: cfg.taskStateEstimator.evictionLookaheadTurns,
+          inputMode: cfg.taskStateEstimator.inputMode,
+          lifecycleMode: cfg.taskStateEstimator.lifecycleMode,
+          evictionPromotionPolicy: cfg.taskStateEstimator.evictionPromotionPolicy,
+          evictionPromotionHotTailSize: cfg.taskStateEstimator.evictionPromotionHotTailSize,
+        }
+      : {
+          enabled: false,
+        },
     summaryGenerationMode: cfg.compaction.summaryGenerationMode,
     summaryMaxOutputTokens: cfg.compaction.summaryMaxOutputTokens,
     cacheHealthEnabled: false,
@@ -979,10 +1122,10 @@ function buildPolicyModuleConfigFromPluginConfig(
 async function applyPolicyAndCompactionBeforeCall(
   turnCtx: RuntimeTurnContext,
   cfg: ReturnType<typeof normalizeConfig>,
+  logger: Required<PluginLogger>,
   modules?: {
     policy?: RuntimeModule;
     compaction?: RuntimeModule;
-    eviction?: RuntimeModule;
   },
 ): Promise<{
   turnCtx: RuntimeTurnContext;
@@ -995,6 +1138,8 @@ async function applyPolicyAndCompactionBeforeCall(
 
   if (cfg.modules.policy && modules?.policy?.beforeBuild) {
     nextCtx = await modules.policy.beforeBuild(nextCtx, NULL_RUNTIME);
+    logTaskStateMonitor(nextCtx, logger);
+    logEvictionPlanMonitor(nextCtx, logger);
     if (bridgedReductionDecision) {
       const policy = asRecord(nextCtx.metadata?.policy) ?? {};
       const decisions = asRecord(policy.decisions) ?? {};
@@ -1018,9 +1163,6 @@ async function applyPolicyAndCompactionBeforeCall(
   if (cfg.modules.compaction && modules?.compaction?.beforeCall) {
     nextCtx = await modules.compaction.beforeCall(nextCtx, NULL_RUNTIME);
   }
-  if (cfg.modules.eviction && modules?.eviction?.beforeCall) {
-    nextCtx = await modules.eviction.beforeCall(nextCtx, NULL_RUNTIME);
-  }
   const compactionChangedSegmentIds: string[] = [];
   for (const segment of nextCtx.segments) {
     if (beforeCompaction.get(segment.id) !== segment.text) {
@@ -1031,9 +1173,91 @@ async function applyPolicyAndCompactionBeforeCall(
   return { turnCtx: nextCtx, compactionChangedSegmentIds };
 }
 
+function logTaskStateMonitor(
+  ctx: RuntimeTurnContext,
+  logger: Required<PluginLogger>,
+): void {
+  const taskState = asRecord(asRecord(asRecord(ctx.metadata?.policy)?.decisions)?.taskState);
+  if (!taskState || taskState.enabled !== true || taskState.attempted !== true) return;
+
+  const transitions = Array.isArray(taskState.transitions)
+    ? taskState.transitions
+        .map((item) => asRecord(item))
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  const rejected = Array.isArray(taskState.rejectedUpdates)
+    ? taskState.rejectedUpdates
+        .map((item) => asRecord(item))
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  const touchedTaskIds = Array.isArray(taskState.touchedTaskIds)
+    ? taskState.touchedTaskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  const note = typeof taskState.note === "string" ? taskState.note.trim() : "";
+
+  if (transitions.length === 0 && rejected.length === 0 && !note) return;
+
+  const transitionText =
+    transitions.length > 0
+      ? transitions
+          .slice(0, 8)
+          .map((item) => {
+            const taskId = typeof item.taskId === "string" ? item.taskId : "task";
+            const from = typeof item.from === "string" && item.from.trim().length > 0 ? item.from : "new";
+            const to = typeof item.to === "string" ? item.to : "unknown";
+            return `${taskId}:${from}->${to}`;
+          })
+          .join(", ")
+      : "none";
+  const rejectedText =
+    rejected.length > 0
+      ? rejected
+          .slice(0, 8)
+          .map((item) => {
+            const taskId = typeof item.taskId === "string" ? item.taskId : "task";
+            const from = typeof item.from === "string" && item.from.trim().length > 0 ? item.from : "new";
+            const to = typeof item.to === "string" ? item.to : "unknown";
+            const reason = typeof item.reason === "string" ? item.reason : "rejected";
+            return `${taskId}:${from}->${to}(${reason})`;
+          })
+          .join(", ")
+      : "none";
+  logger.info(
+    `[ecoclaw/task-state] session=${ctx.sessionId} applied=${taskState.applied === true} touched=${touchedTaskIds.length} transitions=[${transitionText}] rejected=[${rejectedText}]${note ? ` note=${note}` : ""}`,
+  );
+}
+
+function logEvictionPlanMonitor(
+  ctx: RuntimeTurnContext,
+  logger: Required<PluginLogger>,
+): void {
+  const eviction = asRecord(asRecord(asRecord(ctx.metadata?.policy)?.decisions)?.eviction);
+  if (!eviction || eviction.enabled !== true) return;
+  const instructions = Array.isArray(eviction.instructions)
+    ? eviction.instructions
+        .map((item) => asRecord(item))
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  if (instructions.length === 0) return;
+  const taskIds = Array.from(
+    new Set(
+      instructions.flatMap((item) => {
+        const params = asRecord(item.parameters);
+        const taskId =
+          typeof params?.taskId === "string" && params.taskId.trim().length > 0 ? [params.taskId.trim()] : [];
+        return taskId;
+      }),
+    ),
+  );
+  logger.info(
+    `[ecoclaw/eviction-plan] session=${ctx.sessionId} instructions=${instructions.length} tasks=${taskIds.length > 0 ? taskIds.join(", ") : "unknown"} policy=${typeof eviction.policy === "string" ? eviction.policy : "unknown"}`,
+  );
+}
+
 function buildLayeredReductionContext(
   payload: any,
   triggerMinChars: number,
+  sessionId: string,
   passToggles?: {
     repeatedReadDedup?: boolean;
     toolPayloadTrim?: boolean;
@@ -1042,6 +1266,8 @@ function buildLayeredReductionContext(
     agentsStartupOptimization?: boolean;
   },
   passOptions?: Record<string, Record<string, unknown>>,
+  segmentAnchorByCallId?: Map<string, { turnAbsIds: string[]; taskIds: string[] }>,
+  orderedTurnAnchors?: Array<{ turnAbsId: string; taskIds: string[] }>,
 ): {
   turnCtx: RuntimeTurnContext;
   bindings: ProxyReductionBinding[];
@@ -1054,7 +1280,6 @@ function buildLayeredReductionContext(
     instructionCount: number;
     enableToolPayloadTrim?: boolean;
     passToggles?: Record<string, boolean>;
-    reductionInstructionStrategies?: string[];
   };
 } {
   const input = Array.isArray(payload?.input) ? payload.input : [];
@@ -1130,10 +1355,22 @@ function buildLayeredReductionContext(
   let persistedSkippedItems = 0;
   let candidateBlocks = 0;
   let overThresholdBlocks = 0;
+  let orderedTurnIndex = -1;
+  let currentOrderedAnchor: { turnAbsIds: string[]; taskIds: string[] } | undefined;
 
   for (let index = 0; index < input.length; index += 1) {
     const item = input[index];
     if (!item || typeof item !== "object") continue;
+    if (String(item.role ?? "").toLowerCase() === "user" && orderedTurnAnchors) {
+      const nextAnchor = orderedTurnAnchors[orderedTurnIndex + 1];
+      if (nextAnchor) {
+        orderedTurnIndex += 1;
+        currentOrderedAnchor = {
+          turnAbsIds: [nextAnchor.turnAbsId],
+          taskIds: nextAnchor.taskIds,
+        };
+      }
+    }
     if (!isLikelyToolLikeInputItem(item)) continue;
     if (isContextSafePersistedInputItem(item)) {
       persistedSkippedItems += 1;
@@ -1145,6 +1382,7 @@ function buildLayeredReductionContext(
     const itemRole = String(item.role ?? "").toLowerCase();
     const callId = String(item.call_id ?? item.tool_call_id ?? item.id ?? "").trim();
     const callMeta = callId ? callArgsMap.get(callId) : undefined;
+    const anchored = (callId ? segmentAnchorByCallId?.get(callId) : undefined) ?? currentOrderedAnchor;
     const toolName = String(
       item.name
       ?? item.tool_name
@@ -1152,6 +1390,9 @@ function buildLayeredReductionContext(
       ?? callMeta?.toolName
       ?? "",
     ).trim();
+    const isMemoryFaultRecoveryTool =
+      toolName.toLowerCase() === MEMORY_FAULT_RECOVER_TOOL_NAME
+      || hasRecoveryMarker(item?.details);
     const directPath =
       extractPathLike(item)
       ?? extractPathLike(item?.details)
@@ -1211,18 +1452,29 @@ function buildLayeredReductionContext(
         {
           toolName,
           path: dataPath,
+          turnAbsIds: anchored?.turnAbsIds,
+          taskIds: anchored?.taskIds,
           itemType,
           itemRole,
           fieldName,
+          recovery: isMemoryFaultRecoveryTool
+            ? {
+                source: MEMORY_FAULT_RECOVER_TOOL_NAME,
+                skipReduction: true,
+                skipCompaction: true,
+              }
+            : undefined,
           toolPayload: {
             toolName,
             path: dataPath,
+            turnAbsIds: anchored?.turnAbsIds,
+            taskIds: anchored?.taskIds,
             payloadKind: detectToolPayloadKind(text) ?? "stdout",
           },
         },
         { segmentId, itemIndex: index, field: fieldName, beforeLen: text.length },
       );
-      if (applyReduction) {
+      if (applyReduction && !isMemoryFaultRecoveryTool) {
         addReductionInstructions(segmentId, text);
       }
       if (toolName === "read" && dataPath && fieldName !== "arguments") {
@@ -1245,18 +1497,31 @@ function buildLayeredReductionContext(
         {
           toolName,
           path: dataPath,
+          turnAbsIds: anchored?.turnAbsIds,
+          taskIds: anchored?.taskIds,
           itemType,
           itemRole,
           fieldName: "content",
+          recovery: isMemoryFaultRecoveryTool
+            ? {
+                source: MEMORY_FAULT_RECOVER_TOOL_NAME,
+                skipReduction: true,
+                skipCompaction: true,
+              }
+            : undefined,
           toolPayload: {
             toolName,
             path: dataPath,
+            turnAbsIds: anchored?.turnAbsIds,
+            taskIds: anchored?.taskIds,
             payloadKind: detectToolPayloadKind(item.content) ?? "stdout",
           },
         },
         { segmentId, itemIndex: index, field: "content", beforeLen: item.content.length },
       );
-      addReductionInstructions(segmentId, item.content);
+      if (!isMemoryFaultRecoveryTool) {
+        addReductionInstructions(segmentId, item.content);
+      }
       if (toolName === "read" && dataPath) {
         const bucket = readByPath.get(dataPath) ?? [];
         bucket.push(segmentId);
@@ -1282,14 +1547,25 @@ function buildLayeredReductionContext(
           {
             toolName,
             path: dataPath,
+            turnAbsIds: anchored?.turnAbsIds,
+            taskIds: anchored?.taskIds,
             itemType,
             itemRole,
             fieldName: "content",
             blockIndex,
             blockKey,
+            recovery: isMemoryFaultRecoveryTool
+              ? {
+                  source: MEMORY_FAULT_RECOVER_TOOL_NAME,
+                  skipReduction: true,
+                  skipCompaction: true,
+                }
+              : undefined,
             toolPayload: {
               toolName,
               path: dataPath,
+              turnAbsIds: anchored?.turnAbsIds,
+              taskIds: anchored?.taskIds,
               payloadKind: detectToolPayloadKind(text) ?? "stdout",
             },
           },
@@ -1302,7 +1578,9 @@ function buildLayeredReductionContext(
             beforeLen: text.length,
           },
         );
-        addReductionInstructions(segmentId, text);
+        if (!isMemoryFaultRecoveryTool) {
+          addReductionInstructions(segmentId, text);
+        }
         if (toolName === "read" && dataPath) {
           const bucket = readByPath.get(dataPath) ?? [];
           bucket.push(segmentId);
@@ -1327,7 +1605,7 @@ function buildLayeredReductionContext(
   }
 
   const turnCtx: RuntimeTurnContext = {
-    sessionId: "proxy-session",
+    sessionId: sessionId.trim() || "proxy-session",
     sessionMode: "single",
     provider: "openai",
     model: String(payload?.model ?? "unknown"),
@@ -1375,9 +1653,65 @@ function buildLayeredReductionContext(
         htmlSlimming: enableHtmlSlimming,
         execOutputTruncation: enableExecOutputTruncation,
       },
-      reductionInstructionStrategies: reductionInstructions.map((item) => item.strategy),
     },
   };
+}
+
+async function loadSegmentAnchorByCallId(
+  stateDir: string,
+  sessionId: string,
+): Promise<Map<string, { turnAbsIds: string[]; taskIds: string[] }>> {
+  const registry = await loadSessionTaskRegistry(stateDir, sessionId);
+  await syncRawSemanticTurnsFromTranscript(stateDir, sessionId);
+  const turnSeqs = await listRawSemanticTurnSeqs(stateDir, sessionId);
+  const out = new Map<string, { turnAbsIds: string[]; taskIds: string[] }>();
+
+  const put = (callId: string, turnAbsId: string, taskIds: string[]): void => {
+    const normalizedCallId = String(callId ?? "").trim();
+    const normalizedTurnAbsId = String(turnAbsId ?? "").trim();
+    if (!normalizedCallId || !normalizedTurnAbsId) return;
+    const prev = out.get(normalizedCallId);
+    if (!prev) {
+      out.set(normalizedCallId, {
+        turnAbsIds: [normalizedTurnAbsId],
+        taskIds: dedupeStrings(taskIds),
+      });
+      return;
+    }
+    prev.turnAbsIds = dedupeStrings([...prev.turnAbsIds, normalizedTurnAbsId]);
+    prev.taskIds = dedupeStrings([...prev.taskIds, ...taskIds]);
+  };
+
+  for (const turnSeq of turnSeqs) {
+    const rawTurn = await loadRawSemanticTurnRecord(stateDir, sessionId, turnSeq);
+    if (!rawTurn) continue;
+    const turnAbsId = rawTurn.turnAbsId;
+    const taskIds = registry.turnToTaskIds[turnAbsId] ?? [];
+    for (const toolCall of rawTurn.toolCalls) {
+      put(toolCall.toolCallId, turnAbsId, taskIds);
+    }
+    for (const toolResult of rawTurn.toolResults) {
+      put(toolResult.toolCallId, turnAbsId, taskIds);
+    }
+  }
+
+  return out;
+}
+
+async function loadOrderedTurnAnchors(
+  stateDir: string,
+  sessionId: string,
+): Promise<Array<{ turnAbsId: string; taskIds: string[] }>> {
+  const registry = await loadSessionTaskRegistry(stateDir, sessionId);
+  return Object.entries(registry.turnToTaskIds)
+    .map(([turnAbsId, taskIds]) => ({
+      turnAbsId,
+      taskIds: dedupeStrings(taskIds),
+      turnSeq: Number(turnAbsId.split(":t").at(-1) ?? Number.NaN),
+    }))
+    .filter((item) => item.turnAbsId.trim().length > 0 && Number.isFinite(item.turnSeq))
+    .sort((a, b) => a.turnSeq - b.turnSeq)
+    .map(({ turnAbsId, taskIds }) => ({ turnAbsId, taskIds }));
 }
 
 function isReductionPassEnabled(
@@ -1478,10 +1812,12 @@ type ProxyAfterCallReductionResult = {
   }>;
 };
 
-function applyLayeredReductionToInput(
+async function applyLayeredReductionToInput(
   payload: any,
   maxToolChars: number,
   triggerMinChars: number,
+  sessionId: string,
+  logger: Required<PluginLogger>,
   passToggles?: {
     repeatedReadDedup?: boolean;
     toolPayloadTrim?: boolean;
@@ -1493,9 +1829,10 @@ function applyLayeredReductionToInput(
   beforeCallModules?: {
     policy?: RuntimeModule;
     compaction?: RuntimeModule;
+    eviction?: RuntimeModule;
   },
   cfg?: ReturnType<typeof normalizeConfig>,
-): Promise<ProxyReductionResult> | ProxyReductionResult {
+): Promise<ProxyReductionResult> {
   if (!Array.isArray(payload?.input)) {
     return {
       changedItems: 0,
@@ -1515,11 +1852,22 @@ function applyLayeredReductionToInput(
       },
     };
   }
+  const segmentAnchorByCallId =
+    cfg?.stateDir && sessionId && sessionId !== "proxy-session"
+      ? await loadSegmentAnchorByCallId(cfg.stateDir, sessionId).catch(() => new Map())
+      : undefined;
+  const orderedTurnAnchors =
+    cfg?.stateDir && sessionId && sessionId !== "proxy-session"
+      ? await loadOrderedTurnAnchors(cfg.stateDir, sessionId).catch(() => [])
+      : undefined;
   const { turnCtx, bindings, stats } = buildLayeredReductionContext(
     payload,
     triggerMinChars,
+    sessionId,
     passToggles,
     passOptions,
+    segmentAnchorByCallId,
+    orderedTurnAnchors,
   );
   if (turnCtx.segments.length === 0 || bindings.length === 0) {
     return {
@@ -1542,7 +1890,7 @@ function applyLayeredReductionToInput(
     };
   }
   const beforeCallCtxPromise = beforeCallModules && cfg
-    ? applyPolicyAndCompactionBeforeCall(turnCtx, cfg, beforeCallModules)
+    ? applyPolicyAndCompactionBeforeCall(turnCtx, cfg, logger, beforeCallModules)
     : Promise.resolve({ turnCtx, compactionChangedSegmentIds: [] as string[] });
 
   const passes = resolveLayerReductionPasses({ maxToolChars, passOptions }).filter(
@@ -1662,7 +2010,9 @@ function applyLayeredReductionToInput(
 function applyProxyReductionToInput(
   payload: any,
   options?: {
+    sessionId?: string;
     engine?: "layered";
+    logger?: Required<PluginLogger>;
     triggerMinChars?: number;
     maxToolChars?: number;
     passToggles?: {
@@ -1676,16 +2026,19 @@ function applyProxyReductionToInput(
     beforeCallModules?: {
       policy?: RuntimeModule;
       compaction?: RuntimeModule;
+      eviction?: RuntimeModule;
     };
     cfg?: ReturnType<typeof normalizeConfig>;
   },
-): Promise<ProxyReductionResult> | ProxyReductionResult {
+): Promise<ProxyReductionResult> {
   const triggerMinChars = Math.max(256, options?.triggerMinChars ?? 2200);
   const maxToolChars = Math.max(256, options?.maxToolChars ?? 1200);
   return applyLayeredReductionToInput(
     payload,
     maxToolChars,
     triggerMinChars,
+    String(options?.sessionId ?? "proxy-session"),
+    options?.logger ?? makeLogger(),
     options?.passToggles,
     options?.passOptions,
     options?.beforeCallModules,
@@ -1981,6 +2334,7 @@ async function applyLayeredReductionAfterCall(
   const { turnCtx } = buildLayeredReductionContext(
     requestPayload,
     triggerMinChars,
+    "proxy-session",
     passToggles,
     passOptions,
   );
@@ -2072,6 +2426,14 @@ function extractInputText(input: any): string {
       .join("\n");
   }
   return "";
+}
+
+function estimatePayloadInputChars(input: any): number {
+  try {
+    return normalizeText(extractInputText(input)).length;
+  } catch {
+    return 0;
+  }
 }
 
 function findDeveloperAndPrimaryUser(input: any): {
@@ -2339,7 +2701,7 @@ async function appendUpstreamTransportTrace(
   record: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const cfg = normalizeConfig(logger.config ?? {});
+    const cfg = normalizeConfig({});
     const tracePath = join(cfg.stateDir, "ecoclaw", "upstream-transport-trace.jsonl");
     await mkdir(dirname(tracePath), { recursive: true });
     await appendFile(
@@ -2364,7 +2726,7 @@ async function requestUpstreamWithCurl(
   const proxySettings = resolveUpstreamProxySettings();
   try {
     await writeFile(bodyPath, JSON.stringify(payload), "utf8");
-    await appendUpstreamTransportTrace(logger ?? createPluginLogger("warn"), {
+    await appendUpstreamTransportTrace(logger ?? makeLogger(), {
       stage: "curl_start",
       upstreamBaseUrl: upstream.baseUrl,
       httpProxy: curlEnv.http_proxy ?? curlEnv.HTTP_PROXY ?? "",
@@ -2417,7 +2779,7 @@ async function requestUpstreamWithCurl(
     const text = stdout.slice(0, idx);
     const status = Number.parseInt(stdout.slice(idx + marker.length).trim(), 10);
     const rawHeaders = await readFile(headersPath, "utf8");
-    await appendUpstreamTransportTrace(logger ?? createPluginLogger("warn"), {
+    await appendUpstreamTransportTrace(logger ?? makeLogger(), {
       stage: "curl_ok",
       upstreamBaseUrl: upstream.baseUrl,
       status: Number.isFinite(status) ? status : 502,
@@ -2430,7 +2792,7 @@ async function requestUpstreamWithCurl(
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    await appendUpstreamTransportTrace(logger ?? createPluginLogger("warn"), {
+    await appendUpstreamTransportTrace(logger ?? makeLogger(), {
       stage: "curl_error",
       upstreamBaseUrl: upstream.baseUrl,
       error: detail,
@@ -2599,6 +2961,7 @@ async function ensureExplicitProxyModelsInConfig(
 async function startEmbeddedResponsesProxy(
   cfg: ReturnType<typeof normalizeConfig>,
   logger: Required<PluginLogger>,
+  resolveSessionIdForPayload?: (payload: any) => string | undefined,
 ): Promise<{ baseUrl: string; upstream: UpstreamConfig; close: () => Promise<void> } | null> {
   if (!cfg.proxyAutostart) return null;
   let upstream: UpstreamConfig | null = null;
@@ -2621,15 +2984,13 @@ async function startEmbeddedResponsesProxy(
   }
 
   const policyModule = createPolicyModule(buildPolicyModuleConfigFromPluginConfig(cfg));
+  const turnLocalCompaction = cfg.compaction.turnLocalCompaction ?? { enabled: false, archiveDir: undefined };
+  const reductionPassOptions = cfg.reduction.passOptions ?? {};
   const compactionModule = createCompactionModule({
     turnLocalCompaction: {
-      enabled: cfg.compaction.turnLocalCompaction.enabled,
-      archiveDir: cfg.compaction.turnLocalCompaction.archiveDir,
+      enabled: turnLocalCompaction.enabled,
+      archiveDir: turnLocalCompaction.archiveDir,
     },
-  });
-  const evictionModule = createEvictionModule({
-    enabled: cfg.modules.eviction && cfg.eviction.enabled,
-    policy: cfg.eviction.policy,
   });
 
   const server = createServer(async (req, res) => {
@@ -2657,6 +3018,8 @@ async function startEmbeddedResponsesProxy(
       const proxyPureForward = cfg.proxyMode.pureForward;
       const reductionTriggerMinChars = Math.max(256, cfg.reduction.triggerMinChars ?? 2200);
       const reductionMaxToolChars = Math.max(256, cfg.reduction.maxToolChars ?? 1200);
+      const resolvedSessionId =
+        String(resolveSessionIdForPayload?.(payload) ?? "proxy-session").trim() || "proxy-session";
       if (!proxyPureForward && cfg.modules.reduction) {
         injectMemoryFaultProtocolInstructions(payload);
       }
@@ -2704,32 +3067,57 @@ async function startEmbeddedResponsesProxy(
           senderMetadataBlocksBefore: 0,
           senderMetadataBlocksAfter: 0,
         };
+      if (!proxyPureForward && cfg.stateDir) {
+        await appendTaskStateTrace(cfg.stateDir, {
+          stage: "stable_prefix_rewrite",
+          sessionId: resolvedSessionId,
+          model,
+          promptCacheKey: stableRewrite.promptCacheKey,
+          inputItemCount: Array.isArray(payload?.input) ? payload.input.length : 0,
+          inputChars: estimatePayloadInputChars(payload?.input),
+          userContentRewrites: stableRewrite.userContentRewrites,
+          senderMetadataBlocksBefore: stableRewrite.senderMetadataBlocksBefore,
+          senderMetadataBlocksAfter: stableRewrite.senderMetadataBlocksAfter,
+        });
+      }
+      const beforeReductionInputCount = Array.isArray(payload?.input) ? payload.input.length : 0;
+      const beforeReductionInputChars = estimatePayloadInputChars(payload?.input);
       const reductionApplied: ProxyReductionResult = !proxyPureForward && cfg.modules.reduction
-        ? await applyProxyReductionToInput(payload, {
-          engine: cfg.reduction.engine,
-          triggerMinChars: cfg.reduction.triggerMinChars,
-          maxToolChars: cfg.reduction.maxToolChars,
-          passToggles: cfg.reduction.passes,
-          passOptions: {
-            repeated_read_dedup: cfg.reduction.passOptions.repeatedReadDedup,
-            tool_payload_trim: cfg.reduction.passOptions.toolPayloadTrim,
-            html_slimming: cfg.reduction.passOptions.htmlSlimming,
-            exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
-            agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-            format_slimming: cfg.reduction.passOptions.formatSlimming,
-            semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
-            format_cleaning: cfg.reduction.passOptions.formatCleaning,
-            path_truncation: cfg.reduction.passOptions.pathTruncation,
-            image_downsample: cfg.reduction.passOptions.imageDownsample,
-            line_number_strip: cfg.reduction.passOptions.lineNumberStrip,
-          },
-          beforeCallModules: {
-            policy: policyModule,
-            compaction: compactionModule,
-            eviction: evictionModule,
-          },
-          cfg,
-        })
+        ? await (() => {
+          if (cfg.stateDir) {
+            void appendTaskStateTrace(cfg.stateDir, {
+              stage: "proxy_reduction_session_resolved",
+              resolvedSessionId,
+              promptPreview: String(payload?.prompt ?? "").slice(0, 160),
+            });
+          }
+          return applyProxyReductionToInput(payload, {
+            sessionId: resolvedSessionId,
+            logger,
+            engine: cfg.reduction.engine,
+            triggerMinChars: cfg.reduction.triggerMinChars,
+            maxToolChars: cfg.reduction.maxToolChars,
+            passToggles: cfg.reduction.passes,
+            passOptions: {
+              repeated_read_dedup: reductionPassOptions.repeatedReadDedup ?? {},
+              tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
+              html_slimming: reductionPassOptions.htmlSlimming ?? {},
+              exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
+              agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
+              format_slimming: reductionPassOptions.formatSlimming ?? {},
+              semantic_llmlingua2: reductionPassOptions.semanticLlmlingua2 ?? {},
+              format_cleaning: reductionPassOptions.formatCleaning ?? {},
+              path_truncation: reductionPassOptions.pathTruncation ?? {},
+              image_downsample: reductionPassOptions.imageDownsample ?? {},
+              line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
+            },
+            beforeCallModules: {
+              policy: policyModule,
+              compaction: compactionModule,
+            },
+            cfg,
+          });
+        })()
         : {
           changedItems: 0,
           changedBlocks: 0,
@@ -2747,6 +3135,24 @@ async function startEmbeddedResponsesProxy(
             skippedReason: proxyPureForward ? "proxy_pure_forward" : "module_disabled",
           },
         };
+      if (cfg.stateDir) {
+        await appendTaskStateTrace(cfg.stateDir, {
+          stage: "proxy_before_call_rewrite",
+          sessionId: resolvedSessionId,
+          model,
+          proxyPureForward,
+          inputItemCountBefore: beforeReductionInputCount,
+          inputItemCountAfter: Array.isArray(payload?.input) ? payload.input.length : 0,
+          inputCharsBefore: beforeReductionInputChars,
+          inputCharsAfter: estimatePayloadInputChars(payload?.input),
+          reductionChangedItems: reductionApplied.changedItems,
+          reductionChangedBlocks: reductionApplied.changedBlocks,
+          reductionSavedChars: reductionApplied.savedChars,
+          reductionSkippedReason: reductionApplied.diagnostics?.skippedReason ?? null,
+          reductionCandidates: reductionApplied.diagnostics?.candidateBlocks ?? 0,
+          reductionOverThreshold: reductionApplied.diagnostics?.overThresholdBlocks ?? 0,
+        });
+      }
       if (!proxyPureForward && cfg.modules.reduction) {
         payload.__ecoclaw_reduction_applied = true;
       }
@@ -2773,6 +3179,7 @@ async function startEmbeddedResponsesProxy(
           at: requestAt,
           requestId,
           stage: "proxy_inbound",
+          sessionId: resolvedSessionId,
           model,
           upstreamModel,
           upstreamBaseUrl: upstream.baseUrl,
@@ -2813,6 +3220,7 @@ async function startEmbeddedResponsesProxy(
         const debugRecord = {
           at: new Date().toISOString(),
           stage: "proxy_inbound",
+          sessionId: resolvedSessionId,
           model,
           upstreamModel,
           instructionsChars: instructions.length,
@@ -2848,6 +3256,7 @@ async function startEmbeddedResponsesProxy(
       let memoryFaultAutoReplayCount = 0;
       upstreamResp = await requestUpstreamResponses(upstream, activePayload, logger);
       txt = upstreamResp.text;
+      const beforeAfterCallTextChars = txt.length;
       responseContentType = upstreamResp.headers["content-type"] ?? "";
       try {
         parsedResponseForMirror = JSON.parse(txt);
@@ -2872,17 +3281,17 @@ async function startEmbeddedResponsesProxy(
               reductionTriggerMinChars,
               cfg.reduction.passes,
               {
-                repeated_read_dedup: cfg.reduction.passOptions.repeatedReadDedup,
-                tool_payload_trim: cfg.reduction.passOptions.toolPayloadTrim,
-                html_slimming: cfg.reduction.passOptions.htmlSlimming,
-                exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
-                agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-                format_slimming: cfg.reduction.passOptions.formatSlimming,
-                semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
-                format_cleaning: cfg.reduction.passOptions.formatCleaning,
-                path_truncation: cfg.reduction.passOptions.pathTruncation,
-                image_downsample: cfg.reduction.passOptions.imageDownsample,
-                line_number_strip: cfg.reduction.passOptions.lineNumberStrip,
+                repeated_read_dedup: reductionPassOptions.repeatedReadDedup ?? {},
+                tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
+                html_slimming: reductionPassOptions.htmlSlimming ?? {},
+                exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
+                agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
+                format_slimming: reductionPassOptions.formatSlimming ?? {},
+                semantic_llmlingua2: reductionPassOptions.semanticLlmlingua2 ?? {},
+                format_cleaning: reductionPassOptions.formatCleaning ?? {},
+                path_truncation: reductionPassOptions.pathTruncation ?? {},
+                image_downsample: reductionPassOptions.imageDownsample ?? {},
+                line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
               },
             );
             if (afterCallReduction.changed) {
@@ -2907,17 +3316,17 @@ async function startEmbeddedResponsesProxy(
               reductionTriggerMinChars,
               cfg.reduction.passes,
               {
-                repeated_read_dedup: cfg.reduction.passOptions.repeatedReadDedup,
-                tool_payload_trim: cfg.reduction.passOptions.toolPayloadTrim,
-                html_slimming: cfg.reduction.passOptions.htmlSlimming,
-                exec_output_truncation: cfg.reduction.passOptions.execOutputTruncation,
-                agents_startup_optimization: cfg.reduction.passOptions.agentsStartupOptimization,
-                format_slimming: cfg.reduction.passOptions.formatSlimming,
-                semantic_llmlingua2: cfg.reduction.passOptions.semanticLlmlingua2,
-                format_cleaning: cfg.reduction.passOptions.formatCleaning,
-                path_truncation: cfg.reduction.passOptions.pathTruncation,
-                image_downsample: cfg.reduction.passOptions.imageDownsample,
-                line_number_strip: cfg.reduction.passOptions.lineNumberStrip,
+                repeated_read_dedup: reductionPassOptions.repeatedReadDedup ?? {},
+                tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
+                html_slimming: reductionPassOptions.htmlSlimming ?? {},
+                exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
+                agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
+                format_slimming: reductionPassOptions.formatSlimming ?? {},
+                semantic_llmlingua2: reductionPassOptions.semanticLlmlingua2 ?? {},
+                format_cleaning: reductionPassOptions.formatCleaning ?? {},
+                path_truncation: reductionPassOptions.pathTruncation ?? {},
+                image_downsample: reductionPassOptions.imageDownsample ?? {},
+                line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
               },
             );
             txt = sseResult.text;
@@ -2946,6 +3355,23 @@ async function startEmbeddedResponsesProxy(
             passCount: 0,
             skippedReason: "proxy_pure_forward",
           };
+      }
+      if (cfg.stateDir) {
+        await appendTaskStateTrace(cfg.stateDir, {
+          stage: "proxy_after_call_rewrite",
+          sessionId: resolvedSessionId,
+          model,
+          proxyPureForward,
+          responseContentType,
+          parsedResponse: Boolean(parsedResponseForMirror),
+          beforeTextChars: beforeAfterCallTextChars,
+          afterTextChars: txt.length,
+          changed: Boolean(afterCallReduction?.changed),
+          savedChars: Number(afterCallReduction?.savedChars ?? 0),
+          passCount: Number(afterCallReduction?.passCount ?? 0),
+          skippedReason: afterCallReduction?.skippedReason ?? null,
+          mode: afterCallReduction?.mode ?? null,
+        });
       }
       {
         const parsedResponse = parsedResponseForMirror;
@@ -3004,6 +3430,7 @@ async function startEmbeddedResponsesProxy(
         const forwardedRecord = {
           at: new Date().toISOString(),
           stage: "proxy_forwarded",
+          sessionId: resolvedSessionId,
           model,
           upstreamModel,
           upstreamTransport: upstreamRespFinal.transport,
@@ -3032,6 +3459,7 @@ async function startEmbeddedResponsesProxy(
           payload: activePayload,
         };
         await appendJsonl(cfg.debugTapPath, forwardedRecord);
+        await appendForwardedInputDump(cfg.stateDir, resolvedSessionId, forwardedRecord);
       }
       if (cfg.debugTapProviderTraffic) {
         let parsedResponse: any = null;
@@ -3132,6 +3560,22 @@ function toJsonSafe(value: unknown, seen = new WeakSet<object>()): unknown {
 async function appendJsonl(path: string, payload: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, `${JSON.stringify(toJsonSafe(payload))}\n`, "utf8");
+}
+
+async function appendTaskStateTrace(stateDir: string, payload: Record<string, unknown>): Promise<void> {
+  await appendJsonl(join(stateDir, "task-state", "trace.jsonl"), {
+    at: new Date().toISOString(),
+    ...payload,
+  });
+}
+
+async function appendForwardedInputDump(
+  stateDir: string,
+  sessionId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const safeSessionId = String(sessionId || "session").replace(/[^a-zA-Z0-9._-]+/g, "_");
+  await appendJsonl(join(stateDir, "ecoclaw", "forwarded-inputs", `${safeSessionId}.jsonl`), payload);
 }
 
 async function appendReductionPassTrace(
@@ -3280,8 +3724,8 @@ function hookOn(api: any, event: string, handler: (...args: any[]) => any): void
 type EcoCanonicalState = {
   version: 1;
   sessionId: string;
-  sourceMessageCount: number;
   messages: any[];
+  seenMessageIds: string[];
   updatedAt: string;
 };
 
@@ -3356,6 +3800,506 @@ function ensureContextSafeDetails(
   return base;
 }
 
+function contextSafeRecovery(details: unknown): Record<string, unknown> | undefined {
+  const contextSafe = asRecord(asRecord(details)?.contextSafe);
+  return asRecord(contextSafe?.recovery);
+}
+
+function hasRecoveryMarker(details: unknown): boolean {
+  return Boolean(contextSafeRecovery(details));
+}
+
+function buildRecoveryContextSafePatch(source: string): Record<string, unknown> {
+  return {
+    recovery: {
+      source,
+      skipReduction: true,
+      skipCompaction: true,
+    },
+  };
+}
+
+function messageToolCallId(message: Record<string, unknown>): string | undefined {
+  const direct =
+    typeof message.tool_call_id === "string" && message.tool_call_id.trim().length > 0
+      ? message.tool_call_id.trim()
+      : typeof message.toolCallId === "string" && message.toolCallId.trim().length > 0
+        ? message.toolCallId.trim()
+        : undefined;
+  return direct;
+}
+
+function canonicalMessageTaskIds(message: Record<string, unknown>): string[] {
+  const details = asRecord(message.details);
+  const contextSafe = asRecord(details?.contextSafe);
+  return Array.isArray(contextSafe?.taskIds)
+    ? contextSafe.taskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function extractCanonicalProtocolRefs(message: Record<string, unknown>): Array<{ callId: string; kind: "call" | "result" }> {
+  const refs: Array<{ callId: string; kind: "call" | "result" }> = [];
+  const directCallId = messageToolCallId(message);
+  if (directCallId && isToolResultLikeMessage(message)) {
+    refs.push({ callId: directCallId, kind: "result" });
+  }
+  const content = Array.isArray(message.content) ? message.content : [];
+  for (const rawBlock of content) {
+    const block = asRecord(rawBlock);
+    if (!block) continue;
+    const type = String(block.type ?? "").toLowerCase();
+    if (type === "toolcall" || type === "tool_call" || type === "function_call") {
+      const callId = String(block.id ?? block.call_id ?? block.tool_call_id ?? "").trim();
+      if (callId) refs.push({ callId, kind: "call" });
+      continue;
+    }
+    if (type === "function_call_output" || type === "tool_call_output" || type === "tool_result") {
+      const callId = String(block.call_id ?? block.tool_call_id ?? block.id ?? "").trim();
+      if (callId) refs.push({ callId, kind: "result" });
+    }
+  }
+  return refs;
+}
+
+function computeClosureDeferredTaskInfo(messages: any[], evictableTaskIds: Set<string>): {
+  deferredTaskIds: Set<string>;
+  deferredByTaskId: Record<string, Array<{ callId: string; reason: "missing_call" | "missing_result" | "outside_candidate_task" }>>;
+} {
+  const protocolByCallId = new Map<string, {
+    hasCall: boolean;
+    hasResult: boolean;
+    taskIds: Set<string>;
+    hasOutsideCandidateTask: boolean;
+  }>();
+
+  for (const raw of messages) {
+    if (!raw || typeof raw !== "object") continue;
+    const message = raw as Record<string, unknown>;
+    const taskIds = canonicalMessageTaskIds(message);
+    const refs = extractCanonicalProtocolRefs(message);
+    if (refs.length === 0) continue;
+    for (const ref of refs) {
+      const bucket = protocolByCallId.get(ref.callId) ?? {
+        hasCall: false,
+        hasResult: false,
+        taskIds: new Set<string>(),
+        hasOutsideCandidateTask: false,
+      };
+      if (ref.kind === "call") bucket.hasCall = true;
+      if (ref.kind === "result") bucket.hasResult = true;
+      if (taskIds.length === 0) {
+        bucket.hasOutsideCandidateTask = true;
+      } else {
+        for (const taskId of taskIds) {
+          bucket.taskIds.add(taskId);
+          if (!evictableTaskIds.has(taskId)) bucket.hasOutsideCandidateTask = true;
+        }
+      }
+      protocolByCallId.set(ref.callId, bucket);
+    }
+  }
+
+  const deferred = new Set<string>();
+  const deferredByTaskId: Record<string, Array<{ callId: string; reason: "missing_call" | "missing_result" | "outside_candidate_task" }>> = {};
+  for (const [callId, protocol] of protocolByCallId.entries()) {
+    const protocolTaskIds = [...protocol.taskIds];
+    if (protocolTaskIds.length === 0) continue;
+    const reasons: Array<"missing_call" | "missing_result" | "outside_candidate_task"> = [];
+    if (!protocol.hasCall) reasons.push("missing_call");
+    if (!protocol.hasResult) reasons.push("missing_result");
+    if (protocol.hasOutsideCandidateTask) reasons.push("outside_candidate_task");
+    if (reasons.length === 0) continue;
+    for (const taskId of protocolTaskIds) {
+      if (!evictableTaskIds.has(taskId)) continue;
+      deferred.add(taskId);
+      const bucket = deferredByTaskId[taskId] ?? [];
+      for (const reason of reasons) {
+        bucket.push({ callId, reason });
+      }
+      deferredByTaskId[taskId] = bucket;
+    }
+  }
+  return { deferredTaskIds: deferred, deferredByTaskId };
+}
+
+function sortedRegistryTurnAnchors(
+  registry: Awaited<ReturnType<typeof loadSessionTaskRegistry>>,
+): Array<{ turnAbsId: string; taskIds: string[] }> {
+  return Object.entries(registry.turnToTaskIds)
+    .map(([turnAbsId, taskIds]) => ({
+      turnAbsId,
+      taskIds: dedupeStrings(taskIds),
+      turnSeq: Number(turnAbsId.split(":t").at(-1) ?? Number.NaN),
+    }))
+    .filter((item) => item.turnAbsId.trim().length > 0 && Number.isFinite(item.turnSeq))
+    .sort((a, b) => a.turnSeq - b.turnSeq)
+    .map(({ turnAbsId, taskIds }) => ({ turnAbsId, taskIds }));
+}
+
+function annotateCanonicalMessagesWithTaskAnchors(
+  messages: any[],
+  registry: Awaited<ReturnType<typeof loadSessionTaskRegistry>>,
+): { messages: any[]; changed: boolean } {
+  const anchors = sortedRegistryTurnAnchors(registry);
+  if (anchors.length === 0) return { messages, changed: false };
+  const anchorIndexByTurnAbsId = new Map(anchors.map((anchor, index) => [anchor.turnAbsId, index] as const));
+  let currentIndex = -1;
+  let currentAnchor = anchors[0];
+  let changed = false;
+  const nextMessages = messages.map((raw) => {
+    if (!raw || typeof raw !== "object") return raw;
+    const message = raw as Record<string, unknown>;
+    const details = asRecord(message.details);
+    const contextSafe = asRecord(details?.contextSafe);
+    const existingEviction = asRecord(contextSafe?.eviction);
+    if (existingEviction?.archived === true || existingEviction?.kind === "cached_pointer_stub") {
+      return raw;
+    }
+    const prevTurnAbsId = typeof contextSafe?.turnAbsId === "string" ? contextSafe.turnAbsId : "";
+    const prevTaskIds = Array.isArray(contextSafe?.taskIds)
+      ? contextSafe.taskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    const anchoredIndex = prevTurnAbsId ? anchorIndexByTurnAbsId.get(prevTurnAbsId) : undefined;
+    if (anchoredIndex !== undefined) {
+      currentIndex = anchoredIndex;
+      currentAnchor = anchors[anchoredIndex]!;
+      const expectedTaskIds = currentAnchor?.taskIds ?? [];
+      if (JSON.stringify(prevTaskIds) === JSON.stringify(expectedTaskIds)) {
+        return raw;
+      }
+    }
+    const role = String(message.role ?? "").toLowerCase();
+    if (role === "user" && currentIndex + 1 < anchors.length) {
+      currentIndex += 1;
+      currentAnchor = anchors[currentIndex]!;
+    } else if (currentIndex < 0) {
+      currentIndex = 0;
+      currentAnchor = anchors[0]!;
+    }
+    const nextTaskIds = currentAnchor?.taskIds ?? [];
+    if (prevTurnAbsId === currentAnchor.turnAbsId && JSON.stringify(prevTaskIds) === JSON.stringify(nextTaskIds)) {
+      return raw;
+    }
+    changed = true;
+    return {
+      ...message,
+      details: ensureContextSafeDetails(message.details, {
+        turnAbsId: currentAnchor.turnAbsId,
+        taskIds: nextTaskIds,
+      }),
+    };
+  });
+  return { messages: nextMessages, changed };
+}
+
+function parseEvictedTaskIdFromMessage(message: Record<string, unknown>): string | undefined {
+  const text = contentToText(message.content);
+  const match = text.match(/\[Evicted completed task `([^`]+)`\]/);
+  return typeof match?.[1] === "string" && match[1].trim().length > 0 ? match[1].trim() : undefined;
+}
+
+type CanonicalTaskArchiveInfo = {
+  taskId: string;
+  archivePath: string;
+  dataKey: string;
+  originalSize: number;
+};
+
+const canonicalEvictionLocks = new Map<string, Promise<void>>();
+
+async function withCanonicalEvictionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = canonicalEvictionLocks.get(sessionId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  canonicalEvictionLocks.set(sessionId, previous.then(() => current));
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (canonicalEvictionLocks.get(sessionId) === current) {
+      canonicalEvictionLocks.delete(sessionId);
+    }
+  }
+}
+
+async function loadCanonicalTaskArchives(
+  stateDir: string,
+  sessionId: string,
+): Promise<Map<string, CanonicalTaskArchiveInfo>> {
+  const archiveDir = join(stateDir, "ecoclaw", "canonical-eviction", "task");
+  const out = new Map<string, CanonicalTaskArchiveInfo>();
+  let entries: string[] = [];
+  try {
+    entries = await readdir(archiveDir);
+  } catch {
+    return out;
+  }
+
+  for (const name of entries.filter((item) => item.endsWith(".json")).sort().reverse()) {
+    const archivePath = join(archiveDir, name);
+    const archive = await readArchive(archivePath);
+    if (!archive || archive.sessionId !== sessionId) continue;
+    const metadata = asRecord(archive.metadata);
+    const taskIds = Array.isArray(metadata?.taskIds)
+      ? metadata.taskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    for (const taskId of taskIds) {
+      if (out.has(taskId)) continue;
+      out.set(taskId, {
+        taskId,
+        archivePath,
+        dataKey: archive.dataKey,
+        originalSize: archive.originalSize,
+      });
+    }
+  }
+  return out;
+}
+
+function resolveCanonicalToolCallInfo(messages: any[]): Map<string, { toolName: string; dataKey?: string }> {
+  const out = new Map<string, { toolName: string; dataKey?: string }>();
+  for (const raw of messages) {
+    if (!raw || typeof raw !== "object") continue;
+    const message = raw as Record<string, unknown>;
+    const role = String(message.role ?? "").toLowerCase();
+    if (role !== "assistant") continue;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const item of content) {
+      const block = asRecord(item);
+      if (!block) continue;
+      const type = String(block.type ?? "").toLowerCase();
+      if (type !== "toolcall" && type !== "tool_call") continue;
+      const callId = typeof block.id === "string" ? block.id.trim() : "";
+      const toolName = typeof block.name === "string" ? block.name.trim().toLowerCase() : "tool";
+      const args = asRecord(block.arguments);
+      const dataKey = extractPathLike(args);
+      if (callId) out.set(callId, { toolName, dataKey });
+    }
+  }
+  return out;
+}
+
+function canonicalArchiveTextForMessage(message: Record<string, unknown>): string {
+  const role = String(message.role ?? "unknown").trim().toLowerCase() || "unknown";
+  const toolName = String(message.toolName ?? message.tool_name ?? "").trim().toLowerCase();
+  const text = isToolResultLikeMessage(message) ? extractToolMessageText(message) : contentToText(message.content);
+  const normalizedText = text.trim();
+  if (!normalizedText) return "";
+  const header = toolName ? `${role}:${toolName}` : role;
+  return `[${header}]\n${normalizedText}`;
+}
+
+async function applyCanonicalEviction(params: {
+  stateDir: string;
+  sessionId: string;
+  messages: any[];
+  registry: Awaited<ReturnType<typeof loadSessionTaskRegistry>>;
+  enabled: boolean;
+  policy: string;
+  minBlockChars: number;
+  replacementMode: "pointer_stub" | "drop";
+}): Promise<{ messages: any[]; changed: boolean; appliedCount: number; appliedTaskIds: string[] }> {
+  if (!params.enabled) {
+    return { messages: params.messages, changed: false, appliedCount: 0, appliedTaskIds: [] };
+  }
+  const evictableTaskIds = new Set(params.registry.evictableTaskIds);
+  if (evictableTaskIds.size === 0) {
+    return { messages: params.messages, changed: false, appliedCount: 0, appliedTaskIds: [] };
+  }
+  return withCanonicalEvictionLock(params.sessionId, async () => {
+    const { deferredTaskIds, deferredByTaskId } = computeClosureDeferredTaskInfo(params.messages, evictableTaskIds);
+    await appendTaskStateTrace(params.stateDir, {
+      stage: "canonical_eviction_closure_checked",
+      sessionId: params.sessionId,
+      evictableTaskIds: [...evictableTaskIds].sort(),
+      deferredTaskIds: [...deferredTaskIds].sort(),
+      deferredByTaskId,
+      replacementMode: params.replacementMode,
+      messageCount: params.messages.length,
+    });
+    const persistedArchives = await loadCanonicalTaskArchives(params.stateDir, params.sessionId);
+    const rolePriority = (message: Record<string, unknown>): number => {
+      const role = String(message.role ?? "").trim().toLowerCase();
+      if (role === "assistant") return 0;
+      if (role === "tool" || role === "toolresult") return 1;
+      if (role === "user") return 2;
+      return 3;
+    };
+    const bundles = new Map<string, {
+      firstIndex: number;
+      representativeIndex: number;
+      messageIndexes: number[];
+      turnAbsIds: string[];
+      taskIds: string[];
+      archiveParts: string[];
+      totalChars: number;
+      alreadyArchived: boolean;
+    }>();
+    const archivedTaskIds = new Set<string>();
+    for (const raw of params.messages) {
+      if (!raw || typeof raw !== "object") continue;
+      const message = raw as Record<string, unknown>;
+      const details = asRecord(message.details);
+      const contextSafe = asRecord(details?.contextSafe);
+      const skipEviction = asRecord(contextSafe?.eviction)?.skip === true;
+      if (skipEviction) continue;
+      const existingEviction = asRecord(contextSafe?.eviction);
+      if (existingEviction?.archived !== true && existingEviction?.kind !== "cached_pointer_stub") continue;
+      const taskIds = Array.isArray(contextSafe?.taskIds)
+        ? contextSafe.taskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      for (const taskId of taskIds) archivedTaskIds.add(taskId);
+      const parsedTaskId = parseEvictedTaskIdFromMessage(message);
+      if (parsedTaskId) archivedTaskIds.add(parsedTaskId);
+    }
+    for (let index = 0; index < params.messages.length; index += 1) {
+      const raw = params.messages[index];
+      if (!raw || typeof raw !== "object") continue;
+      const message = raw as Record<string, unknown>;
+      const details = asRecord(message.details);
+      const contextSafe = asRecord(details?.contextSafe);
+      const skipEviction = asRecord(contextSafe?.eviction)?.skip === true;
+      if (skipEviction) continue;
+      const taskIds = Array.isArray(contextSafe?.taskIds)
+        ? contextSafe.taskIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      const matchedTaskIds = taskIds.filter((taskId) => evictableTaskIds.has(taskId));
+      if (matchedTaskIds.length !== 1) continue;
+      const taskId = matchedTaskIds[0]!;
+      if (deferredTaskIds.has(taskId)) continue;
+      if (archivedTaskIds.has(taskId)) continue;
+      const existingEviction = asRecord(contextSafe?.eviction);
+      const bundle = bundles.get(taskId) ?? {
+        firstIndex: index,
+        representativeIndex: index,
+        messageIndexes: [],
+        turnAbsIds: [],
+        taskIds: [taskId],
+        archiveParts: [],
+        totalChars: 0,
+        alreadyArchived: false,
+      };
+      bundle.firstIndex = Math.min(bundle.firstIndex, index);
+      if (rolePriority(message) < rolePriority((params.messages[bundle.representativeIndex] ?? {}) as Record<string, unknown>)) {
+        bundle.representativeIndex = index;
+      }
+      bundle.messageIndexes.push(index);
+      if (typeof contextSafe?.turnAbsId === "string" && contextSafe.turnAbsId.trim().length > 0) {
+        bundle.turnAbsIds.push(contextSafe.turnAbsId);
+      }
+      if (existingEviction?.archived === true || existingEviction?.kind === "cached_pointer_stub") {
+        bundle.alreadyArchived = true;
+      } else {
+        const archiveText = canonicalArchiveTextForMessage(message);
+        if (archiveText) {
+          bundle.archiveParts.push(archiveText);
+          bundle.totalChars += archiveText.length;
+        }
+      }
+      bundles.set(taskId, bundle);
+    }
+
+    let changed = false;
+    let appliedCount = 0;
+    const appliedTaskIds: string[] = [];
+    const nextMessages: any[] = [];
+    const skipIndexes = new Set<number>();
+    const stubByIndex = new Map<number, Record<string, unknown>>();
+    for (const [taskId, bundle] of bundles.entries()) {
+      if (bundle.alreadyArchived) continue;
+      if (bundle.totalChars < params.minBlockChars) continue;
+      const normalizedTurns = dedupeStrings(bundle.turnAbsIds);
+      const representative = (params.messages[bundle.representativeIndex] ?? {}) as Record<string, unknown>;
+      const representativeDetails = asRecord(representative.details);
+      const representativeContextSafe = asRecord(representativeDetails?.contextSafe);
+      const digest = createHash("sha256").update(bundle.archiveParts.join("\n\n")).digest("hex").slice(0, 16);
+      const stableTaskId = safeId(taskId);
+      const existingArchive = persistedArchives.get(taskId);
+      const dataKey = existingArchive?.dataKey ?? `canonical_task_eviction:${stableTaskId}`;
+      const archived = existingArchive
+        ? { archivePath: existingArchive.archivePath }
+        : await archiveContent({
+            sessionId: params.sessionId,
+            segmentId: `task-${stableTaskId}`,
+            sourcePass: "canonical_eviction",
+            toolName: "task",
+            dataKey,
+            originalText: bundle.archiveParts.join("\n\n"),
+            archiveDir: join(params.stateDir, "ecoclaw", "canonical-eviction", "task"),
+            metadata: {
+              contentDigest: digest,
+              evictionPolicy: params.policy,
+              persistedBy: "ecoclaw.context_engine.eviction",
+              taskIds: [taskId],
+              turnAbsIds: normalizedTurns,
+            },
+          });
+      const originalSize = existingArchive?.originalSize ?? bundle.totalChars;
+      if (params.replacementMode === "pointer_stub") {
+        const stub =
+          `[Evicted completed task \`${taskId}\`] ` +
+          `This earlier task was paged out from canonical context after completion. ` +
+          buildRecoveryHint({
+            dataKey,
+            originalSize,
+            archivePath: archived.archivePath,
+            sourceLabel: "canonical_task_eviction",
+          });
+        stubByIndex.set(bundle.firstIndex, {
+          role: "assistant",
+          content: [{ type: "text", text: stub }],
+          details: ensureContextSafeDetails(representative.details, {
+            turnAbsId: normalizedTurns[0] ?? representativeContextSafe?.turnAbsId,
+            taskIds: [taskId],
+            eviction: {
+              archived: true,
+              kind: "cached_pointer_stub",
+              archivePath: archived.archivePath,
+              dataKey,
+              policy: params.policy,
+              persistedBy: "ecoclaw.context_engine.eviction",
+              scope: "task",
+            },
+            originalChars: originalSize,
+          }),
+        });
+        for (const idx of bundle.messageIndexes) {
+          if (idx === bundle.firstIndex) continue;
+          skipIndexes.add(idx);
+        }
+      } else {
+        for (const idx of bundle.messageIndexes) {
+          skipIndexes.add(idx);
+        }
+      }
+      changed = true;
+      appliedCount += 1;
+      appliedTaskIds.push(taskId);
+    }
+
+    for (let index = 0; index < params.messages.length; index += 1) {
+      const raw = params.messages[index];
+      if (skipIndexes.has(index)) {
+        continue;
+      }
+      const stub = stubByIndex.get(index);
+      if (stub) {
+        nextMessages.push(stub);
+        continue;
+      }
+      if (!raw || typeof raw !== "object") {
+        nextMessages.push(raw);
+        continue;
+      }
+      nextMessages.push(raw);
+    }
+    return { messages: nextMessages, changed, appliedCount, appliedTaskIds };
+  });
+}
+
 function buildToolResultPreview(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars)}\n\n[ecoclaw preview truncated]`;
@@ -3380,7 +4324,17 @@ async function loadCanonicalState(stateDir: string, sessionId: string): Promise<
     if (!parsed || parsed.version !== 1 || parsed.sessionId !== sessionId || !Array.isArray(parsed.messages)) {
       return null;
     }
-    return parsed;
+    const seenMessageIds = Array.isArray((parsed as any).seenMessageIds)
+      ? ((parsed as any).seenMessageIds as unknown[])
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    return {
+      version: 1,
+      sessionId: parsed.sessionId,
+      messages: parsed.messages,
+      seenMessageIds,
+      updatedAt: parsed.updatedAt,
+    };
   } catch {
     return null;
   }
@@ -3396,89 +4350,162 @@ function estimateMessagesChars(messages: any[]): number {
   return messages.reduce((sum, msg) => sum + contentToText(msg?.content ?? "").length, 0);
 }
 
-function pruneCanonicalMessages(
-  messages: any[],
-  keepRecentToolResults: number,
-  placeholder: string,
-): { messages: any[]; changed: boolean } {
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return { messages: Array.isArray(messages) ? messages : [], changed: false };
-  }
-  const toolIndexes: number[] = [];
-  for (let i = 0; i < messages.length; i += 1) {
-    const msg = messages[i];
-    if (!msg || typeof msg !== "object") continue;
-    if (isToolResultLikeMessage(msg as Record<string, unknown>)) toolIndexes.push(i);
-  }
-  if (toolIndexes.length <= keepRecentToolResults) return { messages, changed: false };
-  const keepSet = new Set<number>(toolIndexes.slice(-keepRecentToolResults));
-  let changed = false;
-  const next = messages.map((msg, idx) => {
-    if (!msg || typeof msg !== "object") return msg;
-    if (!isToolResultLikeMessage(msg as Record<string, unknown>)) return msg;
-    if (keepSet.has(idx)) return msg;
-    const text = extractToolMessageText(msg as Record<string, unknown>);
-    if (text === placeholder) return msg;
-    changed = true;
+function appendCanonicalTranscript(
+  loaded: EcoCanonicalState | null,
+  transcriptEntries: TranscriptSessionRow[],
+  sessionId: string,
+): { state: EcoCanonicalState; changed: boolean } {
+  const rawEntries = Array.isArray(transcriptEntries) ? structuredClone(transcriptEntries) : [];
+  if (!loaded) {
     return {
-      ...(msg as Record<string, unknown>),
-      content: placeholder,
-      details: ensureContextSafeDetails((msg as Record<string, unknown>).details, {
-        prunedByCanonical: true,
-        originalChars: text.length,
-      }),
+      state: {
+        version: 1,
+        sessionId,
+        messages: rawEntries.map((entry) => entry.message),
+        seenMessageIds: rawEntries.map(transcriptMessageStableId),
+        updatedAt: new Date().toISOString(),
+      },
+      changed: true,
     };
-  });
-  return { messages: next, changed };
+  }
+
+  const seen = new Set(
+    Array.isArray(loaded.seenMessageIds)
+      ? loaded.seenMessageIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+  );
+  const newMessages: any[] = [];
+  const newIds: string[] = [];
+  for (const entry of rawEntries) {
+    const stableId = transcriptMessageStableId(entry);
+    if (seen.has(stableId)) continue;
+    seen.add(stableId);
+    newIds.push(stableId);
+    newMessages.push(entry.message);
+  }
+  if (newMessages.length === 0) {
+    return {
+      state: {
+        ...loaded,
+        updatedAt: loaded.updatedAt,
+      },
+      changed: false,
+    };
+  }
+
+  return {
+    state: {
+      version: 1,
+      sessionId,
+      messages: [...loaded.messages, ...newMessages],
+      seenMessageIds: [...(Array.isArray(loaded.seenMessageIds) ? loaded.seenMessageIds : []), ...newIds],
+      updatedAt: new Date().toISOString(),
+    },
+    changed: true,
+  };
 }
 
-async function syncCanonicalState(params: {
+async function syncCanonicalStateFromTranscript(params: {
   stateDir: string;
   sessionId: string;
-  rawMessages: any[];
-  pruneThresholdChars: number;
-  keepRecentToolResults: number;
-  placeholder: string;
+  logger?: Required<PluginLogger>;
 }): Promise<{ state: EcoCanonicalState; changed: boolean }> {
   const loaded = await loadCanonicalState(params.stateDir, params.sessionId);
-  const rawMessages = Array.isArray(params.rawMessages) ? structuredClone(params.rawMessages) : [];
-  let messages: any[] = rawMessages;
-  let sourceMessageCount = rawMessages.length;
-  let changed = false;
+  const transcriptEntries = await readTranscriptEntriesForSession(params.sessionId);
+  if (!transcriptEntries) {
+    if (loaded) return { state: loaded, changed: false };
+    const emptyState: EcoCanonicalState = {
+      version: 1,
+      sessionId: params.sessionId,
+      messages: [],
+      seenMessageIds: [],
+      updatedAt: new Date().toISOString(),
+    };
+    return { state: emptyState, changed: false };
+  }
+  const appended = appendCanonicalTranscript(loaded, transcriptEntries, params.sessionId);
+  await appendTaskStateTrace(params.stateDir, {
+    stage: "canonical_state_sync",
+    sessionId: params.sessionId,
+    changed: appended.changed,
+    loadedMessageCount: Array.isArray(loaded?.messages) ? loaded!.messages.length : 0,
+    transcriptEntryCount: transcriptEntries.length,
+    finalMessageCount: appended.state.messages.length,
+    appendedMessageCount: Math.max(
+      0,
+      appended.state.messages.length - (Array.isArray(loaded?.messages) ? loaded!.messages.length : 0),
+    ),
+    seenMessageIdsCount: Array.isArray(appended.state.seenMessageIds) ? appended.state.seenMessageIds.length : 0,
+  });
+  return appended;
+}
 
-  if (loaded && loaded.sourceMessageCount <= rawMessages.length) {
-    if (loaded.sourceMessageCount < rawMessages.length) {
-      messages = [...loaded.messages, ...rawMessages.slice(loaded.sourceMessageCount)];
-      sourceMessageCount = rawMessages.length;
-      changed = true;
-    } else {
-      messages = loaded.messages;
-      sourceMessageCount = loaded.sourceMessageCount;
-    }
-  } else if (loaded) {
-    messages = rawMessages;
-    sourceMessageCount = rawMessages.length;
+async function rewriteCanonicalState(params: {
+  stateDir: string;
+  sessionId: string;
+  state: EcoCanonicalState;
+  evictionEnabled?: boolean;
+  evictionPolicy?: string;
+  evictionMinBlockChars?: number;
+  evictionReplacementMode?: "pointer_stub" | "drop";
+  logger?: Required<PluginLogger>;
+}): Promise<{ state: EcoCanonicalState; changed: boolean }> {
+  const registry = await loadSessionTaskRegistry(params.stateDir, params.sessionId);
+  const startMessages = params.state.messages;
+  let messages = startMessages;
+  let changed = false;
+  const annotated = annotateCanonicalMessagesWithTaskAnchors(messages, registry);
+  if (annotated.changed) {
+    messages = annotated.messages;
     changed = true;
   }
-
-  const currentChars = estimateMessagesChars(messages);
-  if (currentChars >= params.pruneThresholdChars) {
-    const pruned = pruneCanonicalMessages(messages, params.keepRecentToolResults, params.placeholder);
-    if (pruned.changed) {
-      messages = pruned.messages;
-      changed = true;
-    }
-  }
-
-  const state: EcoCanonicalState = {
-    version: 1,
+  const evictionApplied = await applyCanonicalEviction({
+    stateDir: params.stateDir,
     sessionId: params.sessionId,
-    sourceMessageCount,
     messages,
-    updatedAt: new Date().toISOString(),
+    registry,
+    enabled: params.evictionEnabled === true,
+    policy: params.evictionPolicy ?? "noop",
+    minBlockChars: Math.max(0, params.evictionMinBlockChars ?? 256),
+    replacementMode: params.evictionReplacementMode === "drop" ? "drop" : "pointer_stub",
+  });
+  if (evictionApplied.changed) {
+    messages = evictionApplied.messages;
+    changed = true;
+    await appendTaskStateTrace(params.stateDir, {
+      stage: "canonical_eviction_applied",
+      sessionId: params.sessionId,
+      appliedCount: evictionApplied.appliedCount,
+      appliedTaskIds: evictionApplied.appliedTaskIds,
+      evictableTaskIds: registry.evictableTaskIds,
+      replacementMode: params.evictionReplacementMode === "drop" ? "drop" : "pointer_stub",
+    });
+    params.logger?.info(
+      `[ecoclaw/eviction-apply] session=${params.sessionId} applied=${evictionApplied.appliedCount} tasks=${evictionApplied.appliedTaskIds.join(", ") || "none"}`,
+    );
+  }
+  await appendTaskStateTrace(params.stateDir, {
+    stage: "canonical_state_rewrite",
+    sessionId: params.sessionId,
+    changed,
+    replacementMode: params.evictionReplacementMode === "drop" ? "drop" : "pointer_stub",
+    beforeMessageCount: startMessages.length,
+    afterAnnotationMessageCount: annotated.changed ? annotated.messages.length : startMessages.length,
+    afterEvictionMessageCount: messages.length,
+    beforeChars: estimateMessagesChars(startMessages),
+    afterChars: estimateMessagesChars(messages),
+    evictableTaskIds: registry.evictableTaskIds,
+  });
+  return {
+    state: changed
+      ? {
+          ...params.state,
+          messages,
+          updatedAt: new Date().toISOString(),
+        }
+      : params.state,
+    changed,
   };
-  if (!loaded) changed = true;
-  return { state, changed };
 }
 
 function createEcoClawContextEngine(
@@ -3495,53 +4522,75 @@ function createEcoClawContextEngine(
       return { ingested: false };
     },
     async afterTurn(params: { sessionId: string; messages: any[] }) {
-      const synced = await syncCanonicalState({
+      const synced = await syncCanonicalStateFromTranscript({
         stateDir: cfg.stateDir,
         sessionId: params.sessionId,
-        rawMessages: params.messages,
-        pruneThresholdChars: cfg.contextEngine.pruneThresholdChars ?? 100_000,
-        keepRecentToolResults: cfg.contextEngine.keepRecentToolResults ?? 5,
-        placeholder: cfg.contextEngine.placeholder ?? "",
+        logger,
       });
-      if (synced.changed) {
-        await saveCanonicalState(cfg.stateDir, synced.state);
+      const rewritten = await rewriteCanonicalState({
+        stateDir: cfg.stateDir,
+        sessionId: params.sessionId,
+        state: synced.state,
+        evictionEnabled: cfg.modules.eviction && cfg.eviction.enabled,
+        evictionPolicy: cfg.eviction.policy,
+        evictionMinBlockChars: cfg.eviction.minBlockChars,
+        evictionReplacementMode: cfg.eviction.replacementMode,
+        logger,
+      });
+      if (synced.changed || rewritten.changed) {
+        await saveCanonicalState(cfg.stateDir, rewritten.state);
       }
     },
     async assemble(params: { sessionId: string; messages: any[]; tokenBudget?: number }) {
-      const synced = await syncCanonicalState({
+      const synced = await syncCanonicalStateFromTranscript({
         stateDir: cfg.stateDir,
         sessionId: params.sessionId,
-        rawMessages: params.messages,
-        pruneThresholdChars: cfg.contextEngine.pruneThresholdChars ?? 100_000,
-        keepRecentToolResults: cfg.contextEngine.keepRecentToolResults ?? 5,
-        placeholder: cfg.contextEngine.placeholder ?? "",
+        logger,
       });
-      if (synced.changed) {
-        await saveCanonicalState(cfg.stateDir, synced.state);
+      const rewritten = await rewriteCanonicalState({
+        stateDir: cfg.stateDir,
+        sessionId: params.sessionId,
+        state: synced.state,
+        evictionEnabled: cfg.modules.eviction && cfg.eviction.enabled,
+        evictionPolicy: cfg.eviction.policy,
+        evictionMinBlockChars: cfg.eviction.minBlockChars,
+        evictionReplacementMode: cfg.eviction.replacementMode,
+        logger,
+      });
+      if (synced.changed || rewritten.changed) {
+        await saveCanonicalState(cfg.stateDir, rewritten.state);
       }
-      const estimatedChars = estimateMessagesChars(synced.state.messages);
+      const estimatedChars = estimateMessagesChars(rewritten.state.messages);
       return {
-        messages: synced.state.messages,
+        messages: rewritten.state.messages,
         estimatedTokens: Math.max(1, Math.ceil(estimatedChars / 4)),
       };
     },
     async compact(params: { sessionId: string; messages?: any[]; force?: boolean }) {
-      const source = Array.isArray(params.messages) ? params.messages : [];
-      const synced = await syncCanonicalState({
+      const synced = await syncCanonicalStateFromTranscript({
         stateDir: cfg.stateDir,
         sessionId: params.sessionId,
-        rawMessages: source,
-        pruneThresholdChars: params.force ? 1 : (cfg.contextEngine.pruneThresholdChars ?? 100_000),
-        keepRecentToolResults: cfg.contextEngine.keepRecentToolResults ?? 5,
-        placeholder: cfg.contextEngine.placeholder ?? "",
+        logger,
       });
-      if (synced.changed) {
-        await saveCanonicalState(cfg.stateDir, synced.state);
+      const rewritten = await rewriteCanonicalState({
+        stateDir: cfg.stateDir,
+        sessionId: params.sessionId,
+        state: synced.state,
+        evictionEnabled: cfg.modules.eviction && cfg.eviction.enabled,
+        evictionPolicy: cfg.eviction.policy,
+        evictionMinBlockChars: cfg.eviction.minBlockChars,
+        evictionReplacementMode: cfg.eviction.replacementMode,
+        logger,
+      });
+      if (synced.changed || rewritten.changed) {
+        await saveCanonicalState(cfg.stateDir, rewritten.state);
       }
       return {
         ok: true,
-        compacted: synced.changed,
-        reason: synced.changed ? "ecoclaw canonical state updated" : "ecoclaw canonical state unchanged",
+        compacted: synced.changed || rewritten.changed,
+        reason: synced.changed || rewritten.changed
+          ? "ecoclaw canonical state updated"
+          : "ecoclaw canonical state unchanged",
       };
     },
   };
@@ -3608,6 +4657,20 @@ async function applyToolResultPersistPolicy(
       sourceLabel: "tool_result_persist",
     })
     : "";
+
+  if (cfg.stateDir) {
+    await appendTaskStateTrace(cfg.stateDir, {
+      stage: "tool_result_persist_applied",
+      sessionId: String(event?.sessionId ?? event?.session_id ?? "proxy-session"),
+      toolName: toolName || "tool",
+      toolCallId: callId || null,
+      originalChars: text.length,
+      inlineLimit: limit,
+      persisted: Boolean(outputFile),
+      outputFile: outputFile ?? null,
+      dataKey,
+    });
+  }
 
   return {
     message: {
@@ -3700,6 +4763,16 @@ function extractSessionKey(event: any): string {
 
 function extractOpenClawSessionId(event: any): string {
   const agentMeta = event?.result?.meta?.agentMeta ?? event?.meta?.agentMeta ?? event?.agentMeta;
+  const sessionFile =
+    event?.sessionFile ??
+    event?.result?.sessionFile ??
+    event?.meta?.sessionFile ??
+    agentMeta?.sessionFile ??
+    "";
+  if (typeof sessionFile === "string" && sessionFile.trim().length > 0) {
+    const fileBase = basename(sessionFile.trim()).replace(/\.jsonl$/i, "").trim();
+    if (fileBase.length > 0) return fileBase;
+  }
   const direct =
     event?.sessionId ??
     event?.SessionId ??
@@ -3856,6 +4929,11 @@ type StructuredTurnObservation = {
   textChars: number;
   textPreview: string;
   metadata?: Record<string, unknown>;
+  recovery?: {
+    source: string;
+    skipReduction?: boolean;
+    skipCompaction?: boolean;
+  };
 };
 
 function inferObservationPayloadKind(
@@ -3924,6 +5002,94 @@ function buildToolCallArgsMap(messages: any[]): Map<string, { toolName?: string;
   return map;
 }
 
+function isWriteLikeToolName(toolName: string | undefined): boolean {
+  const normalized = String(toolName ?? "").trim().toLowerCase();
+  return normalized === "write" || normalized.endsWith(".write") || normalized.includes("write_file");
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function summarizeText(text: string, maxChars = 800): string {
+  const normalized = text.trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
+function extractAssistantText(content: unknown): string {
+  if (!Array.isArray(content)) return contentToText(content).trim();
+  const parts: string[] = [];
+  for (const item of content) {
+    if (!item || typeof item !== "object") {
+      const text = contentToText(item).trim();
+      if (text) parts.push(text);
+      continue;
+    }
+    const obj = item as Record<string, unknown>;
+    const type = String(obj.type ?? "").toLowerCase();
+    if (type === "toolcall" || type === "tool_call") continue;
+    const text = contentToText(obj).trim();
+    if (text) parts.push(text);
+  }
+  return parts.join("\n").trim();
+}
+
+function extractFileRefsFromToolArgs(args: Record<string, unknown> | undefined): {
+  filesRead: string[];
+  filesWritten: string[];
+} {
+  const candidates = [
+    args?.path,
+    args?.file_path,
+    args?.filePath,
+    args?.output,
+    args?.output_path,
+    args?.outputPath,
+  ];
+  const normalized = candidates
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+  const filesRead = dedupeStrings(normalized.filter((_, index) => index < 1));
+  const filesWritten = dedupeStrings(normalized.filter((_, index) => index >= 1));
+  return { filesRead, filesWritten };
+}
+
+function sliceMessagesForCurrentUserTurn(messages: any[]): any[] {
+  let lastUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const role = String(messages[i]?.role ?? "").toLowerCase();
+    if (role === "user") {
+      lastUserIndex = i;
+      break;
+    }
+  }
+  return lastUserIndex >= 0 ? messages.slice(lastUserIndex) : messages;
+}
+
+function sliceMessagesForTurnSeq(messages: any[], turnSeq: number): any[] {
+  if (!Array.isArray(messages) || messages.length === 0) return [];
+  const userIndices: number[] = [];
+  for (let i = 0; i < messages.length; i += 1) {
+    const role = String(messages[i]?.role ?? "").toLowerCase();
+    if (role === "user") userIndices.push(i);
+  }
+  if (userIndices.length === 0) return [];
+  const turnIndex = Math.max(0, turnSeq - 1);
+  if (turnIndex >= userIndices.length) return [];
+  const start = userIndices[turnIndex]!;
+  const endExclusive = turnIndex + 1 < userIndices.length ? userIndices[turnIndex + 1]! : messages.length;
+  return messages.slice(start, endExclusive);
+}
+
 function extractTurnObservations(event: any): StructuredTurnObservation[] {
   const messages = Array.isArray(event?.messages) ? event.messages : [];
   const toolCallArgsMap = buildToolCallArgsMap(messages);
@@ -3954,6 +5120,7 @@ function extractTurnObservations(event: any): StructuredTurnObservation[] {
           : undefined;
     const toolCallArgs = callId ? toolCallArgsMap.get(callId) : undefined;
     const resolvedPath = toolCallArgs?.path;
+    const recovery = contextSafeRecovery(msg?.details);
     const metadata: Record<string, unknown> | undefined = resolvedPath
       ? { path: resolvedPath, file_path: resolvedPath }
       : undefined;
@@ -3974,9 +5141,339 @@ function extractTurnObservations(event: any): StructuredTurnObservation[] {
       textChars: text.length,
       textPreview: text.length > 240 ? `${text.slice(0, 240)}...` : text,
       ...(metadata ? { metadata } : {}),
+      ...(recovery
+        ? {
+            recovery: {
+              source:
+                typeof recovery.source === "string" && recovery.source.trim().length > 0
+                  ? recovery.source.trim()
+                  : MEMORY_FAULT_RECOVER_TOOL_NAME,
+              skipReduction: recovery.skipReduction === true,
+              skipCompaction: recovery.skipCompaction === true,
+            },
+          }
+        : {}),
     });
   }
   return out;
+}
+
+function buildRawSemanticTurnRecordFromMessages(
+  sessionId: string,
+  turnSeq: number,
+  messages: any[],
+): RawSemanticTurnRecord | null {
+  const scopedMessages = sliceMessagesForCurrentUserTurn(messages);
+  if (scopedMessages.length === 0) return null;
+
+  const userAnchor = createTurnAnchor(sessionId, turnSeq, "user");
+  const assistantAnchor = createTurnAnchor(sessionId, turnSeq, "assistant");
+  const toolAnchor = createTurnAnchor(sessionId, turnSeq, "tool");
+  const rawRecord: RawSemanticTurnRecord = {
+    sessionId,
+    turnSeq,
+    turnAbsId: buildTurnAbsId(sessionId, turnSeq),
+    messages: [],
+    toolCalls: [],
+    toolResults: [],
+  };
+
+  for (const msg of scopedMessages) {
+    const role = String(msg?.role ?? "").toLowerCase();
+    if (role === "user") {
+      const text = contentToText(msg?.content ?? msg?.text ?? "").trim();
+      if (!text) continue;
+      rawRecord.messages.push({
+        anchor: userAnchor,
+        role: "user",
+        text,
+      });
+      continue;
+    }
+    if (role === "assistant") {
+      const assistantText = extractAssistantText(msg?.content ?? msg?.text ?? "").trim();
+      if (assistantText) {
+        rawRecord.messages.push({
+          anchor: assistantAnchor,
+          role: "assistant",
+          text: assistantText,
+        });
+      }
+      const content = Array.isArray(msg?.content) ? msg.content : [];
+      for (const item of content) {
+        if (!item || typeof item !== "object") continue;
+        const obj = item as Record<string, unknown>;
+        const type = String(obj.type ?? "").toLowerCase();
+        if (type !== "toolcall" && type !== "tool_call") continue;
+        const toolCallId =
+          typeof obj.id === "string" && obj.id.trim().length > 0 ? obj.id.trim() : "";
+        const toolName =
+          typeof obj.name === "string" && obj.name.trim().length > 0 ? obj.name.trim() : "unknown";
+        const args =
+          obj.arguments && typeof obj.arguments === "object"
+            ? (obj.arguments as Record<string, unknown>)
+            : undefined;
+        const argumentsText = args ? JSON.stringify(args) : undefined;
+        const refs = extractFileRefsFromToolArgs(args);
+        rawRecord.toolCalls.push({
+          anchor: assistantAnchor,
+          toolCallId: toolCallId || `toolcall-${rawRecord.toolCalls.length + 1}`,
+          toolName,
+          argumentsText,
+          argumentsSummary: summarizeText(argumentsText ?? toolName, 400),
+          ...(refs.filesRead.length > 0 ? { filesRead: refs.filesRead } : {}),
+          ...(refs.filesWritten.length > 0 ? { filesWritten: refs.filesWritten } : {}),
+        });
+      }
+      continue;
+    }
+  }
+
+  const observations = extractTurnObservations({ messages: scopedMessages });
+  for (const observation of observations) {
+    const filePath =
+      typeof observation.metadata?.path === "string" && observation.metadata.path.trim().length > 0
+        ? observation.metadata.path.trim()
+        : undefined;
+    rawRecord.toolResults.push({
+      anchor: toolAnchor,
+      toolCallId: observation.id,
+      toolName: observation.toolName ?? "unknown",
+      status: observation.payloadKind === "stderr" ? "error" : "success",
+      fullText: observation.text,
+      summary: summarizeText(observation.text, 800),
+      rawContentRef: filePath,
+      ...(observation.recovery ? { recovery: observation.recovery } : {}),
+      ...(filePath
+        ? isWriteLikeToolName(observation.toolName)
+          ? { filesWritten: [filePath] }
+          : { filesRead: [filePath] }
+        : {}),
+    });
+  }
+
+  if (
+    rawRecord.messages.length === 0 &&
+    rawRecord.toolCalls.length === 0 &&
+    rawRecord.toolResults.length === 0
+  ) {
+    return null;
+  }
+
+  return rawRecord;
+}
+
+function dedupeRawSemanticMessages(record: RawSemanticTurnRecord["messages"]): RawSemanticTurnRecord["messages"] {
+  const seen = new Set<string>();
+  const out: RawSemanticTurnRecord["messages"] = [];
+  for (const item of record) {
+    const key = `${item.anchor.turnAbsId}:${item.role}:${item.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function dedupeRawSemanticToolCalls(record: RawSemanticTurnRecord["toolCalls"]): RawSemanticTurnRecord["toolCalls"] {
+  const seen = new Set<string>();
+  const out: RawSemanticTurnRecord["toolCalls"] = [];
+  for (const item of record) {
+    const key = `${item.toolCallId}:${item.toolName}:${item.argumentsText ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function dedupeRawSemanticToolResults(record: RawSemanticTurnRecord["toolResults"]): RawSemanticTurnRecord["toolResults"] {
+  const seen = new Set<string>();
+  const out: RawSemanticTurnRecord["toolResults"] = [];
+  for (const item of record) {
+    const key = `${item.toolCallId}:${item.toolName}:${item.status}:${item.fullText}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function resolveOpenClawStateRoot(): string {
+  const explicit =
+    String(process.env.OPENCLAW_STATE_DIR ?? "").trim()
+    || String(process.env.OPENCLAW_HOME ?? "").trim();
+  if (explicit) return explicit;
+  return join(homedir(), ".openclaw");
+}
+
+async function findTranscriptPathForSession(sessionId: string): Promise<string | null> {
+  const stateRoot = resolveOpenClawStateRoot();
+  const agentsDir = join(stateRoot, "agents");
+  try {
+    const agentEntries = await readdir(agentsDir, { withFileTypes: true });
+    for (const agentEntry of agentEntries) {
+      if (!agentEntry.isDirectory()) continue;
+      const candidate = join(agentsDir, agentEntry.name, "sessions", `${sessionId}.jsonl`);
+      try {
+        await readFile(candidate, "utf8");
+        return candidate;
+      } catch {
+        // keep scanning
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+type TranscriptSessionRow = {
+  id?: string;
+  parentId?: string;
+  timestamp?: string;
+  message: Record<string, unknown>;
+};
+
+function normalizeTranscriptMessageText(message: Record<string, unknown>): string {
+  const content = message.content;
+  if (typeof content === "string") return content.trim();
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const block = item as Record<string, unknown>;
+      const type = typeof block.type === "string" ? block.type : "block";
+      if (typeof block.text === "string") return `${type}:${block.text.trim()}`;
+      if ((type === "toolCall" || type === "tool_call") && typeof block.name === "string") {
+        return `${type}:${block.name}:${JSON.stringify(block.arguments ?? {}, Object.keys(block.arguments ?? {}).sort())}`;
+      }
+      return JSON.stringify(block);
+    })
+    .filter((item) => item.length > 0)
+    .join("\n")
+    .trim();
+}
+
+function transcriptMessageStableId(row: TranscriptSessionRow): string {
+  const nativeId = typeof row.id === "string" ? row.id.trim() : "";
+  if (nativeId) return nativeId;
+  const message = row.message;
+  const role = typeof message.role === "string" ? message.role.trim() : "";
+  const toolCallId =
+    typeof message.toolCallId === "string" ? message.toolCallId.trim()
+    : typeof (message as any).tool_call_id === "string" ? String((message as any).tool_call_id).trim()
+    : "";
+  const toolName =
+    typeof message.toolName === "string" ? message.toolName.trim()
+    : typeof (message as any).tool_name === "string" ? String((message as any).tool_name).trim()
+    : "";
+  const timestamp =
+    (typeof row.timestamp === "string" && row.timestamp.trim().length > 0 ? row.timestamp.trim() : "")
+    || (typeof message.timestamp === "string" ? message.timestamp.trim() : "")
+    || (typeof message.timestamp === "number" ? String(message.timestamp) : "");
+  const basis = [
+    role,
+    toolCallId,
+    toolName,
+    timestamp,
+    normalizeTranscriptMessageText(message),
+  ].join("|");
+  return createHash("sha256").update(basis).digest("hex").slice(0, 20);
+}
+
+async function readTranscriptEntriesForSession(sessionId: string): Promise<TranscriptSessionRow[] | null> {
+  const transcriptPath = await findTranscriptPathForSession(sessionId);
+  if (!transcriptPath) return null;
+  let raw = "";
+  try {
+    raw = await readFile(transcriptPath, "utf8");
+  } catch {
+    return null;
+  }
+  const entries: TranscriptSessionRow[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const row = JSON.parse(trimmed) as Record<string, unknown>;
+      if (row.type !== "message") continue;
+      const message = row.message;
+      if (!message || typeof message !== "object") continue;
+      entries.push({
+        id: typeof row.id === "string" ? row.id : undefined,
+        parentId: typeof row.parentId === "string" ? row.parentId : undefined,
+        timestamp: typeof row.timestamp === "string" ? row.timestamp : undefined,
+        message: structuredClone(message as Record<string, unknown>),
+      });
+    } catch {
+      // Ignore malformed transcript rows.
+    }
+  }
+  return entries;
+}
+
+async function readTranscriptMessagesForSession(sessionId: string): Promise<any[] | null> {
+  const entries = await readTranscriptEntriesForSession(sessionId);
+  if (!entries) return null;
+  return entries.map((entry) => entry.message);
+}
+
+async function buildRawSemanticTurnRecordFromTranscript(
+  sessionId: string,
+  turnSeq: number,
+): Promise<RawSemanticTurnRecord | null> {
+  const messages = await readTranscriptMessagesForSession(sessionId);
+  if (!messages || messages.length === 0) return null;
+  const scopedMessages = sliceMessagesForTurnSeq(messages, turnSeq);
+  if (scopedMessages.length === 0) return null;
+  return buildRawSemanticTurnRecordFromMessages(sessionId, turnSeq, scopedMessages);
+}
+
+async function syncRawSemanticTurnsFromTranscript(
+  stateDir: string,
+  sessionId: string,
+): Promise<{ changed: boolean; turnCount: number; updatedTurnSeqs: number[] }> {
+  const messages = await readTranscriptMessagesForSession(sessionId);
+  if (!messages || messages.length === 0) {
+    return { changed: false, turnCount: 0, updatedTurnSeqs: [] };
+  }
+  let turnCount = 0;
+  for (const message of messages) {
+    if (String(message?.role ?? "").toLowerCase() === "user") {
+      turnCount += 1;
+    }
+  }
+  if (turnCount === 0) {
+    return { changed: false, turnCount: 0, updatedTurnSeqs: [] };
+  }
+  const updatedTurnSeqs: number[] = [];
+  for (let turnSeq = 1; turnSeq <= turnCount; turnSeq += 1) {
+    const record = await buildRawSemanticTurnRecordFromTranscript(sessionId, turnSeq);
+    if (!record) continue;
+    const existing = await loadRawSemanticTurnRecord(stateDir, sessionId, turnSeq);
+    const nextMessages = dedupeRawSemanticMessages(record.messages);
+    const nextToolCalls = dedupeRawSemanticToolCalls(record.toolCalls);
+    const nextToolResults = dedupeRawSemanticToolResults(record.toolResults);
+    const same =
+      existing
+      && JSON.stringify(existing.messages) === JSON.stringify(nextMessages)
+      && JSON.stringify(existing.toolCalls) === JSON.stringify(nextToolCalls)
+      && JSON.stringify(existing.toolResults) === JSON.stringify(nextToolResults);
+    if (same) continue;
+    await persistRawSemanticTurnRecord(stateDir, {
+      ...record,
+      messages: nextMessages,
+      toolCalls: nextToolCalls,
+      toolResults: nextToolResults,
+    });
+    updatedTurnSeqs.push(turnSeq);
+  }
+  return {
+    changed: updatedTurnSeqs.length > 0,
+    turnCount,
+    updatedTurnSeqs,
+  };
 }
 
 function registerEcoClawCommand(
@@ -4141,6 +5638,9 @@ function registerMemoryFaultRecoverTool(
           sourcePass: archive.sourcePass,
           toolName: archive.toolName,
           recovered: true,
+          contextSafe: {
+            ...buildRecoveryContextSafePatch(MEMORY_FAULT_RECOVER_TOOL_NAME),
+          },
         },
       };
     },
@@ -4200,6 +5700,15 @@ function registerMemoryFaultRecoverTool(
       }
       return null;
     };
+    const resolveSessionIdForPayload = (payload: any): string | undefined => {
+      const promptBinding = resolveTurnBinding(String(payload?.prompt ?? ""));
+      if (promptBinding) {
+        return String(promptBinding.upstreamSessionId ?? promptBinding.sessionKey ?? "").trim() || undefined;
+      }
+      const lastUser = findLastUserItem(payload?.input);
+      const bound = resolveTurnBinding(extractItemText(lastUser?.userItem));
+      return String(bound?.upstreamSessionId ?? bound?.sessionKey ?? "").trim() || undefined;
+    };
     let proxyRuntime: Awaited<ReturnType<typeof startEmbeddedResponsesProxy>> | null = null;
     let proxyInitDone = false;
     let proxyInitPromise: Promise<void> | null = null;
@@ -4221,6 +5730,7 @@ function registerMemoryFaultRecoverTool(
         const startedRuntime = await startEmbeddedResponsesProxy(
           cfg,
           logger,
+          resolveSessionIdForPayload,
         );
         if (!startedRuntime) return;
         if (ensureEpoch !== proxyLifecycleEpoch) {
@@ -4254,7 +5764,7 @@ function registerMemoryFaultRecoverTool(
         );
       }
     });
-    hookOn(api, "message_received", (event: any) => {
+    hookOn(api, "message_received", async (event: any) => {
       const sessionKey = extractSessionKey(event);
       const upstreamSessionId =
         extractOpenClawSessionId(event) || topology.getUpstreamSessionId(sessionKey) || undefined;
@@ -4304,7 +5814,7 @@ function registerMemoryFaultRecoverTool(
       if (!debugEnabled) return;
       logger.debug(`[ecoclaw] message_received session=${sessionKey}`);
     });
-    hookOn(api, "llm_input", (event: any) => {
+    hookOn(api, "llm_input", async (event: any) => {
       const userMessage = extractLastUserMessage(event);
       const upstreamSessionId = extractOpenClawSessionId(event);
       const sessionKey = upstreamSessionId || extractSessionKey(event);
@@ -4314,10 +5824,38 @@ function registerMemoryFaultRecoverTool(
           topology.bindUpstreamSession(sessionKey, upstreamSessionId);
         }
       }
+      if (cfg.stateDir && sessionKey.trim()) {
+        const messages = Array.isArray(event?.messages) ? event.messages : [];
+        const transcriptSync = await syncRawSemanticTurnsFromTranscript(cfg.stateDir, sessionKey);
+        await appendTaskStateTrace(cfg.stateDir, {
+          stage: "llm_input_received",
+          sessionId: sessionKey,
+          upstreamSessionId: upstreamSessionId || null,
+          messageCount: messages.length,
+          hasUserMessage: userMessage.trim().length > 0,
+          transcriptTurnCount: transcriptSync.turnCount,
+          transcriptUpdatedTurnSeqs: transcriptSync.updatedTurnSeqs,
+        });
+      }
       if (!debugEnabled) return;
       logger.debug(
         `[ecoclaw] llm_input prompt-bound session=${sessionKey || "unknown"} openclawSessionId=${upstreamSessionId || "-"}`,
       );
+    });
+    hookOn(api, "llm_output", async (event: any) => {
+      const upstreamSessionId = extractOpenClawSessionId(event);
+      const sessionKey = upstreamSessionId || extractSessionKey(event);
+      if (!cfg.stateDir || !sessionKey.trim()) return;
+      const messages = Array.isArray(event?.messages) ? event.messages : [];
+      const transcriptSync = await syncRawSemanticTurnsFromTranscript(cfg.stateDir, sessionKey);
+      await appendTaskStateTrace(cfg.stateDir, {
+        stage: "llm_output_received",
+        sessionId: sessionKey,
+        upstreamSessionId: upstreamSessionId || null,
+        messageCount: messages.length,
+        transcriptTurnCount: transcriptSync.turnCount,
+        transcriptUpdatedTurnSeqs: transcriptSync.updatedTurnSeqs,
+      });
     });
 
     if (typeof api.registerService === "function") {

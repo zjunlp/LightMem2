@@ -5,3 +5,4 @@ export * from "./reduction/index.js";
 export * from "./compaction/index.js";
 export * from "./eviction/index.js";
 export * from "./types.js";
+export * from "./task-state-estimator.js";

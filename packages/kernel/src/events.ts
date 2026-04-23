@@ -18,13 +18,9 @@ export const ECOCLAW_EVENT_TYPES = {
   POLICY_CACHE_HEALTH_DECIDED: "policy.cache.health.decided",
   POLICY_CACHE_HEALTH_RESULT: "policy.cache.health.result",
   POLICY_REDUCTION_DECIDED: "policy.reduction.decided",
-  POLICY_EVICTION_DECIDED: "policy.eviction.decided",
   // Compaction
   COMPACTION_PLAN_GENERATED: "compaction.plan.generated",
   COMPACTION_APPLY_EXECUTED: "compaction.apply.executed",
-  // Eviction
-  EVICTION_PLAN_EVALUATED: "eviction.plan.evaluated",
-  EVICTION_APPLY_EXECUTED: "eviction.apply.executed",
   // Branch materialization
   BRANCH_MATERIALIZED: "branch.materialized",
   // Decision ledger

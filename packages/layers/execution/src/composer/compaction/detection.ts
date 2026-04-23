@@ -39,6 +39,11 @@ function extractDataKey(
   return undefined;
 }
 
+function skipCompaction(metadata: Record<string, unknown> | undefined): boolean {
+  const recovery = asObject(metadata?.recovery);
+  return recovery?.skipCompaction === true;
+}
+
 function isSuccessfulWriteLike(text: string): boolean {
   const lowered = text.toLowerCase();
   if (/successfully (wrote|updated|edited|applied)/i.test(text)) return true;
@@ -73,6 +78,7 @@ export function detectConsumedReads(
   for (let i = 0; i < ctx.segments.length; i += 1) {
     const segment = ctx.segments[i];
     const meta = asObject(segment.metadata);
+    if (skipCompaction(meta)) continue;
     const tool = normalizeToolName(meta);
     if (tool !== "read" && tool !== "exec") continue;
     const dataKey = extractDataKey(meta);
@@ -102,6 +108,7 @@ export function detectConsumedReads(
 
       const segment = ctx.segments[i];
       const meta = asObject(segment.metadata);
+      if (skipCompaction(meta)) continue;
       const tool = normalizeToolName(meta);
       if (tool !== "read" && tool !== "exec") continue;
 
@@ -155,6 +162,7 @@ export function pickRepeatedReadCandidates(
   for (let i = 0; i < ctx.segments.length; i += 1) {
     const segment = ctx.segments[i];
     const meta = asObject(segment.metadata);
+    if (skipCompaction(meta)) continue;
     const tool = normalizeToolName(meta);
     if (tool !== "read" && tool !== "exec") continue;
     const dataKey = extractDataKey(meta);
@@ -215,6 +223,7 @@ export function pickRepeatedReadCandidates(
 
       const readSegment = ctx.segments[readIdx];
       const readMeta = asObject(readSegment.metadata);
+      if (skipCompaction(readMeta)) continue;
 
       candidates.push({
         sourceIndex: readIdx,

@@ -1,4 +1,11 @@
 import type { ApiFamily, RuntimeTurnContext } from "@ecoclaw/kernel";
+import type {
+  DeltaInputMode,
+  DeltaView,
+  SessionTaskRegistry,
+  SessionTaskRegistryPatch,
+  TaskLifecycle,
+} from "@ecoclaw/layer-history";
 
 export const ROUTING_TIERS = ["simple", "standard", "complex", "reasoning"] as const;
 export type RoutingTier = (typeof ROUTING_TIERS)[number];
@@ -193,4 +200,57 @@ export type EvictionDecision = {
   instructions: EvictionInstruction[];
   estimatedSavedChars: number;
   notes?: string[];
+};
+
+// ============================================================================
+// Task State Estimation Types
+// ============================================================================
+
+export type TaskStateTransition = {
+  taskId: string;
+  from?: TaskLifecycle;
+  to: TaskLifecycle;
+  rationale: string;
+};
+
+export type TaskStateEstimatorInput = {
+  registry: SessionTaskRegistry;
+  delta: DeltaView;
+};
+
+export type TaskStateEstimatorApiConfig = {
+  enabled?: boolean;
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  requestTimeoutMs?: number;
+  batchTurns?: number;
+  evictionLookaheadTurns?: number;
+  inputMode?: DeltaInputMode;
+  lifecycleMode?: "coupled" | "decoupled";
+  evictionPromotionPolicy?: "fifo";
+  evictionPromotionHotTailSize?: number;
+};
+
+export type SemanticTaskUpdate = {
+  taskId: string;
+  title?: string;
+  objective: string;
+  lifecycle: TaskLifecycle;
+  coveredTurnAbsIds?: string[];
+  completionEvidence?: string[];
+  unresolvedQuestions?: string[];
+  currentSubgoal?: string;
+  evictableReason?: string;
+};
+
+export type TaskStateEstimatorOutput = {
+  baseVersion: number;
+  taskUpdates: SemanticTaskUpdate[];
+};
+
+export type TaskStateEstimator = {
+  estimate(
+    input: TaskStateEstimatorInput,
+  ): Promise<TaskStateEstimatorOutput> | TaskStateEstimatorOutput;
 };
