@@ -152,49 +152,6 @@ This phase is mostly implemented in:
 - `packages/layers/history/`
 - `packages/layers/decision/`
 
-<span id='repository-structure'/>
-
-## 📁 Repository Structure
-
-### Live packages
-
-- `packages/kernel/`
-  - shared runtime types, events, and interfaces
-
-- `packages/layers/history/`
-  - raw semantic turns, task registry, and history-oriented state
-
-- `packages/layers/decision/`
-  - policy logic, task-state estimation, and eviction promotion
-
-- `packages/openclaw-plugin/`
-  - the runtime bridge into OpenClaw
-
-### Important plugin-local modules
-
-Inside `packages/openclaw-plugin/src/`, the runtime is split into focused modules:
-
-- `proxy/`
-  - request-time rewriting, stable-prefix, reduction, upstream forwarding
-
-- `canonical/`
-  - canonical history state, task anchors, task-level eviction
-
-- `transcript/`
-  - transcript-to-raw-semantic synchronization
-
-- `execution/`
-  - plugin-local reduction passes and archive-recovery helpers
-
-- `recovery/`
-  - memory-fault recovery protocol and recovery tool
-
-- `tool-results/`
-  - oversized tool-result persistence
-
-- `runtime/`
-  - plugin runtime orchestration
-
 <span id='experimental-results'/>
 
 ## 📊 Experimental Results
