@@ -30,11 +30,11 @@
     "pack:release": "bash ./scripts/pack_release.sh",
     "install:release": "bash ./scripts/install_release.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "acceptance:e2e": "bash ./scripts/e2e.sh",
-    "acceptance:cache": "bash ./scripts/cache_acceptance.sh",
-    "acceptance:report": "bash ./scripts/acceptance_report.sh",
-    "acceptance:summary": "bash ./scripts/summary_e2e.sh",
-    "acceptance:semantic": "bash ./scripts/semantic_e2e.sh",
+    "dev:acceptance:e2e": "bash ./scripts/e2e.sh",
+    "dev:acceptance:cache": "bash ./scripts/cache_acceptance.sh",
+    "dev:acceptance:report": "bash ./scripts/acceptance_report.sh",
+    "dev:acceptance:summary": "bash ./scripts/summary_e2e.sh",
+    "dev:acceptance:semantic": "bash ./scripts/semantic_e2e.sh",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

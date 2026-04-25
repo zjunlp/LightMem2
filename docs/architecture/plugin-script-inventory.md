@@ -43,11 +43,11 @@ not part of the published plugin payload.
 
 Current package script bindings:
 
-- `npm run acceptance:e2e`
-- `npm run acceptance:cache`
-- `npm run acceptance:report`
-- `npm run acceptance:semantic`
-- `npm run acceptance:summary`
+- `npm run dev:acceptance:e2e`
+- `npm run dev:acceptance:cache`
+- `npm run dev:acceptance:report`
+- `npm run dev:acceptance:semantic`
+- `npm run dev:acceptance:summary`
 
 ## Current Assessment
 
@@ -59,6 +59,7 @@ These scripts are not dead code in the narrow sense, because:
 But they should be treated as:
 
 - plugin-side development tooling
+- legacy targeted acceptance checks
 - not as the canonical project evaluation path
 
 The canonical benchmark/evaluation flow now belongs in `EcoClaw-Bench`, and in
@@ -77,7 +78,7 @@ Acceptance helpers and fixtures should remain local development tooling.
 Near-term guidance:
 
 1. keep release helpers intact
-2. keep acceptance helpers available
+2. keep acceptance helpers available as legacy dev tooling
 3. stop expanding these scripts with benchmark-specific logic
 4. move benchmark documentation and benchmark runtime setup out of this package
 
