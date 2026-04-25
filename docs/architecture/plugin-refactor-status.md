@@ -121,9 +121,8 @@
 - turn observation extraction with recovery-aware metadata
 
 ### `session/topology.ts`
-- logical task-cache/session topology manager
 - upstream session binding
-- cache create/delete/session branching
+- runtime session-key -> OpenClaw session-id binding
 
 ### `session/turn-bindings.ts`
 - recent turn binding state load/save
