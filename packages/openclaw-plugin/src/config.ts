@@ -125,7 +125,7 @@ export function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 const NULL_RUNTIME: RuntimeModuleRuntime = {
   async callModel() {
-    throw new Error("callModel is unavailable in plugin-side before_call optimization");
+    throw new Error("callModel is unavailable during plugin-side before_call optimization");
   },
 };
 

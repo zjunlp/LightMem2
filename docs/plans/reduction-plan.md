@@ -43,7 +43,7 @@ No change needed - `beforeBuild` already correctly outputs `beforeCallPassIds`
 
 1. **Plugin-specific logic loss**: `enableHtmlSlimming` in `passToggles` is plugin-specific. But `analyzeToolPayloadTrim` internally detects HTML and uses html slimming, so decision layer covers this.
 
-2. **User dynamic control**: User's ability to dynamically toggle passes via `/ecoclaw` command may be lost. Need to support per-request config override or event mechanism.
+2. **User dynamic control**: If pass-level runtime toggling is needed again, it should return as an explicit config/event interface rather than as a TUI command side path.
 
 ## Steps
 

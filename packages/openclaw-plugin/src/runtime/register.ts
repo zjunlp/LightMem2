@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { installLlmHookTap } from "../trace/hooks.js";
-import { registerEcoClawCommand } from "../commands/register.js";
 import { createSessionTopologyManager } from "../session/topology.js";
 import { loadRecentTurnBindingsFromState, persistRecentTurnBindingsToState } from "../session/turn-bindings.js";
 import { maybeRegisterProxyProvider } from "../proxy/provider.js";
@@ -205,12 +204,6 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     extractLastUserMessage: deps.extractLastUserMessage,
   });
 
-  deps.registerEcoClawCommand(api, logger, topology, cfg, {
-    extractSessionKey: deps.extractSessionKey,
-    safeId: deps.safeId,
-    purgeTaskCacheWorkspace: (stateDir: string, taskId: string) => deps.purgeTaskCacheWorkspace(stateDir, taskId),
-  });
-
   deps.hookOn(api, "session_start", (event: any) => {
     const sessionKey = deps.extractSessionKey(event);
     const upstreamSessionId = deps.extractOpenClawSessionId(event);
@@ -218,7 +211,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     topology.bindUpstreamSession(sessionKey, upstreamSessionId);
     if (deps.debugEnabled) {
       logger.debug(
-        `[ecoclaw] session_start synced sessionKey=${sessionKey} openclawSessionId=${upstreamSessionId} ${topology.getStatus(sessionKey)}`,
+        `[ecoclaw] session_start synced sessionKey=${sessionKey} openclawSessionId=${upstreamSessionId}`,
       );
     }
   });
@@ -228,37 +221,6 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     const upstreamSessionId = deps.extractOpenClawSessionId(event) || topology.getUpstreamSessionId(sessionKey) || undefined;
     const userMessage = deps.extractLastUserMessage(event);
     if (userMessage.trim()) rememberTurnBinding(userMessage, sessionKey, upstreamSessionId);
-    const cmd = deps.parseEcoClawCommand(userMessage);
-    if (cmd.kind !== "none") {
-      if (cmd.kind === "status") {
-        logger.info(`[ecoclaw] ${topology.getStatus(sessionKey)}`);
-      } else if (cmd.kind === "cache_new") {
-        const logical = topology.newTaskCache(sessionKey, cmd.taskId);
-        logger.info(`[ecoclaw] cache new -> ${topology.getStatus(sessionKey)} logical=${logical}`);
-      } else if (cmd.kind === "cache_delete") {
-        const removed = topology.deleteTaskCache(sessionKey, cmd.taskId);
-        if (!removed) {
-          logger.info(`[ecoclaw] cache delete -> no matching task-cache for ${cmd.taskId ? deps.safeId(cmd.taskId) : "current"}`);
-        } else {
-          void deps.purgeTaskCacheWorkspace(cfg.stateDir, removed.removedTaskId)
-            .then((purge: any) => {
-              logger.info(
-                `[ecoclaw] cache delete -> removed=${removed.removedTaskId} bindings=${removed.removedBindings} purged=${purge.purged.length} now=${topology.getStatus(sessionKey)} logical=${removed.switchedToLogical}`,
-              );
-            })
-            .catch((err: any) => {
-              logger.warn(`[ecoclaw] cache delete purge failed for ${removed.removedTaskId}: ${err instanceof Error ? err.message : String(err)}`);
-            });
-        }
-      } else if (cmd.kind === "session_new") {
-        const logical = topology.newSession(sessionKey);
-        logger.info(`[ecoclaw] session new -> ${topology.getStatus(sessionKey)} logical=${logical}`);
-      } else if (cmd.kind === "openclaw_session_new") {
-        logger.info(`[ecoclaw] observed native /new on ${sessionKey}; waiting for OpenClaw session_start to publish the new sessionId`);
-      } else {
-        logger.info(`[ecoclaw] ${deps.commandHelpText().replace(/\n/g, " | ")}`);
-      }
-    }
     if (!deps.debugEnabled) return;
     logger.debug(`[ecoclaw] message_received session=${sessionKey}`);
   });
@@ -322,7 +284,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
         } else {
           logger.info("[ecoclaw] Embedded proxy unavailable; ecoclaw provider was not registered.");
         }
-        logger.info("[ecoclaw] Use explicit model key: ecoclaw/<model> (example: ecoclaw/gpt-5.4).");
+        logger.info("[ecoclaw] TokenPilot runtime active. Use explicit model key: ecoclaw/<model> (example: ecoclaw/gpt-5.4).");
         logger.info(`[ecoclaw] State dir=${cfg.stateDir} debugTap=${cfg.debugTapProviderTraffic ? "on" : "off"}`);
       },
       stop: () => {

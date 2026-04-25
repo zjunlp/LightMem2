@@ -27,8 +27,8 @@ export function maybeRegisterProxyProvider(
     }));
     api.registerProvider({
       id: "ecoclaw",
-      name: "EcoClaw Router",
-      label: "EcoClaw Router",
+      name: "TokenPilot Router",
+      label: "TokenPilot Router",
       api: "openai-responses",
       baseUrl,
       apiKey: cfg.proxyApiKey ?? "ecoclaw-local",

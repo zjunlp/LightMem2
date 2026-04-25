@@ -30,6 +30,8 @@ async function main() {
   await mkdir(dirname(workerDest), { recursive: true });
   await copyFile(workerSrc, workerDest);
 
+  // Keep the runtime manifest beside the bundled extension entry so the local
+  // OpenClaw extension directory can be synced directly from dist/.
   const pluginManifestSrc = join(process.cwd(), "openclaw.plugin.json");
   const pluginManifestDest = join(process.cwd(), "dist", "openclaw.plugin.json");
   await copyFile(pluginManifestSrc, pluginManifestDest);

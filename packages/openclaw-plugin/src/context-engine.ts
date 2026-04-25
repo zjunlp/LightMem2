@@ -2,17 +2,12 @@
 import { rewriteCanonicalState, syncCanonicalStateFromTranscript } from "./canonical/rewrite.js";
 import { estimateMessagesChars, saveCanonicalState } from "./canonical/state.js";
 
-export async function purgeTaskCacheWorkspace(stateDir: string, taskId: string, safeId: (value: string) => string): Promise<{ purged: string[] }> {
-  const mod = await import("./session/workspace.js");
-  return mod.purgeTaskCacheWorkspace(stateDir, taskId, safeId);
-}
-
 export function createEcoClawContextEngine(cfg: any, logger: any, deps: any) {
   const canonicalMessageTaskIdsBound = (message: Record<string, unknown>): string[] => deps.canonicalMessageTaskIds(message, deps.asRecord);
   return {
     info: {
       id: "ecoclaw-context",
-      name: "EcoClaw Context Engine",
+      name: "TokenPilot Context Engine",
     },
     async ingest() {
       return { ingested: false };
@@ -129,7 +124,7 @@ export function createEcoClawContextEngine(cfg: any, logger: any, deps: any) {
       return {
         ok: true,
         compacted: synced.changed || rewritten.changed,
-        reason: synced.changed || rewritten.changed ? "ecoclaw canonical state updated" : "ecoclaw canonical state unchanged",
+        reason: synced.changed || rewritten.changed ? "tokenpilot canonical state updated" : "tokenpilot canonical state unchanged",
       };
     },
   };

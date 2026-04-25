@@ -129,18 +129,6 @@
 - recent turn binding state load/save
 - provider-side turn-binding persistence
 
-### `session/workspace.ts`
-- task-cache workspace purge helper
-- session directory cleanup for deleted task-caches
-
-### `commands/ecoclaw.ts`
-- /ecoclaw command parsing
-- command help text generation
-
-### `commands/register.ts`
-- /ecoclaw runtime command registration glue
-- command handler wiring and task-cache operation delegation
-
 ### `runtime/helpers.ts`
 - shared logger/hook helpers
 - session/user-message extraction helpers
@@ -229,3 +217,4 @@
 - `index.ts` now mainly owns proxy-runtime helper wiring, test hooks, and final plugin export glue.
 - plugin-side legacy `compaction` runtime/config compatibility has been removed.
 - summary controls now live under `plugins.entries.ecoclaw.config.summary.*`.
+- legacy `/ecoclaw` command wiring and task-cache workspace deletion helpers have been removed from the live runtime.

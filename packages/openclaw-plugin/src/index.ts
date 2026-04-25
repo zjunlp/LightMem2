@@ -53,8 +53,6 @@ import {
   appendTaskStateTrace,
 } from "./trace/io.js";
 import { applyToolResultPersistPolicy } from "./tool-results/persist.js";
-import { commandHelpText, parseEcoClawCommand } from "./commands/ecoclaw.js";
-import { registerEcoClawCommand } from "./commands/register.js";
 import { maybeRegisterProxyProvider } from "./proxy/provider.js";
 import { registerMemoryFaultRecoverTool } from "./recovery/tool.js";
 import { installLlmHookTap } from "./trace/hooks.js";
@@ -97,7 +95,7 @@ import {
   normalizeConfig,
   safeId,
 } from "./config.js";
-import { createEcoClawContextEngine, purgeTaskCacheWorkspace } from "./context-engine.js";
+import { createEcoClawContextEngine } from "./context-engine.js";
 import { registerRuntime } from "./runtime/register.js";
 import {
   injectMemoryFaultProtocolInstructions,
@@ -222,10 +220,6 @@ module.exports = {
       extractSessionKey,
       extractLastUserMessage,
       extractOpenClawSessionId,
-      parseEcoClawCommand,
-      commandHelpText,
-      registerEcoClawCommand,
-      purgeTaskCacheWorkspace: (stateDir: string, taskId: string) => purgeTaskCacheWorkspace(stateDir, taskId, safeId),
       normalizeTurnBindingMessage,
       extractItemText: (item: any) => extractItemText(item, extractInputText),
       findLastUserItem,
