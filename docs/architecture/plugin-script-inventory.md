@@ -32,7 +32,8 @@ Package script bindings:
 ## Acceptance Helpers
 
 These scripts are still wired into `package.json` and are useful for targeted
-plugin-side validation. They are not the main benchmark harness.
+plugin-side validation. They are not the main benchmark harness, and they are
+not part of the published plugin payload.
 
 - `/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/scripts/e2e.sh`
 - `/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/scripts/cache_acceptance.sh`
@@ -62,6 +63,14 @@ But they should be treated as:
 
 The canonical benchmark/evaluation flow now belongs in `EcoClaw-Bench`, and in
 the future should move into the main repo under `experiments/`.
+
+The published plugin package should stay narrow:
+
+- runtime files in `dist/`
+- `openclaw.plugin.json`
+- plugin README
+
+Acceptance helpers and fixtures should remain local development tooling.
 
 ## Cleanup Guidance
 

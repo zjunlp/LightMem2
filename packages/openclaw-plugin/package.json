@@ -14,13 +14,7 @@
     "dist/index.js.map",
     "dist/semantic-llmlingua2-worker.py",
     "openclaw.plugin.json",
-    "README.md",
-    "scripts/acceptance_report.sh",
-    "scripts/e2e.sh",
-    "scripts/summary_e2e.sh",
-    "scripts/semantic_e2e.sh",
-    "scripts/cache_acceptance.sh",
-    "fixtures/responses-cache-bridge-session.jsonl"
+    "README.md"
   ],
   "openclaw": {
     "extensions": [
