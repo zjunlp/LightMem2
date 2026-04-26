@@ -21,8 +21,8 @@ The migration is now in an intermediate state:
 
 - dataset tasks and assets have already been copied here
 - dataset-side Python harness files have already been copied here
-- wrapper cleanup is still in progress before this becomes the canonical
-  runnable surface
+- the active single-agent method path now runs from this subtree
+- baseline remains deferred and is not part of the migrated canonical path
 
 ## Current Contents
 
@@ -40,7 +40,7 @@ The migration is now in an intermediate state:
 - `scripts/`
   - current home for the cleaned method-path wrapper surface
 - `save/`
-  - reserved for future saved result structure
+  - reserved for local run outputs; only directory skeletons should be committed
 
 ## Immediate Goal
 

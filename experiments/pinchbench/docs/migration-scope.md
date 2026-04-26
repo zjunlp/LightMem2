@@ -53,8 +53,9 @@ Reason:
 Important:
 
 - the dataset-side Python files are being moved before they are fully cleaned
-- they still contain deferred branches such as multi-agent / MAS and upload
-  integration
+- they may still contain historical assumptions inherited from the external
+  harness, but the active migrated path has already been reduced to
+  single-agent PinchBench execution
 - migration first, cleanup second
 
 ### Defer
