@@ -12,7 +12,7 @@ export function registerMemoryFaultRecoverTool(
   logger: { warn: (message: string) => void },
 ): void {
   if (typeof api.registerTool !== "function") {
-    logger.warn("[ecoclaw] registerTool unavailable in this OpenClaw version.");
+    logger.warn("[plugin-runtime] registerTool unavailable in this OpenClaw version.");
     return;
   }
 

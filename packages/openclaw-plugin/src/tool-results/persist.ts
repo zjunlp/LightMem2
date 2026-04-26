@@ -82,7 +82,7 @@ export async function applyToolResultPersistPolicy(
     });
     outputFile = archived.archivePath;
   } catch (err) {
-    logger.warn(`[ecoclaw] tool_result_persist artifact write failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[plugin-runtime] tool_result_persist artifact write failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   const preview = buildToolResultPreview(text, limit);

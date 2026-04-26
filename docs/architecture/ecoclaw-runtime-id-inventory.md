@@ -120,6 +120,12 @@ refactor after the runtime ID layer has a compatibility plan.
 These do not need to be renamed now, but they do not need permanent
 preservation either.
 
+#### Internal singleton keys
+
+- [runtime/register.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/runtime/register.ts)
+  - internal embedded-proxy singleton key already moved to the neutral
+    `__runtime_optimizer_embedded_proxy_runtime__`
+
 ## Class C: Logging, Comments, and Historical References
 
 These are the lowest-risk `ecoclaw` references. They are not config keys or
@@ -129,16 +135,16 @@ remains unchanged.
 #### Logger prefixes
 
 - [runtime/register.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/runtime/register.ts)
-  - `[ecoclaw] ...`
+  - `[plugin-runtime] ...`
 - [proxy/runtime.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/proxy/runtime.ts)
-  - `[ecoclaw] ...`
+  - `[plugin-runtime] ...`
 - [proxy/upstream.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/proxy/upstream.ts)
-  - `[ecoclaw] ...`
+  - `[plugin-runtime] ...`
 - [recovery/tool.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/recovery/tool.ts)
-  - `[ecoclaw] ...`
+  - `[plugin-runtime] ...`
 
-These can be renamed later without changing config semantics, but they should
-be changed consistently rather than opportunistically.
+These have already been moved off the brand-specific `[ecoclaw]` prefix without
+changing config semantics.
 
 #### Historical docs and bug reports
 

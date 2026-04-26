@@ -274,7 +274,7 @@ export async function requestUpstreamResponses(
       upstreamBaseUrl: upstream.baseUrl,
       error: fetchDetail,
     });
-    logger.warn(`[ecoclaw] upstream fetch failed, fallback to curl: ${fetchDetail}`);
+    logger.warn(`[plugin-runtime] upstream fetch failed, fallback to curl: ${fetchDetail}`);
     try {
       return await requestUpstreamWithCurl(upstream, payload, stateDir, logger);
     } catch (curlErr) {
@@ -285,7 +285,7 @@ export async function requestUpstreamResponses(
         fetchError: fetchDetail,
         curlError: curlDetail,
       });
-      logger.error(`[ecoclaw] upstream curl fallback failed: ${curlDetail}`);
+      logger.error(`[plugin-runtime] upstream curl fallback failed: ${curlDetail}`);
       throw new Error(`upstream fetch failed (${fetchDetail}); curl fallback failed (${curlDetail})`);
     }
   }
@@ -331,7 +331,7 @@ export async function detectUpstreamConfig(
       }],
     };
   } catch (err) {
-    logger.warn(`[ecoclaw] detect upstream config failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[plugin-runtime] detect upstream config failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
@@ -378,10 +378,10 @@ export async function ensureExplicitProxyModelsInConfig(
     const nextRaw = JSON.stringify(doc, null, 2);
     if (nextRaw !== raw) {
       await writeFile(cfgPath, nextRaw, "utf8");
-      logger.info(`[ecoclaw] synced explicit model keys into openclaw.json (${upstream.models.length} models).`);
+      logger.info(`[plugin-runtime] synced explicit model keys into openclaw.json (${upstream.models.length} models).`);
     }
   } catch (err) {
-    logger.warn(`[ecoclaw] sync explicit proxy models failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[plugin-runtime] sync explicit proxy models failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

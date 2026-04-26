@@ -166,7 +166,7 @@ module.exports = {
     const cfg = normalizeConfig(api?.pluginConfig);
 
     if (!cfg.enabled) {
-      logger.info("[ecoclaw] Plugin disabled by config.");
+      logger.info("[plugin-runtime] Plugin disabled by config.");
       return;
     }
 
@@ -206,7 +206,7 @@ module.exports = {
         safeId,
       }));
     } else if (cfg.contextEngine.enabled) {
-      logger.warn("[ecoclaw] registerContextEngine unavailable in this OpenClaw version.");
+      logger.warn("[plugin-runtime] registerContextEngine unavailable in this OpenClaw version.");
     }
 
     void registerRuntime(api, cfg, logger, {

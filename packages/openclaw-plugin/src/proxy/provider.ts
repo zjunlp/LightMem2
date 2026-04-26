@@ -9,7 +9,7 @@ export function maybeRegisterProxyProvider(
   upstream: UpstreamConfig,
 ) {
   if (typeof api.registerProvider !== "function") {
-    logger.warn("[ecoclaw] registerProvider not supported by this OpenClaw version.");
+    logger.warn("[plugin-runtime] registerProvider not supported by this OpenClaw version.");
     return;
   }
 
@@ -36,9 +36,9 @@ export function maybeRegisterProxyProvider(
       models: modelIds.length > 0 ? modelDefs : ["gpt-5.4"],
     });
     logger.info(
-      `[ecoclaw] Registered provider ecoclaw/* via embedded proxy. mirrored=${modelIds.slice(0, 6).join(",")}${modelIds.length > 6 ? "..." : ""}`,
+      `[plugin-runtime] Registered provider ecoclaw/* via embedded proxy. mirrored=${modelIds.slice(0, 6).join(",")}${modelIds.length > 6 ? "..." : ""}`,
     );
   } catch (err: unknown) {
-    logger.error(`[ecoclaw] Failed to register provider: ${err instanceof Error ? err.message : String(err)}`);
+    logger.error(`[plugin-runtime] Failed to register provider: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

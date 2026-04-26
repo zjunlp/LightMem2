@@ -167,7 +167,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     const ensureEpoch = proxyLifecycleEpoch;
     proxyInitPromise = (async () => {
       const g = globalThis as any;
-      const existing = g.__ecoclaw_embedded_proxy_runtime__;
+      const existing = g.__runtime_optimizer_embedded_proxy_runtime__;
       if (existing && existing.baseUrl && existing.upstream) {
         if (ensureEpoch !== proxyLifecycleEpoch) return;
         proxyRuntime = existing;
@@ -181,13 +181,13 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
         return;
       }
       proxyRuntime = startedRuntime;
-      g.__ecoclaw_embedded_proxy_runtime__ = startedRuntime;
+      g.__runtime_optimizer_embedded_proxy_runtime__ = startedRuntime;
       deps.maybeRegisterProxyProvider(api, cfg, logger, startedRuntime.baseUrl, startedRuntime.upstream);
       await deps.ensureExplicitProxyModelsInConfig(startedRuntime.baseUrl, startedRuntime.upstream, logger);
       proxyInitDone = true;
     })().catch((err) => {
       proxyInitDone = false;
-      logger.warn(`[ecoclaw] embedded proxy init failed: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(`[plugin-runtime] embedded proxy init failed: ${err instanceof Error ? err.message : String(err)}`);
     }).finally(() => {
       proxyInitPromise = null;
     });
@@ -211,7 +211,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     topology.bindUpstreamSession(sessionKey, upstreamSessionId);
     if (deps.debugEnabled) {
       logger.debug(
-        `[ecoclaw] session_start synced sessionKey=${sessionKey} openclawSessionId=${upstreamSessionId}`,
+        `[plugin-runtime] session_start synced sessionKey=${sessionKey} openclawSessionId=${upstreamSessionId}`,
       );
     }
   });
@@ -222,7 +222,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
     const userMessage = deps.extractLastUserMessage(event);
     if (userMessage.trim()) rememberTurnBinding(userMessage, sessionKey, upstreamSessionId);
     if (!deps.debugEnabled) return;
-    logger.debug(`[ecoclaw] message_received session=${sessionKey}`);
+    logger.debug(`[plugin-runtime] message_received session=${sessionKey}`);
   });
 
   deps.hookOn(api, "llm_input", async (event: any) => {
@@ -251,7 +251,7 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
       });
     }
     if (!deps.debugEnabled) return;
-    logger.debug(`[ecoclaw] llm_input prompt-bound session=${upstreamSessionId || "pending-session"} openclawSessionId=${upstreamSessionId || "-"}`);
+    logger.debug(`[plugin-runtime] llm_input prompt-bound session=${upstreamSessionId || "pending-session"} openclawSessionId=${upstreamSessionId || "-"}`);
   });
 
   deps.hookOn(api, "llm_output", async (event: any) => {
@@ -278,24 +278,24 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
       id: "ecoclaw-runtime",
       start: () => {
         void ensureProxyReady();
-        logger.info("[ecoclaw] Plugin active.");
+        logger.info("[plugin-runtime] Plugin active.");
         if (proxyRuntime?.baseUrl) {
-          logger.info(`[ecoclaw] Embedded proxy active at ${proxyRuntime.baseUrl}`);
+          logger.info(`[plugin-runtime] Embedded proxy active at ${proxyRuntime.baseUrl}`);
         } else {
-          logger.info("[ecoclaw] Embedded proxy unavailable; ecoclaw provider was not registered.");
+          logger.info("[plugin-runtime] Embedded proxy unavailable; ecoclaw provider was not registered.");
         }
-        logger.info("[ecoclaw] TokenPilot runtime active. Use explicit model key: ecoclaw/<model> (example: ecoclaw/gpt-5.4).");
-        logger.info(`[ecoclaw] State dir=${cfg.stateDir} debugTap=${cfg.debugTapProviderTraffic ? "on" : "off"}`);
+        logger.info("[plugin-runtime] TokenPilot runtime active. Use explicit model key: ecoclaw/<model> (example: ecoclaw/gpt-5.4).");
+        logger.info(`[plugin-runtime] State dir=${cfg.stateDir} debugTap=${cfg.debugTapProviderTraffic ? "on" : "off"}`);
       },
       stop: () => {
         proxyLifecycleEpoch += 1;
         const stopEpoch = proxyLifecycleEpoch;
         if (proxyRuntime) {
           void proxyRuntime.close().catch((err) => {
-            logger.warn(`[ecoclaw] embedded proxy stop failed: ${err instanceof Error ? err.message : String(err)}`);
+            logger.warn(`[plugin-runtime] embedded proxy stop failed: ${err instanceof Error ? err.message : String(err)}`);
           });
           const g = globalThis as any;
-          if (g.__ecoclaw_embedded_proxy_runtime__ === proxyRuntime) delete g.__ecoclaw_embedded_proxy_runtime__;
+          if (g.__runtime_optimizer_embedded_proxy_runtime__ === proxyRuntime) delete g.__runtime_optimizer_embedded_proxy_runtime__;
           proxyRuntime = null;
           proxyInitDone = false;
         }
@@ -303,14 +303,14 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
           void proxyInitPromise.then(() => {
             if (stopEpoch !== proxyLifecycleEpoch) return;
             const g = globalThis as any;
-            const runtime = g.__ecoclaw_embedded_proxy_runtime__;
+            const runtime = g.__runtime_optimizer_embedded_proxy_runtime__;
             if (runtime && runtime !== proxyRuntime) {
               void runtime.close().catch(() => undefined);
-              if (g.__ecoclaw_embedded_proxy_runtime__ === runtime) delete g.__ecoclaw_embedded_proxy_runtime__;
+              if (g.__runtime_optimizer_embedded_proxy_runtime__ === runtime) delete g.__runtime_optimizer_embedded_proxy_runtime__;
             }
           }).catch(() => undefined);
         }
-        logger.info("[ecoclaw] Plugin stopped.");
+        logger.info("[plugin-runtime] Plugin stopped.");
       },
     });
   }

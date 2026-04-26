@@ -38,12 +38,12 @@ export async function startEmbeddedResponsesProxy(
       apiKey: cfg.proxyApiKey,
       models: detected?.models ?? [],
     };
-    logger.info(`[ecoclaw] proxy using configured upstream: ${upstream.baseUrl}`);
+    logger.info(`[plugin-runtime] proxy using configured upstream: ${upstream.baseUrl}`);
   } else {
     upstream = await helpers.detectUpstreamConfig(logger);
   }
   if (!upstream) {
-    logger.warn("[ecoclaw] no upstream provider discovered; proxy disabled.");
+    logger.warn("[plugin-runtime] no upstream provider discovered; proxy disabled.");
     return null;
   }
 
@@ -248,7 +248,7 @@ export async function startEmbeddedResponsesProxy(
         payload.__ecoclaw_reduction_applied = true;
       }
       helpers.stripInternalPayloadMarkers(payload);
-      logger.info(`[ecoclaw] proxy request model=${model || "unknown"} upstreamModel=${upstreamModel || "unknown"} instrChars=${instructions.length} cacheKey=${stableRewrite.promptCacheKey} userContentRewrites=${stableRewrite.userContentRewrites} senderBlocks=${stableRewrite.senderMetadataBlocksBefore}->${stableRewrite.senderMetadataBlocksAfter} reductionEngine=${proxyPureForward ? "proxy_pure_forward" : cfg.reduction.engine} reductionItems=${reductionApplied.changedItems} reductionBlocks=${reductionApplied.changedBlocks} reductionSavedChars=${reductionApplied.savedChars} reductionCandidates=${reductionApplied.diagnostics?.candidateBlocks ?? 0} reductionOverThreshold=${reductionApplied.diagnostics?.overThresholdBlocks ?? 0} reductionPersistedSkipped=${reductionApplied.diagnostics?.persistedSkippedItems ?? 0} reductionSkipped=${reductionApplied.diagnostics?.skippedReason ?? "none"}`);
+      logger.info(`[plugin-runtime] proxy request model=${model || "unknown"} upstreamModel=${upstreamModel || "unknown"} instrChars=${instructions.length} cacheKey=${stableRewrite.promptCacheKey} userContentRewrites=${stableRewrite.userContentRewrites} senderBlocks=${stableRewrite.senderMetadataBlocksBefore}->${stableRewrite.senderMetadataBlocksAfter} reductionEngine=${proxyPureForward ? "proxy_pure_forward" : cfg.reduction.engine} reductionItems=${reductionApplied.changedItems} reductionBlocks=${reductionApplied.changedBlocks} reductionSavedChars=${reductionApplied.savedChars} reductionCandidates=${reductionApplied.diagnostics?.candidateBlocks ?? 0} reductionOverThreshold=${reductionApplied.diagnostics?.overThresholdBlocks ?? 0} reductionPersistedSkipped=${reductionApplied.diagnostics?.persistedSkippedItems ?? 0} reductionSkipped=${reductionApplied.diagnostics?.skippedReason ?? "none"}`);
       {
         const requestAt = new Date().toISOString();
         const requestId = createHash("sha1").update(JSON.stringify([
@@ -580,7 +580,7 @@ export async function startEmbeddedResponsesProxy(
     });
   });
   const baseUrl = `http://127.0.0.1:${cfg.proxyPort}/v1`;
-  logger.info(`[ecoclaw] embedded responses proxy listening at ${baseUrl}`);
+  logger.info(`[plugin-runtime] embedded responses proxy listening at ${baseUrl}`);
   return {
     baseUrl,
     upstream,

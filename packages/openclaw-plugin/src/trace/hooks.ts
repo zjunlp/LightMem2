@@ -55,9 +55,9 @@ export function installLlmHookTap(
         };
         await appendJsonl(llmHookTapPath, rec);
       } catch (err) {
-        logger.warn(`[ecoclaw] llm-hook tap write failed(${hookName}): ${err instanceof Error ? err.message : String(err)}`);
+        logger.warn(`[plugin-runtime] llm-hook tap write failed(${hookName}): ${err instanceof Error ? err.message : String(err)}`);
       }
     });
   }
-  logger.info(`[ecoclaw] LLM hook tap enabled. path=${llmHookTapPath}`);
+  logger.info(`[plugin-runtime] LLM hook tap enabled. path=${llmHookTapPath}`);
 }
