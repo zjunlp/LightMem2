@@ -88,7 +88,7 @@ test("rewritePayloadForStablePrefix preserves content shape and injects dynamic 
         content: [
           {
             type: "input_text",
-            text: "Runtime: agent=bench-ecoclaw-gpt-5-4-mini-0213-j0013 | host=mistral\nYour working directory is: /tmp/pinchbench/0213/agent_workspace_j0013",
+            text: "Runtime: agent=bench-tokenpilot-gpt-5-4-mini-0213-j0013 | host=mistral\nYour working directory is: /tmp/pinchbench/0213/agent_workspace_j0013",
           },
         ],
       },
@@ -104,7 +104,7 @@ test("rewritePayloadForStablePrefix preserves content shape and injects dynamic 
   assert.match(String(payload.input[0].content[0].text), /Your working directory is: <WORKDIR>/);
   assert.equal(Array.isArray(payload.input[0].content), true);
   assert.match(String(payload.input[1].content[0].text), /- WORKDIR: \/tmp\/pinchbench\/0213\/agent_workspace_j0013/);
-  assert.match(String(payload.input[1].content[0].text), /- AGENT_ID: bench-ecoclaw-gpt-5-4-mini-0213-j0013/);
+  assert.match(String(payload.input[1].content[0].text), /- AGENT_ID: bench-tokenpilot-gpt-5-4-mini-0213-j0013/);
   assert.match(String(payload.input[1].content[0].text), /Please continue\./);
   assert.match(out.promptCacheKey, /^ecoclaw-pfx-/);
 });

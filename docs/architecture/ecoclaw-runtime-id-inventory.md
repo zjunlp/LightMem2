@@ -114,11 +114,11 @@ refactor after the runtime ID layer has a compatibility plan.
 #### Test fixtures and helper names
 
 - [reduction-proxy.test.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/reduction-proxy.test.ts)
-  - `bench-ecoclaw-*`
   - `ecoclaw-pfx-*`
 
-These do not need to be renamed now, but they do not need permanent
-preservation either.
+The old `bench-ecoclaw-*` fixture strings have already been removed. The
+remaining `ecoclaw-pfx-*` assertion is still tied to a live cache-key format,
+so it is not a pure test-only name.
 
 #### Internal singleton keys
 
