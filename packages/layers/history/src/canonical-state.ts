@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { join, dirname } from "node:path";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 export type EcoCanonicalState = {
   version: 1;

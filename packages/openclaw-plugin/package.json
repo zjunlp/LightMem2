@@ -31,9 +31,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {
-    "@ecoclaw/runtime-core": "workspace:*"
-  },
   "devDependencies": {
     "esbuild": "^0.25.10",
     "tsx": "^4.21.0",

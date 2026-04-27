@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { rewriteCanonicalState, syncCanonicalStateFromTranscript } from "../page-out/canonical-rewrite.js";
-import { estimateMessagesChars, saveCanonicalState } from "../page-out/canonical-state.js";
+import { estimateMessagesChars, saveCanonicalState } from "@ecoclaw/layer-history";
 
 export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
   const canonicalMessageTaskIdsBound = (message: Record<string, unknown>): string[] => deps.canonicalMessageTaskIds(message, deps.asRecord);
