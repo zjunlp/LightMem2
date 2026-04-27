@@ -1,4 +1,4 @@
-import type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "@ecoclaw/kernel";
+import type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "@tokenpilot/kernel";
 
 export type BuiltinReductionPassId =
   | "tool_payload_trim"

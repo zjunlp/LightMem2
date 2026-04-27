@@ -1,4 +1,4 @@
-import type { ContextSegment } from "@ecoclaw/kernel";
+import type { ContextSegment } from "@tokenpilot/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 
 type HtmlSlimmingOptions = {

@@ -1,5 +1,5 @@
-import type { RuntimeTurnContext, RuntimeTurnResult } from "@ecoclaw/kernel";
-import type { PersistedMessageKind, PersistedMessageOrigin, PersistedMessageRole } from "@ecoclaw/kernel";
+import type { RuntimeTurnContext, RuntimeTurnResult } from "@tokenpilot/kernel";
+import type { PersistedMessageKind, PersistedMessageOrigin, PersistedMessageRole } from "@tokenpilot/kernel";
 
 // Inlined from @ecoclaw/layer-context (being removed)
 export type ContextViewMessageSnapshot = {

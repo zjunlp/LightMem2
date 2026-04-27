@@ -1,11 +1,11 @@
-import type { ApiFamily, RuntimeTurnContext } from "@ecoclaw/kernel";
+import type { ApiFamily, RuntimeTurnContext } from "@tokenpilot/kernel";
 import type {
   DeltaInputMode,
   DeltaView,
   SessionTaskRegistry,
   SessionTaskRegistryPatch,
   TaskLifecycle,
-} from "@ecoclaw/layer-history";
+} from "@tokenpilot/history";
 
 export const ROUTING_TIERS = ["simple", "standard", "complex", "reasoning"] as const;
 export type RoutingTier = (typeof ROUTING_TIERS)[number];

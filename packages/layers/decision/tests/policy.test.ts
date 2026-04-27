@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RUNTIME_EVENT_TYPES, findRuntimeEventsByType } from "@ecoclaw/kernel";
+import { RUNTIME_EVENT_TYPES, findRuntimeEventsByType } from "@tokenpilot/kernel";
 import { createPolicyModule, readPolicyOnlineMetadata } from "../src/policy.js";
 import { createContextViewSnapshot, createTurnContext } from "./test-utils.js";
 

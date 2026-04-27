@@ -1,4 +1,4 @@
-import type { RuntimeTurnContext, RuntimeTurnResult } from "@ecoclaw/kernel";
+import type { RuntimeTurnContext, RuntimeTurnResult } from "@tokenpilot/kernel";
 import { resolveReductionPass, execOutputTruncationBeforeCallPass } from "./registry.js";
 import type {
   ReductionMetadata,

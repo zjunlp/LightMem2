@@ -1,5 +1,5 @@
 import type { ReductionPassHandler } from "../reduction/types.js";
-import { stripLineNumbers } from "@ecoclaw/layer-decision";
+import { stripLineNumbers } from "@tokenpilot/decision";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

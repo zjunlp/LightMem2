@@ -1,4 +1,4 @@
-import type { ContextSegment, RuntimeTurnContext } from "@ecoclaw/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,

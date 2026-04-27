@@ -5,7 +5,7 @@ import {
   normalizeFullWidthDigits,
   normalizeFullWidthSpace,
   normalizeExcessWhitespace,
-} from "@ecoclaw/layer-decision";
+} from "@tokenpilot/decision";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

@@ -8,7 +8,7 @@ import {
   type ApiFamily,
   type RuntimeModule,
   type RuntimeTurnContext,
-} from "@ecoclaw/kernel";
+} from "@tokenpilot/kernel";
 import {
   analyzePolicyLocality,
   type LocalityActionHint,
@@ -47,7 +47,7 @@ import {
   type SessionTaskRegistry,
   type TaskLifecycle,
   type TaskState,
-} from "@ecoclaw/layer-history";
+} from "@tokenpilot/history";
 import { createApiTaskStateEstimator } from "./task-state-estimator.js";
 import type { SemanticTaskUpdate, TaskStateEstimator, TaskStateEstimatorApiConfig, TaskStateTransition } from "./types.js";
 

@@ -1,4 +1,4 @@
-import type { RuntimeTurnResult, RuntimeTurnContext } from "@ecoclaw/kernel";
+import type { RuntimeTurnResult, RuntimeTurnContext } from "@tokenpilot/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;

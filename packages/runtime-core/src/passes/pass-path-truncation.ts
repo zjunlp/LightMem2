@@ -1,5 +1,5 @@
 import type { ReductionPassHandler } from "../reduction/types.js";
-import { truncatePath } from "@ecoclaw/layer-decision";
+import { truncatePath } from "@tokenpilot/decision";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

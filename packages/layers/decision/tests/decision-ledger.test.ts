@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RUNTIME_EVENT_TYPES, appendResultEvent, findRuntimeEventsByType } from "@ecoclaw/kernel";
+import { RUNTIME_EVENT_TYPES, appendResultEvent, findRuntimeEventsByType } from "@tokenpilot/kernel";
 import { createDecisionLedgerModule } from "../src/decision-ledger.js";
 import { createTurnContext, createTurnResult } from "./test-utils.js";
 

@@ -9,7 +9,7 @@ import {
   type DecisionEvidence,
   type DecisionRecord,
   type RuntimeModule,
-} from "@ecoclaw/kernel";
+} from "@tokenpilot/kernel";
 import { readPolicyOnlineMetadata } from "./policy.js";
 
 export type DecisionLedgerModuleConfig = {
