@@ -18,6 +18,7 @@ directory in this repo.
 - [Experiments Consolidation Plan](architecture/experiments-consolidation-plan.md) - How benchmark assets should merge into `experiments/`
 - [Runtime-Neutral Contracts Plan](architecture/runtime-neutral-contracts-plan.md) - Contract split between `kernel`, `layers`, `runtime-core`, and host adapters
 - [OpenClaw Plugin Extraction Inventory](architecture/openclaw-plugin-extraction-inventory.md) - Current boundary between adapter-only code, extracted shared logic, and mixed request-preprocessing surfaces
+- [Runtime Rename Migration Plan](architecture/runtime-rename-migration-plan.md) - Staged compatibility plan for renaming plugin ids, provider prefixes, env vars, package names, and persisted markers
 - [PinchBench Experiments README](../experiments/pinchbench/README.md) - Narrowed first-pass experiments merge target
 
 ## Plans

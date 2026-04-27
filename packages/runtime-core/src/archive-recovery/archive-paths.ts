@@ -6,7 +6,7 @@ export function sanitizePathPart(value: string): string {
 }
 
 export function defaultPluginStateDir(): string {
-  const envStateDir = process.env.ECOCLAW_STATE_DIR;
+  const envStateDir = process.env.TOKENPILOT_STATE_DIR || process.env.ECOCLAW_STATE_DIR;
   if (typeof envStateDir === "string" && envStateDir.trim().length > 0) {
     return envStateDir.trim();
   }

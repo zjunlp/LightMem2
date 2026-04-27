@@ -6,7 +6,7 @@ PINCHBENCH_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 normalize_openclaw_runtime_env() {
-  local openclaw_home="${ECOCLAW_OPENCLAW_HOME:-/mnt/20t/xubuqiang}"
+  local openclaw_home="${TOKENPILOT_OPENCLAW_HOME:-${ECOCLAW_OPENCLAW_HOME:-/mnt/20t/xubuqiang}}"
   export HOME="${openclaw_home}"
   export XDG_CACHE_HOME="${HOME}/.cache"
   export XDG_CONFIG_HOME="${HOME}/.config"
@@ -14,6 +14,19 @@ normalize_openclaw_runtime_env() {
 }
 
 normalize_openclaw_runtime_env
+
+promote_tokenpilot_aliases() {
+  local key=""
+  local legacy_key=""
+  while IFS='=' read -r key _; do
+    [[ -z "${key}" ]] && continue
+    [[ "${key}" != TOKENPILOT_* ]] && continue
+    legacy_key="ECOCLAW_${key#TOKENPILOT_}"
+    if [[ -z "${!legacy_key+x}" || -z "${!legacy_key}" ]]; then
+      export "${legacy_key}=${!key}"
+    fi
+  done < <(env)
+}
 
 import_dotenv() {
   local env_path="${1:-${REPO_ROOT}/.env}"
@@ -42,6 +55,7 @@ import_dotenv() {
 import_runtime_envs() {
   import_dotenv "${PINCHBENCH_ROOT}/.env"
   import_dotenv "${REPO_ROOT}/.env"
+  promote_tokenpilot_aliases
 }
 
 normalize_model_name() {

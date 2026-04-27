@@ -30,7 +30,8 @@ OPENCLAW_AGENT_LOCAL = os.environ.get("OPENCLAW_AGENT_LOCAL", "false").strip().l
     "on",
 }
 DEFAULT_BENCH_OPENCLAW_HOME = Path(
-    os.environ.get("ECOCLAW_OPENCLAW_HOME", "/mnt/20t/xubuqiang")
+    os.environ.get("TOKENPILOT_OPENCLAW_HOME")
+    or os.environ.get("ECOCLAW_OPENCLAW_HOME", "/mnt/20t/xubuqiang")
 )
 DEFAULT_BENCH_OPENCLAW_STATE_DIR = DEFAULT_BENCH_OPENCLAW_HOME / ".openclaw"
 if not os.environ.get("OPENCLAW_CONFIG_PATH"):

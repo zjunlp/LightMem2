@@ -79,23 +79,31 @@ function resolveUpstreamProxySettings(): {
   noProxy?: string;
 } {
   const httpProxy =
-    process.env.ECOCLAW_UPSTREAM_HTTP_PROXY
+    process.env.TOKENPILOT_UPSTREAM_HTTP_PROXY
+    || process.env.tokenpilot_upstream_http_proxy
+    || process.env.ECOCLAW_UPSTREAM_HTTP_PROXY
     || process.env.ecoclaw_upstream_http_proxy
     || process.env.http_proxy
     || process.env.HTTP_PROXY;
   const httpsProxy =
-    process.env.ECOCLAW_UPSTREAM_HTTPS_PROXY
+    process.env.TOKENPILOT_UPSTREAM_HTTPS_PROXY
+    || process.env.tokenpilot_upstream_https_proxy
+    || process.env.ECOCLAW_UPSTREAM_HTTPS_PROXY
     || process.env.ecoclaw_upstream_https_proxy
     || process.env.https_proxy
     || process.env.HTTPS_PROXY
     || httpProxy;
   const allProxy =
-    process.env.ECOCLAW_UPSTREAM_ALL_PROXY
+    process.env.TOKENPILOT_UPSTREAM_ALL_PROXY
+    || process.env.tokenpilot_upstream_all_proxy
+    || process.env.ECOCLAW_UPSTREAM_ALL_PROXY
     || process.env.ecoclaw_upstream_all_proxy
     || process.env.all_proxy
     || process.env.ALL_PROXY;
   const noProxy =
-    process.env.ECOCLAW_UPSTREAM_NO_PROXY
+    process.env.TOKENPILOT_UPSTREAM_NO_PROXY
+    || process.env.tokenpilot_upstream_no_proxy
+    || process.env.ECOCLAW_UPSTREAM_NO_PROXY
     || process.env.ecoclaw_upstream_no_proxy
     || process.env.no_proxy
     || process.env.NO_PROXY

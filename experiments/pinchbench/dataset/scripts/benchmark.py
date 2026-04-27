@@ -1346,11 +1346,11 @@ def main():
         logger.error("Missing required argument: --model")
         sys.exit(2)
 
-    # Determine judge model: --judge arg > ECOCLAW_JUDGE env > default
+    # Determine judge model: --judge arg > TOKENPILOT_JUDGE/ECOCLAW_JUDGE env > default
     args.model = normalize_benchmark_model_id(args.model)
     judge_model = args.judge
     if not judge_model:
-        judge_model = os.environ.get("ECOCLAW_JUDGE")
+        judge_model = os.environ.get("TOKENPILOT_JUDGE") or os.environ.get("ECOCLAW_JUDGE")
     if not judge_model:
         judge_model = "openrouter/anthropic/claude-opus-4.5"
     judge_model = normalize_benchmark_model_id(judge_model)
@@ -1367,10 +1367,10 @@ def main():
     run_id = _next_run_id(run_root)
     skill_dir = skill_root
 
-    # Determine parallel jobs: --parallel arg > ECOCLAW_PARALLEL env > default 1
+    # Determine parallel jobs: --parallel arg > TOKENPILOT_PARALLEL/ECOCLAW_PARALLEL env > default 1
     parallel_jobs = args.parallel
     if parallel_jobs is None:
-        parallel_jobs = int(os.environ.get("ECOCLAW_PARALLEL", "1"))
+        parallel_jobs = int(os.environ.get("TOKENPILOT_PARALLEL") or os.environ.get("ECOCLAW_PARALLEL", "1"))
     parallel_jobs = max(1, int(parallel_jobs))
     logger.info("Parallel isolated jobs: %s", parallel_jobs)
     session_mode = args.session_mode

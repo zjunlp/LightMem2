@@ -24,10 +24,18 @@ The active method path expects runtime credentials/config to come from:
 2. repo-root `.env`
 3. explicit shell exports
 
-Required variables are:
+Preferred variables are:
+
+- `TOKENPILOT_BASE_URL`
+- `TOKENPILOT_API_KEY`
+
+Legacy fallback variables are:
 
 - `ECOCLAW_BASE_URL`
 - `ECOCLAW_API_KEY`
+
+The active scripts now dual-read `TOKENPILOT_*` first and fall back to
+`ECOCLAW_*`.
 
 If you want to use unprefixed model aliases such as `gpt-5.4-mini`, also set:
 

@@ -68,6 +68,8 @@ The migrated method path does not assume any specific upstream vendor.
 
 Instead, it expects the experiment owner to provide:
 
+- `TOKENPILOT_BASE_URL`
+- `TOKENPILOT_API_KEY`
 - `PINCHBENCH_MODEL_<MODEL_NAME>_BASE_URL`
 - `PINCHBENCH_MODEL_<MODEL_NAME>_API_KEY`
 - optional `PINCHBENCH_MODEL_<MODEL_NAME>_PROVIDER_PREFIX`
