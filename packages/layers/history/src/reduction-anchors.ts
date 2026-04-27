@@ -2,8 +2,8 @@
 import {
   listRawSemanticTurnSeqs,
   loadRawSemanticTurnRecord,
-} from "../../../../layers/history/src/raw-semantic.js";
-import { loadSessionTaskRegistry } from "../../../../layers/history/src/registry.js";
+} from "./raw-semantic.js";
+import { loadSessionTaskRegistry } from "./registry.js";
 
 export async function loadSegmentAnchorByCallId(
   stateDir: string,
@@ -39,12 +39,8 @@ export async function loadSegmentAnchorByCallId(
     if (!rawTurn) continue;
     const turnAbsId = rawTurn.turnAbsId;
     const taskIds = registry.turnToTaskIds[turnAbsId] ?? [];
-    for (const toolCall of rawTurn.toolCalls) {
-      put(toolCall.toolCallId, turnAbsId, taskIds);
-    }
-    for (const toolResult of rawTurn.toolResults) {
-      put(toolResult.toolCallId, turnAbsId, taskIds);
-    }
+    for (const toolCall of rawTurn.toolCalls) put(toolCall.toolCallId, turnAbsId, taskIds);
+    for (const toolResult of rawTurn.toolResults) put(toolResult.toolCallId, turnAbsId, taskIds);
   }
 
   return out;
@@ -65,31 +61,4 @@ export async function loadOrderedTurnAnchors(
     .filter((item) => item.turnAbsId.trim().length > 0 && Number.isFinite(item.turnSeq))
     .sort((a, b) => a.turnSeq - b.turnSeq)
     .map(({ turnAbsId, taskIds }) => ({ turnAbsId, taskIds }));
-}
-
-export function isReductionPassEnabled(
-  passId: string,
-  passToggles?: {
-    repeatedReadDedup?: boolean;
-    toolPayloadTrim?: boolean;
-    htmlSlimming?: boolean;
-    execOutputTruncation?: boolean;
-    agentsStartupOptimization?: boolean;
-  },
-): boolean {
-  if (!passToggles) return true;
-  switch (passId) {
-    case "repeated_read_dedup":
-      return passToggles.repeatedReadDedup ?? true;
-    case "tool_payload_trim":
-      return passToggles.toolPayloadTrim ?? true;
-    case "html_slimming":
-      return passToggles.htmlSlimming ?? true;
-    case "exec_output_truncation":
-      return passToggles.execOutputTruncation ?? true;
-    case "agents_startup_optimization":
-      return passToggles.agentsStartupOptimization ?? true;
-    default:
-      return true;
-  }
 }

@@ -10,5 +10,6 @@ export * from "./lifecycle.js";
 export * from "./scoring.js";
 export * from "./view.js";
 export * from "./registry.js";
+export * from "./reduction-anchors.js";
 export * from "./delta.js";
 export * from "./raw-semantic.js";
