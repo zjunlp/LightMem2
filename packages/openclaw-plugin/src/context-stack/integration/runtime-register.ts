@@ -289,9 +289,9 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
         if (proxyRuntime?.baseUrl) {
           logger.info(`[plugin-runtime] Embedded proxy active at ${proxyRuntime.baseUrl}`);
         } else {
-          logger.info("[plugin-runtime] Embedded proxy unavailable; ecoclaw provider was not registered.");
+          logger.info("[plugin-runtime] Embedded proxy unavailable; tokenpilot provider was not registered.");
         }
-        logger.info("[plugin-runtime] TokenPilot runtime active. Use explicit model key: ecoclaw/<model> (example: ecoclaw/gpt-5.4).");
+        logger.info("[plugin-runtime] TokenPilot runtime active. Use explicit model key: tokenpilot/<model> (example: tokenpilot/gpt-5.4).");
         logger.info(`[plugin-runtime] State dir=${cfg.stateDir} debugTap=${cfg.debugTapProviderTraffic ? "on" : "off"}`);
       },
       stop: () => {

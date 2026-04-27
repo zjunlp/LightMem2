@@ -18,7 +18,7 @@ The current shared runtime profile installs:
 
 - OpenClaw extension id: `ecoclaw`
 - context engine slot: `ecoclaw-context`
-- provider prefix: `ecoclaw/*`
+- provider prefix: `tokenpilot/*`
 - extra plugin tool: `memory_fault_recover`
 
 These are runtime capabilities available to the harness. Individual runs may

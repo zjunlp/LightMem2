@@ -309,7 +309,7 @@ export async function detectUpstreamConfig(
     const providers = parsed?.models?.providers ?? {};
     const preferred = ["tuzi", "dica", "openai", "qwen-portal", "bailian", "gmn"];
     const selectedProvider = preferred.find((id) => providers?.[id]?.baseUrl && providers?.[id]?.apiKey)
-      ?? Object.keys(providers).find((id) => id !== "ecoclaw" && providers[id]?.baseUrl && providers[id]?.apiKey)
+      ?? Object.keys(providers).find((id) => id !== "tokenpilot" && id !== "ecoclaw" && providers[id]?.baseUrl && providers[id]?.apiKey)
       ?? Object.keys(providers)[0];
     if (!selectedProvider) return null;
     const p = providers[selectedProvider];
@@ -359,7 +359,7 @@ export async function ensureExplicitProxyModelsInConfig(
     doc.agents.defaults = doc.agents.defaults ?? {};
     doc.agents.defaults.models = doc.agents.defaults.models ?? {};
 
-    const existingProvider = doc.models.providers.ecoclaw ?? {};
+    const existingProvider = doc.models.providers.tokenpilot ?? {};
     const desiredModels = upstream.models.map((m) => ({
       id: m.id,
       name: m.name,
@@ -369,17 +369,17 @@ export async function ensureExplicitProxyModelsInConfig(
       contextWindow: m.contextWindow,
       maxTokens: m.maxTokens,
     }));
-    doc.models.providers.ecoclaw = {
+    doc.models.providers.tokenpilot = {
       ...existingProvider,
       baseUrl: proxyBaseUrl,
-      apiKey: "ecoclaw-local",
+      apiKey: "tokenpilot-local",
       api: "openai-responses",
       authHeader: false,
       models: desiredModels,
     };
 
     for (const model of upstream.models) {
-      const key = `ecoclaw/${model.id}`;
+      const key = `tokenpilot/${model.id}`;
       if (!doc.agents.defaults.models[key]) doc.agents.defaults.models[key] = {};
     }
 
@@ -396,6 +396,10 @@ export async function ensureExplicitProxyModelsInConfig(
 export function normalizeProxyModelId(model: string): string {
   const value = model.trim();
   if (!value) return value;
-  const stripped = value.startsWith("ecoclaw/") ? value.slice("ecoclaw/".length) : value;
+  const stripped = value.startsWith("tokenpilot/")
+    ? value.slice("tokenpilot/".length)
+    : value.startsWith("ecoclaw/")
+      ? value.slice("ecoclaw/".length)
+      : value;
   return stripped.replace("gpt-5-4-mini", "gpt-5.4-mini");
 }

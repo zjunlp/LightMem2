@@ -31,8 +31,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 import_runtime_envs
-MODEL_LIKE="${MODEL:-${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-ecoclaw/gpt-5.4-mini}}}"
-JUDGE_LIKE="${JUDGE:-${TOKENPILOT_JUDGE:-${ECOCLAW_JUDGE:-ecoclaw/gpt-5.4-mini}}}"
+MODEL_LIKE="${MODEL:-${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-tokenpilot/gpt-5.4-mini}}}"
+JUDGE_LIKE="${JUDGE:-${TOKENPILOT_JUDGE:-${ECOCLAW_JUDGE:-tokenpilot/gpt-5.4-mini}}}"
 apply_model_runtime_env "${MODEL_LIKE}"
 require_method_runtime_env
 apply_ecoclaw_env

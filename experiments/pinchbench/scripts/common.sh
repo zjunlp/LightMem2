@@ -212,7 +212,7 @@ ensure_ecoclaw_plugin_config() {
   local reduction_pass_html_slimming="${ECOCLAW_REDUCTION_PASS_HTML_SLIMMING:-true}"
   local reduction_pass_exec_output_truncation="${ECOCLAW_REDUCTION_PASS_EXEC_OUTPUT_TRUNCATION:-true}"
   local reduction_pass_agents_startup_optimization="${ECOCLAW_REDUCTION_PASS_AGENTS_STARTUP_OPTIMIZATION:-true}"
-  local default_model="${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-ecoclaw/gpt-5.4-mini}}"
+  local default_model="${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-tokenpilot/gpt-5.4-mini}}"
   local exec_host="${ECOCLAW_EXEC_HOST:-gateway}"
   local exec_security="${ECOCLAW_EXEC_SECURITY:-full}"
   local exec_ask="${ECOCLAW_EXEC_ASK:-off}"

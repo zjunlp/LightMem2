@@ -55,13 +55,13 @@ corepack pnpm typecheck
 When the plugin is active, it registers an explicit provider namespace:
 
 ```text
-ecoclaw/<model>
+tokenpilot/<model>
 ```
 
 Example:
 
 ```text
-ecoclaw/gpt-5.4-mini
+tokenpilot/gpt-5.4-mini
 ```
 
 ## Runtime State

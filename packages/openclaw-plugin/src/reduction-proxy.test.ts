@@ -99,7 +99,7 @@ test("rewritePayloadForStablePrefix preserves content shape and injects dynamic 
     ],
   };
 
-  const out = hooks.rewritePayloadForStablePrefix(payload, "ecoclaw/gpt-5.4-mini");
+  const out = hooks.rewritePayloadForStablePrefix(payload, "tokenpilot/gpt-5.4-mini");
 
   assert.match(String(payload.input[0].content[0].text), /Your working directory is: <WORKDIR>/);
   assert.equal(Array.isArray(payload.input[0].content), true);
@@ -120,7 +120,7 @@ test("applyProxyReductionToInput still runs with policy-only before-call modules
   const { createPolicyModule } = await import("../../layers/decision/src/policy.js");
 
   const payload: any = {
-    model: "ecoclaw/gpt-5.4-mini",
+    model: "tokenpilot/gpt-5.4-mini",
     input: [
       {
         role: "tool",

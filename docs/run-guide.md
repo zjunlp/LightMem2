@@ -79,7 +79,7 @@ What you want to see in the gateway log:
 
 - plugin active
 - embedded responses proxy listening
-- provider `ecoclaw/*` registered
+- provider `tokenpilot/*` registered
 
 ## Environment Sanity
 
