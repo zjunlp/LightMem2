@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { RuntimeModule, RuntimeModuleRuntime } from "../../kernel/src/interfaces.js";
-import type { RuntimeTurnContext } from "../../kernel/src/types.js";
-import type { PolicyModuleConfig } from "../../layers/decision/src/policy.js";
-import { applyPolicyMonitors } from "./runtime/register.js";
+import type { RuntimeModule, RuntimeModuleRuntime } from "../../../../kernel/src/interfaces.js";
+import type { RuntimeTurnContext } from "../../../../kernel/src/types.js";
+import type { PolicyModuleConfig } from "../../../../layers/decision/src/policy.js";
+import { applyPolicyMonitors } from "./runtime-register.js";
 
 export type PluginRuntimeConfig = {
   enabled?: boolean;

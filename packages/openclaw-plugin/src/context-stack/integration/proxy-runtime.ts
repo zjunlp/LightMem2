@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { join, dirname } from "node:path";
 import { mkdir, appendFile } from "node:fs/promises";
-import type { UpstreamConfig, UpstreamHttpResponse } from "./upstream.js";
+import type { UpstreamConfig, UpstreamHttpResponse } from "../../proxy/upstream.js";
 
 function extractItemText(item: any, extractInputText: (input: any) => string): string {
   if (!item || typeof item !== "object") return "";

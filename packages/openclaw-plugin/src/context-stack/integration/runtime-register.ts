@@ -3,15 +3,15 @@ import {
   createSessionTopologyManager,
   loadRecentTurnBindingsFromState,
   persistRecentTurnBindingsToState,
-} from "../context-stack/page-out.js";
+} from "../page-out.js";
 import {
   registerMemoryFaultRecoverTool,
-} from "../context-stack/page-in.js";
+} from "../page-in.js";
 import {
   installLlmHookTap,
   maybeRegisterProxyProvider,
   startEmbeddedResponsesProxy,
-} from "../context-stack/integration.js";
+} from "../integration.js";
 
 function logTaskStateMonitor(
   ctx: any,

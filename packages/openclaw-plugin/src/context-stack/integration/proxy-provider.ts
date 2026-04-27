@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { UpstreamConfig } from "./upstream.js";
+import type { UpstreamConfig } from "../../proxy/upstream.js";
 
 export function maybeRegisterProxyProvider(
   api: any,

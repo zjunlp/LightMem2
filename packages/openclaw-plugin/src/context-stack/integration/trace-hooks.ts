@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { appendJsonl } from "./io.js";
+import { appendJsonl } from "../../trace/io.js";
 
 export function resolveLlmHookTapPath(debugTapPath: string): string {
   if (debugTapPath.endsWith(".jsonl")) {
