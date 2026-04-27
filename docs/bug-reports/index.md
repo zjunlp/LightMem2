@@ -499,7 +499,7 @@ Caveat:
 
 ---
 
-## 15. judge tool restriction must not mutate global ecoclaw modules (2026-04-25)
+## 15. judge tool restriction must not mutate global plugin modules (2026-04-25)
 
 **Severity**: High
 

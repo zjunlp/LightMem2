@@ -56,6 +56,10 @@ if (!contextView) {
 
 ## Dependency graph (before removal)
 
+The dependency graph below preserves the package names that existed at removal
+time. Those package names have since been migrated to the `@tokenpilot/*`
+namespace.
+
 ```
 layer-orchestration/
   @ecoclaw/kernel
@@ -77,6 +81,10 @@ layer-decision/
 ---
 
 ## Removal order (completed)
+
+The import examples below are historical diffs from the pre-rename package
+namespace. They are kept as migration records, not as the current active
+package names.
 
 ### ✅ Phase 1 — Remove `layer-orchestration`
 

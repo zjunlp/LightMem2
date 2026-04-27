@@ -22,6 +22,8 @@ openclaw-plugin/src/
 ## Legacy execution structure
 
 原 `packages/layers/execution/` 已整体删除；下面的结构仅作为迁移记录保留。
+其中出现的旧 package/import 名称反映的是当时的删除现场，不代表当前
+`@tokenpilot/*` 工作区命名。
 
 ---
 

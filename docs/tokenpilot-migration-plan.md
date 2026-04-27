@@ -36,9 +36,9 @@ This means:
 
 - README titles, repository names, documentation headings, figure labels, and
   benchmark writeups may change again later
-- persisted/runtime ids such as `ECOCLAW_*`,
-  `~/.openclaw/ecoclaw-plugin-state`, protocol markers, and archive path
-  basenames should stay stable until there is a dedicated compatibility migration
+- persisted/runtime ids such as `ECOCLAW_*`, legacy state-path basenames,
+  protocol markers, and archive path basenames should stay stable until there
+  is a dedicated compatibility migration
 
 If a later rename is needed, repeat the brand-layer process first. Do not start
 with runtime/global replacement.
