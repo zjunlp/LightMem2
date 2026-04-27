@@ -1,4 +1,4 @@
-import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "./recovery-common.js";
+import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@ecoclaw/runtime-core";
 
 const MEMORY_FAULT_PROTOCOL_INSTRUCTIONS = [
   "[EcoClaw Recovery Protocol]",

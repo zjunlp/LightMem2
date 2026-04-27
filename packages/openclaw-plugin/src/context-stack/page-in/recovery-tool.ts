@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  buildRecoveryContextSafePatch,
+  MEMORY_FAULT_RECOVER_TOOL_NAME,
   readArchive,
   resolveArchivePathFromLookup,
   resolveRecoveryStateDir,
 } from "@ecoclaw/runtime-core";
-import { buildRecoveryContextSafePatch, MEMORY_FAULT_RECOVER_TOOL_NAME } from "./recovery-common.js";
 
 export function registerMemoryFaultRecoverTool(
   api: any,
