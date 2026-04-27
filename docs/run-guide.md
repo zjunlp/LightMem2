@@ -9,8 +9,8 @@ benchmark harness repository for now.
 The two paths below are the current local layout on this machine, not a
 stable brand-facing contract:
 
-- `/mnt/20t/xubuqiang/EcoClaw/EcoClaw-Bench/scripts/install_pinchbench_runtime.sh`
-- `/mnt/20t/xubuqiang/EcoClaw/EcoClaw-Bench/docs/pinchbench-runtime-profile.md`
+- `/mnt/20t/xubuqiang/EcoClaw/TokenPilot-Bench/scripts/install_pinchbench_runtime.sh`
+- `/mnt/20t/xubuqiang/EcoClaw/TokenPilot-Bench/docs/pinchbench-runtime-profile.md`
 
 Use this guide when you need to verify:
 
@@ -40,7 +40,7 @@ When iterating on the plugin locally:
 Typical commands:
 
 ```bash
-cd /mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin
+cd /mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin
 corepack pnpm build
 
 cp dist/index.js \
@@ -57,7 +57,7 @@ Byte-level check:
 
 ```bash
 cmp \
-  /mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/dist/index.js \
+  /mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/dist/index.js \
   /mnt/20t/xubuqiang/.openclaw/extensions/tokenpilot/dist/index.js
 ```
 

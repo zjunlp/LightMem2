@@ -20,8 +20,8 @@ from benchmark/evaluation concerns that should stay outside the plugin package.
 These are still part of the package install/release path and should remain
 discoverable:
 
-- `/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/scripts/pack_release.sh`
-- `/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/scripts/install_release.sh`
+- `/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/scripts/pack_release.sh`
+- `/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/scripts/install_release.sh`
 
 Package script bindings:
 

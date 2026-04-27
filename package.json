@@ -2,7 +2,7 @@
     "name": "ecoclaw",
     "private": true,
     "version": "0.1.0",
-    "description": "EcoClaw: Resource-Efficient Execution for Language Model Agents",
+    "description": "TokenPilot: Lightweight and Efficient Context Management for Lifelong Agents",
     "scripts": {
         "build": "pnpm -r build",
         "typecheck": "pnpm -r typecheck",

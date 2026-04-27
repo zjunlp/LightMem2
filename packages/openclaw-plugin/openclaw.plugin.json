@@ -35,7 +35,7 @@
       },
       "stateDir": {
         "type": "string",
-        "description": "Directory for TokenPilot plugin state (default: ~/.openclaw/ecoclaw-plugin-state)."
+        "description": "Directory for TokenPilot plugin state (default prefers ~/.openclaw/tokenpilot-plugin-state, with legacy fallback)."
       },
       "debugTapProviderTraffic": {
         "type": "boolean",

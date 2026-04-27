@@ -40,57 +40,57 @@ changed during a simple brand refresh.
 
 ### Plugin identity
 
-- [openclaw.plugin.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/openclaw.plugin.json)
+- [openclaw.plugin.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/openclaw.plugin.json)
   - active id is now `tokenpilot`
-- [package.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/package.json)
+- [package.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/package.json)
   - active package name is now `tokenpilot`
-- [index.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/index.ts)
+- [index.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/index.ts)
   - runtime registration now uses `id: "tokenpilot"`
 
 ### Context-engine identity
 
-- [context-engine.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/context-engine.ts)
+- [context-engine.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/context-engine.ts)
   - `id: "layered-context"`
-- [index.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/index.ts)
+- [index.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/index.ts)
   - `api.registerContextEngine("layered-context", ...)`
 
 ### Provider namespace
 
-- [proxy-provider.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/proxy-provider.ts)
+- [proxy-provider.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/proxy-provider.ts)
   - provider `id: "tokenpilot"`
   - registration of `tokenpilot/*`
-- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
+- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
   - mirrored model keys under `tokenpilot/<model>`
-- [README.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/README.md)
+- [README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/README.md)
   - documented runtime model prefix `tokenpilot/<model>`
 
 ### Environment-variable prefixes
 
-- [config.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/config.ts)
+- [config.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/config.ts)
   - `ECOCLAW_TASK_STATE_ESTIMATOR_*`
-- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
+- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
   - `ECOCLAW_UPSTREAM_*`
-- [archive-paths.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/runtime-core/src/archive-recovery/archive-paths.ts)
+- [archive-paths.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/runtime-core/src/archive-recovery/archive-paths.ts)
   - `ECOCLAW_STATE_DIR`
-- [common.sh](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/experiments/pinchbench/scripts/common.sh)
+- [common.sh](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/pinchbench/scripts/common.sh)
   - runtime setup still depends on many `ECOCLAW_*`
 
 ### State directory and artifact layout
 
-- [config.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/config.ts)
+- [config.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/config.ts)
   - default state dir `~/.openclaw/ecoclaw-plugin-state`
-- [archive-paths.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/runtime-core/src/archive-recovery/archive-paths.ts)
+- [archive-paths.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/runtime-core/src/archive-recovery/archive-paths.ts)
   - `.ecoclaw-archives`
   - `stateDir/ecoclaw/tool-result-archives/...`
-- [canonical-eviction.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/page-out/canonical-eviction.ts)
+- [canonical-eviction.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/page-out/canonical-eviction.ts)
   - `stateDir/ecoclaw/canonical-eviction/...`
-- [trace/io.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/trace/io.ts)
+- [trace/io.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/trace/io.ts)
   - `stateDir/ecoclaw/forwarded-inputs/...`
   - `stateDir/ecoclaw/reduction-pass-trace.jsonl`
-- [proxy-runtime.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/proxy-runtime.ts)
+- [proxy-runtime.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/proxy-runtime.ts)
   - `stateDir/ecoclaw/proxy-requests.jsonl`
   - `stateDir/ecoclaw/proxy-responses.jsonl`
-- [turn-bindings.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/session/turn-bindings.ts)
+- [turn-bindings.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/session/turn-bindings.ts)
   - `stateDir/ecoclaw/controls/recent-turn-bindings.json`
 
 ### Prompt / payload / persisted markers
@@ -99,30 +99,30 @@ These are protocol markers, persisted content markers, or stable cache-key
 formats. Renaming them carelessly would break compatibility or invalidate
 persisted state.
 
-- [recovery-protocol.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/page-in/recovery-protocol.ts)
+- [recovery-protocol.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/page-in/recovery-protocol.ts)
   - `[Recovery Protocol]`
   - `__ecoclaw_reduction_applied`
   - `__ecoclaw_replay_raw`
-- [reduction-context.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/request-preprocessing/reduction-context.ts)
+- [reduction-context.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/request-preprocessing/reduction-context.ts)
   - `[persisted tool result]`
-- [tool-result-persist.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/runtime-core/src/archive-recovery/tool-result-persist.ts)
+- [tool-result-persist.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/runtime-core/src/archive-recovery/tool-result-persist.ts)
   - preview / persist markers containing `ecoclaw`
-- [stable-prefix.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/request-preprocessing/stable-prefix.ts)
+- [stable-prefix.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/request-preprocessing/stable-prefix.ts)
   - `runtime-pfx-*`
-- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
+- [upstream.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/upstream.ts)
   - `__UPSTREAM_CURL_STATUS__`
 
 ### Workspace package names
 
 This migration has already landed. The active package namespace is now:
 
-- [packages/kernel/package.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/kernel/package.json)
+- [packages/kernel/package.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/kernel/package.json)
   - `@tokenpilot/kernel`
-- [packages/layers/history/package.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/layers/history/package.json)
+- [packages/layers/history/package.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/layers/history/package.json)
   - `@tokenpilot/history`
-- [packages/layers/decision/package.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/layers/decision/package.json)
+- [packages/layers/decision/package.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/layers/decision/package.json)
   - `@tokenpilot/decision`
-- [packages/runtime-core/package.json](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/runtime-core/package.json)
+- [packages/runtime-core/package.json](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/runtime-core/package.json)
   - `@tokenpilot/runtime-core`
 
 So workspace package names are no longer part of the live legacy `ecoclaw`
@@ -146,9 +146,9 @@ touching live runtime ids.
 
 ### Remaining low-risk log wording
 
-- [runtime-register.ts](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/packages/openclaw-plugin/src/context-stack/integration/runtime-register.ts)
+- [runtime-register.ts](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/packages/openclaw-plugin/src/context-stack/integration/runtime-register.ts)
   - policy monitor log labels
-- [common.sh](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/experiments/pinchbench/scripts/common.sh)
+- [common.sh](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/pinchbench/scripts/common.sh)
   - config/setup status wording
 
 These can be normalized to `plugin-runtime` or other neutral labels without
@@ -161,11 +161,11 @@ can continue to change as the project branding changes.
 
 ### Project and migration docs
 
-- [README.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/README.md)
-- [docs/run-guide.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/docs/run-guide.md)
-- [docs/tokenpilot-migration-plan.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/docs/tokenpilot-migration-plan.md)
-- [docs/bug-reports/index.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/docs/bug-reports/index.md)
-- [docs/architecture/openclaw-plugin-extraction-inventory.md](/mnt/20t/xubuqiang/EcoClaw/EcoClaw/docs/architecture/openclaw-plugin-extraction-inventory.md)
+- [README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/README.md)
+- [docs/run-guide.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/docs/run-guide.md)
+- [docs/tokenpilot-migration-plan.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/docs/tokenpilot-migration-plan.md)
+- [docs/bug-reports/index.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/docs/bug-reports/index.md)
+- [docs/architecture/openclaw-plugin-extraction-inventory.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/docs/architecture/openclaw-plugin-extraction-inventory.md)
 
 ### Host-product references
 

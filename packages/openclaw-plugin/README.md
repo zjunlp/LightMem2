@@ -66,11 +66,13 @@ tokenpilot/gpt-5.4-mini
 
 ## Runtime State
 
-Default state directory currently remains:
+Default state directory now prefers:
 
 ```text
-$HOME/.openclaw/ecoclaw-plugin-state/ecoclaw/
+$HOME/.openclaw/tokenpilot-plugin-state/tokenpilot/
 ```
+
+Legacy state roots are still read during the migration window.
 
 Useful files:
 
@@ -87,7 +89,7 @@ When a run looks invalid, start with:
 OPENCLAW_CONFIG_PATH=$HOME/.openclaw/openclaw.json openclaw config validate
 tail -n 100 $HOME/.openclaw/logs/gateway.log
 rg 'stable_prefix_rewrite|proxy_before_call_rewrite|proxy_after_call_rewrite|tool_result_persist_applied' \
-  $HOME/.openclaw/ecoclaw-plugin-state/task-state/trace.jsonl
+  $HOME/.openclaw/tokenpilot-plugin-state/task-state/trace.jsonl
 ```
 
 The runtime sanity guide lives in:
