@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 
 def _upstream_root() -> Path:
-    return Path("/mnt/20t/xubuqiang/EcoClaw/claw-eval")
+    return (Path(__file__).resolve().parents[1] / "vendor").resolve()
 
 
 UPSTREAM_ROOT = _upstream_root()

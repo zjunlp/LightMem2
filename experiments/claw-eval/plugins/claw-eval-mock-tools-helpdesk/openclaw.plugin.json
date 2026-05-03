@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-helpdesk",
+    "name": "Claw-Eval Mock Tools: helpdesk",
+    "description": "Registers only the helpdesk mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

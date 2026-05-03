@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-scheduler",
+    "name": "Claw-Eval Mock Tools: scheduler",
+    "description": "Registers only the scheduler mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

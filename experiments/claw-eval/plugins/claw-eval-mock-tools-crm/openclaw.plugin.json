@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-crm",
+    "name": "Claw-Eval Mock Tools: crm",
+    "description": "Registers only the crm mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

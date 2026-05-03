@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parents[1] / "save" / "isolated"))
     parser.add_argument(
         "--plugin-root",
-        default="/mnt/20t/xubuqiang/EcoClaw/代码打包/代码打包/plugins",
+        default=str(Path(__file__).resolve().parents[1] / "plugins"),
         help="Directory containing claw-eval mock-tool OpenClaw plugins",
     )
     parser.add_argument(
@@ -117,6 +118,12 @@ def _apply_tokenpilot_runtime_settings(config_path: Path) -> dict[str, object]:
 
     plugins = raw.setdefault("plugins", {})
     plugins["enabled"] = True
+    allow = plugins.setdefault("allow", [])
+    if not isinstance(allow, list):
+        allow = []
+    if "tokenpilot" not in allow:
+        allow.append("tokenpilot")
+    plugins["allow"] = allow
     slots = plugins.setdefault("slots", {})
     slots["contextEngine"] = "layered-context"
     entries = plugins.setdefault("entries", {})
@@ -210,7 +217,7 @@ def _default_service_code_root() -> Path:
     configured = os.environ.get("CLAW_EVAL_SOURCE_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
-    return (Path(__file__).resolve().parents[4] / "claw-eval").resolve()
+    return (Path(__file__).resolve().parents[1] / "vendor").resolve()
 
 
 def _available_provider_models(config_path: Path) -> set[str]:
@@ -354,7 +361,8 @@ def main() -> None:
             print("[status] plugin plan applied")
             if args.execute_tasks:
                 output_dir.mkdir(parents=True, exist_ok=True)
-                run_id = datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S")
+                timestamp = datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S_%f")[:-3]
+                run_id = f"{timestamp}_{secrets.token_hex(2)}"
                 run_root = output_dir / run_id
                 run_root.mkdir(parents=True, exist_ok=True)
                 selected_tasks = selected[: args.max_tasks] if args.max_tasks > 0 else selected

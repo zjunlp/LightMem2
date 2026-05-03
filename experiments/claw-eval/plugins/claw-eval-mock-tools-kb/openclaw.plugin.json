@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-kb",
+    "name": "Claw-Eval Mock Tools: kb",
+    "description": "Registers only the kb mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

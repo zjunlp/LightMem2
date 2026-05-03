@@ -285,6 +285,8 @@ def start_task_services(
 ) -> List[ServiceHandle]:
     handles: List[ServiceHandle] = []
     logs_dir.mkdir(parents=True, exist_ok=True)
+    task_source_dir = _task_source_dir(task)
+    task_fixtures_dir = task_source_dir / "fixtures"
     for service in task.services:
         command = str(service.get("command") or "").strip()
         if not command:
@@ -294,6 +296,7 @@ def start_task_services(
         log_fp = log_path.open("w", encoding="utf-8")
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        env["CLAW_EVAL_DATASET_ROOT"] = str(dataset_root.resolve())
         service_env = service.get("env") or {}
         if isinstance(service_env, dict):
             for key, value in service_env.items():
@@ -304,6 +307,38 @@ def start_task_services(
                 if "/" in rendered and not os.path.isabs(rendered):
                     rendered = str((dataset_root / rendered).resolve())
                 env[str(key)] = rendered
+
+        # Vendor mock services in this repo should resolve fixtures from the
+        # active task's fixture directory instead of relying on upstream repo
+        # relative defaults.
+        service_name = name.lower()
+        service_fixture_overrides = {
+            "gmail": ("GMAIL_FIXTURES", task_fixtures_dir / "gmail" / "inbox.json"),
+            "calendar": ("CALENDAR_FIXTURES", task_fixtures_dir / "calendar" / "events.json"),
+            "todo": ("TODO_FIXTURES", task_fixtures_dir / "todo" / "tasks.json"),
+            "contacts": ("CONTACTS_FIXTURES", task_fixtures_dir / "contacts" / "contacts.json"),
+            "finance": ("FINANCE_FIXTURES", task_fixtures_dir / "finance" / "transactions.json"),
+            "notes": ("NOTES_FIXTURES", task_fixtures_dir / "notes" / "meetings.json"),
+            "kb": ("KB_FIXTURES", task_fixtures_dir / "kb" / "articles.json"),
+            "helpdesk": ("HELPDESK_FIXTURES", task_fixtures_dir / "helpdesk" / "tickets.json"),
+            "inventory": ("INVENTORY_FIXTURES", task_fixtures_dir / "inventory" / "products.json"),
+            "rss": ("RSS_FIXTURES", task_fixtures_dir / "rss" / "articles.json"),
+            "crm": ("CRM_FIXTURES", task_fixtures_dir / "crm" / "customers.json"),
+            "config": ("CONFIG_FIXTURES", task_fixtures_dir / "config" / "integrations.json"),
+            "scheduler": ("SCHEDULER_FIXTURES", task_fixtures_dir / "scheduler" / "jobs.json"),
+        }
+        if service_name in service_fixture_overrides:
+            env_name, fixture_path = service_fixture_overrides[service_name]
+            env.setdefault(env_name, str(fixture_path.resolve()))
+
+        if service_name == "ocr" or service_name.startswith("ocr_"):
+            env.setdefault("OCR_FIXTURES", str(task_fixtures_dir.resolve()))
+        if service_name == "caption":
+            env.setdefault("CAPTION_FIXTURES", str(task_fixtures_dir.resolve()))
+        if service_name == "web":
+            env.setdefault("WEB_SEARCH_FIXTURES", str((task_fixtures_dir / "web" / "search_results.json").resolve()))
+            env.setdefault("WEB_FETCH_FIXTURES", str((task_fixtures_dir / "web" / "pages.json").resolve()))
+
         proc = subprocess.Popen(
             command,
             shell=True,
@@ -525,14 +560,17 @@ def _asset_search_roots(task: ClawEvalTask) -> List[Path]:
             [
                 dataset_root,
                 dataset_root / "general",
-                Path("/mnt/20t/xubuqiang/EcoClaw/general"),
             ]
         )
     return roots
 
 
 def _resolve_from_general_bundle(task: ClawEvalTask, rel_path: str) -> Path | None:
-    bundle_root = Path("/mnt/20t/xubuqiang/EcoClaw/general")
+    dataset_root = _dataset_root(task)
+    if dataset_root is not None:
+        bundle_root = (dataset_root / "general").resolve()
+    else:
+        bundle_root = (Path(__file__).resolve().parents[1] / "dataset" / "general").resolve()
     if not bundle_root.exists():
         return None
     task_slug = task.task_id.lower()

@@ -101,7 +101,17 @@ SERVICE_NAME_TO_PLUGIN_IDS: Dict[str, List[str]] = {
     "crm": ["claw-eval-mock-tools-crm"],
     "caption": ["claw-eval-mock-tools"],
     "ocr": ["claw-eval-mock-tools"],
+    "ocr_paper": ["claw-eval-mock-tools"],
+    "ocr_t50": ["claw-eval-mock-tools"],
+    "ocr_t51": ["claw-eval-mock-tools"],
+    "ocr_t52": ["claw-eval-mock-tools"],
+    "ocr_t53": ["claw-eval-mock-tools"],
+    "ocr_t54": ["claw-eval-mock-tools"],
+    "ocr_t55": ["claw-eval-mock-tools"],
     "ocr_t56": ["claw-eval-mock-tools"],
+    "ocr_t57": ["claw-eval-mock-tools"],
+    "ocr_t58": ["claw-eval-mock-tools"],
+    "ocr_t59": ["claw-eval-mock-tools"],
     "config": ["claw-eval-mock-tools"],
     "scheduler": ["claw-eval-mock-tools-scheduler"],
     "web_real": [],
@@ -269,6 +279,43 @@ def build_plugin_activation_plan(
     )
 
 
+def _all_known_claw_eval_plugin_ids() -> Set[str]:
+    return {
+        pid
+        for ids in TOOL_NAME_TO_PLUGIN_IDS.values()
+        for pid in ids
+        if pid
+    } | {
+        pid
+        for ids in SERVICE_NAME_TO_PLUGIN_IDS.values()
+        for pid in ids
+        if pid
+    }
+
+
+def _sanitize_claw_eval_plugin_state(raw: Dict[str, object]) -> Dict[str, object]:
+    """Strip stale claw-eval plugin state from an OpenClaw config snapshot.
+
+    This keeps unrelated plugins (for example tokenpilot/feishu/qwen auth)
+    intact, while removing any previous claw-eval run-scoped allowlist/entry
+    residue before we create a backup for the next run.
+    """
+    known_plugin_ids = _all_known_claw_eval_plugin_ids()
+    plugins = raw.setdefault("plugins", {})
+
+    allow = plugins.get("allow")
+    if isinstance(allow, list):
+        plugins["allow"] = [plugin_id for plugin_id in allow if plugin_id not in known_plugin_ids]
+
+    entries = plugins.get("entries")
+    if isinstance(entries, dict):
+        for plugin_id in list(entries.keys()):
+            if plugin_id in known_plugin_ids:
+                entries.pop(plugin_id, None)
+
+    return raw
+
+
 def ensure_plugins_installed(
     plugin_ids: Sequence[str],
     plugin_root: Path,
@@ -300,15 +347,21 @@ def activate_plugins_for_run(
         return plan
 
     config_path = config_path.resolve()
-    runner(f"cp '{config_path}' '{plan.backup_path}'")
     raw = json.loads(config_path.read_text(encoding="utf-8"))
+    raw = _sanitize_claw_eval_plugin_state(raw)
+    plan.backup_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     plugins = raw.setdefault("plugins", {})
     plugins["enabled"] = True
     allow = plugins.setdefault("allow", [])
-    if isinstance(allow, list):
-        for plugin_id in plan.enable_plugin_ids:
-            if plugin_id not in allow:
-                allow.append(plugin_id)
+    if not isinstance(allow, list):
+        allow = []
+    allow = [plugin_id for plugin_id in allow if plugin_id not in _all_known_claw_eval_plugin_ids()]
+    for plugin_id in plan.enable_plugin_ids:
+        if plugin_id not in allow:
+            allow.append(plugin_id)
+    plugins["allow"] = allow
+
     load = plugins.setdefault("load", {})
     paths = load.setdefault("paths", [])
     root_str = str(plan.plugin_root)
@@ -320,8 +373,7 @@ def activate_plugins_for_run(
         entry = entries.setdefault(plugin_id, {})
         entry["enabled"] = True
     for plugin_id in plan.disable_plugin_ids:
-        entry = entries.setdefault(plugin_id, {})
-        entry["enabled"] = False
+        entries.pop(plugin_id, None)
 
     config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return plan

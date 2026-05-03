@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools",
+    "name": "Claw-Eval Mock Service Tools",
+    "description": "Registers all Claw-Eval mock service endpoints as OpenClaw tools. Covers gmail, calendar, todo, contacts, finance, notes, kb, helpdesk, inventory, rss, crm, scheduler. Service base URLs are read from CLAW_EVAL_<SERVICE>_URL env vars (default: http://localhost:<port>).",
+    "version": "0.1.0",
+    "configSchema": {}
+}

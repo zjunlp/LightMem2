@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-rss",
+    "name": "Claw-Eval Mock Tools: rss",
+    "description": "Registers only the rss mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

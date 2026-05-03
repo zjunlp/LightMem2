@@ -1,0 +1,4 @@
+# Large claw-eval general asset bundle.
+# Keep the directory structure stable, but do not commit the downloaded files.
+general/*
+!general/README.md
