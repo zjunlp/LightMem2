@@ -293,6 +293,14 @@ def _all_known_claw_eval_plugin_ids() -> Set[str]:
     }
 
 
+def _all_known_claw_eval_tool_names() -> Set[str]:
+    return {
+        tool_name
+        for tool_name, plugin_ids in TOOL_NAME_TO_PLUGIN_IDS.items()
+        if any(plugin_ids)
+    }
+
+
 def _sanitize_claw_eval_plugin_state(raw: Dict[str, object]) -> Dict[str, object]:
     """Strip stale claw-eval plugin state from an OpenClaw config snapshot.
 
@@ -312,6 +320,31 @@ def _sanitize_claw_eval_plugin_state(raw: Dict[str, object]) -> Dict[str, object
         for plugin_id in list(entries.keys()):
             if plugin_id in known_plugin_ids:
                 entries.pop(plugin_id, None)
+
+    return raw
+
+
+def _sanitize_claw_eval_runtime_state(raw: Dict[str, object], plugin_root: Path) -> Dict[str, object]:
+    raw = _sanitize_claw_eval_plugin_state(raw)
+
+    plugins = raw.setdefault("plugins", {})
+    load = plugins.get("load")
+    if isinstance(load, dict):
+        paths = load.get("paths")
+        if isinstance(paths, list):
+            plugin_root_str = str(plugin_root.resolve())
+            legacy_roots = {
+                "/mnt/20t/xubuqiang/EcoClaw/代码打包/代码打包/plugins",
+                plugin_root_str,
+            }
+            load["paths"] = [str(path) for path in paths if str(path) not in legacy_roots]
+
+    tools = raw.get("tools")
+    if isinstance(tools, dict):
+        allow = tools.get("allow")
+        if isinstance(allow, list):
+            claw_eval_tools = _all_known_claw_eval_tool_names()
+            tools["allow"] = [tool_name for tool_name in allow if tool_name not in claw_eval_tools]
 
     return raw
 
@@ -365,8 +398,17 @@ def activate_plugins_for_run(
     load = plugins.setdefault("load", {})
     paths = load.setdefault("paths", [])
     root_str = str(plan.plugin_root)
-    if root_str not in paths:
-        paths.append(root_str)
+    legacy_roots = {"/mnt/20t/xubuqiang/EcoClaw/代码打包/代码打包/plugins"}
+    normalized_paths = []
+    for path in paths:
+        path_str = str(path)
+        if path_str in legacy_roots and path_str != root_str:
+            continue
+        if path_str not in normalized_paths:
+            normalized_paths.append(path_str)
+    if root_str not in normalized_paths:
+        normalized_paths.append(root_str)
+    load["paths"] = normalized_paths
 
     entries = plugins.setdefault("entries", {})
     for plugin_id in plan.enable_plugin_ids:
@@ -388,3 +430,26 @@ def restore_plugins_after_run(
     if runner is not None:
         runner(restore_cmd)
     return restore_cmd
+
+
+def cleanup_claw_eval_plugin_state(
+    config_path: Path,
+    plugin_root: Path,
+    runner: Optional[Callable[[str], object]] = None,
+) -> str:
+    config_path = config_path.resolve()
+    plugin_root = plugin_root.resolve()
+
+    if runner is None:
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+        raw = _sanitize_claw_eval_runtime_state(raw, plugin_root)
+        config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return f"sanitize '{config_path}'"
+
+    def _run() -> None:
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+        raw = _sanitize_claw_eval_runtime_state(raw, plugin_root)
+        config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    _run()
+    return f"sanitize '{config_path}'"

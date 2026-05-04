@@ -69,7 +69,10 @@ if isinstance(load_cfg, dict):
 
 allow = plugins.get("allow")
 if isinstance(allow, list):
-    plugins["allow"] = [item for item in allow if item not in {"ecoclaw", "tokenpilot"}]
+    next_allow = [item for item in allow if item != "ecoclaw"]
+    if "tokenpilot" not in next_allow:
+        next_allow.append("tokenpilot")
+    plugins["allow"] = next_allow
 
 entries = plugins.setdefault("entries", {})
 entries.pop("ecoclaw", None)

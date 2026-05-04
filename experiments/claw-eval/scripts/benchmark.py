@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import secrets
+import signal
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,7 @@ from lib_grading import grade_execution_result
 from lib_services import (
     activate_plugins_for_run,
     build_plugin_install_plan,
+    cleanup_claw_eval_plugin_state,
     restore_plugins_after_run,
     summarize_plugin_closure,
 )
@@ -106,7 +108,30 @@ def _parse_bool_env(name: str, default: bool | None = None) -> bool | None:
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _apply_tokenpilot_runtime_settings(config_path: Path) -> dict[str, object]:
+def _clear_tokenpilot_runtime_settings(config_path: Path) -> dict[str, object]:
+    raw = json.loads(config_path.read_text(encoding="utf-8"))
+    plugins = raw.setdefault("plugins", {})
+    slots = plugins.setdefault("slots", {})
+    if slots.get("contextEngine") == "layered-context":
+        slots["contextEngine"] = "legacy"
+    config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {
+        "tokenpilot_enabled": True,
+        "contextEngine": slots.get("contextEngine"),
+    }
+
+
+def _should_enable_tokenpilot_runtime(execution_model: str) -> bool:
+    explicit = _parse_bool_env("TOKENPILOT_RUNTIME_ENABLED")
+    if explicit is not None:
+        return explicit
+    return execution_model.startswith("tokenpilot/")
+
+
+def _apply_tokenpilot_runtime_settings(config_path: Path, *, execution_model: str) -> dict[str, object]:
+    if not _should_enable_tokenpilot_runtime(execution_model):
+        return _clear_tokenpilot_runtime_settings(config_path)
+
     raw = json.loads(config_path.read_text(encoding="utf-8"))
 
     enable_reduction = _parse_bool_env("TOKENPILOT_ENABLE_REDUCTION")
@@ -334,8 +359,47 @@ def main() -> None:
         )
 
     activation_plan = None
+    cleanup_context: dict[str, object] = {
+        "done": False,
+    }
+
+    def _cleanup_plugin_state() -> None:
+        if cleanup_context.get("done"):
+            return
+        try:
+            if activation_plan is not None and activation_plan.backup_path.exists():
+                restore_cmd = restore_plugins_after_run(
+                    activation_plan,
+                    config_path,
+                    runner=run_shell,
+                )
+                print(f"[restore] {restore_cmd}")
+            cleanup_cmd = cleanup_claw_eval_plugin_state(
+                config_path,
+                Path(args.plugin_root),
+                runner=run_shell,
+            )
+            print(f"[cleanup] {cleanup_cmd}")
+        finally:
+            cleanup_context["done"] = True
+
+    def _handle_signal(signum, _frame) -> None:
+        print(f"[signal] received {signum}, restoring OpenClaw config")
+        _cleanup_plugin_state()
+        raise SystemExit(128 + int(signum))
+
+    previous_sigint = signal.getsignal(signal.SIGINT)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
     should_apply_plan = args.apply_plugin_plan or args.execute_tasks
     if should_apply_plan:
+        cleanup_cmd = cleanup_claw_eval_plugin_state(
+            config_path,
+            Path(args.plugin_root),
+            runner=run_shell,
+        )
+        print(f"[cleanup-pre] {cleanup_cmd}")
         activation_plan = activate_plugins_for_run(
             install_plan.required_plugins,
             Path(args.plugin_root),
@@ -355,7 +419,7 @@ def main() -> None:
             run_tools = _synchronize_run_tool_allowlist(config_path, selected, all_declared_tools)
             if run_tools:
                 print(f"[tools] run-scoped allow entries: {run_tools}")
-            runtime_patch = _apply_tokenpilot_runtime_settings(config_path)
+            runtime_patch = _apply_tokenpilot_runtime_settings(config_path, execution_model=execution_model)
             if runtime_patch:
                 print(f"[tokenpilot] runtime patch applied: {runtime_patch}")
             print("[status] plugin plan applied")
@@ -428,13 +492,9 @@ def main() -> None:
                 )
                 print(f"[run] summary saved to {summary_path}")
         finally:
-            if activation_plan is not None and activation_plan.backup_path.exists():
-                restore_cmd = restore_plugins_after_run(
-                    activation_plan,
-                    config_path,
-                    runner=run_shell,
-                )
-                print(f"[restore] {restore_cmd}")
+            _cleanup_plugin_state()
+            signal.signal(signal.SIGINT, previous_sigint)
+            signal.signal(signal.SIGTERM, previous_sigterm)
     else:
         print("[dry-run] plugin plan not applied")
 

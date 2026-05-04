@@ -13,8 +13,12 @@ from ..models.content import ImageBlock, TextBlock, ToolResultBlock, ToolUseBloc
 from ..models.task import TaskDefinition
 from ..models.trace import DimensionScores, MediaLoad, ToolDispatch, TraceMessage
 
-# base.py is at src/claw_eval/graders/base.py → parents[3] is the repo root.
-_DEFAULT_TASKS_DIR = Path(__file__).resolve().parents[3] / "tasks"
+# Vendored layout:
+# experiments/claw-eval/vendor/claw_eval_src/graders/base.py
+# Prefer the repo-local dataset/tasks tree when available.
+_DEFAULT_TASKS_DIR = (
+    Path(__file__).resolve().parents[3] / "dataset" / "tasks"
+)
 
 
 def load_peer_grader(task_id: str, tasks_dir: str | Path = _DEFAULT_TASKS_DIR) -> type:

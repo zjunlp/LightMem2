@@ -18,6 +18,7 @@ export type UpstreamConfig = {
   providerId: string;
   baseUrl: string;
   apiKey: string;
+  apiFamily?: string;
   models: UpstreamModelDef[];
 };
 
@@ -122,6 +123,78 @@ function hasExplicitUpstreamProxyEnv(): boolean {
   return Boolean(settings.httpProxy || settings.httpsProxy || settings.allProxy);
 }
 
+function upstreamEndpoint(upstream: UpstreamConfig): string {
+  const family = String(upstream.apiFamily ?? "openai-responses").toLowerCase();
+  if (family.includes("completions")) {
+    return `${upstream.baseUrl}/chat/completions`;
+  }
+  return `${upstream.baseUrl}/responses`;
+}
+
+function normalizeInputTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as Record<string, unknown>;
+    const t = String(b.type ?? "").toLowerCase();
+    if ((t === "input_text" || t === "text" || t === "output_text") && typeof b.text === "string") {
+      parts.push(b.text);
+    } else if (typeof b.content === "string") {
+      parts.push(b.content);
+    }
+  }
+  return parts.join("\n");
+}
+
+function responsesPayloadToChatCompletions(payload: any): any {
+  const input = Array.isArray(payload?.input) ? payload.input : [];
+  const messages = input.map((item: any) => ({
+    role: typeof item?.role === "string" ? item.role : "user",
+    content: normalizeInputTextContent(item?.content),
+  }));
+  const model = typeof payload?.model === 'string' ? payload.model : undefined;
+  return {
+    model,
+    messages,
+    temperature: typeof payload?.temperature === 'number' ? payload.temperature : 0,
+    max_tokens: typeof payload?.max_output_tokens === 'number' ? payload.max_output_tokens : undefined,
+    stream: false,
+  };
+}
+
+function chatCompletionsToResponsesText(raw: string): string {
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+  const choice = Array.isArray(parsed?.choices) ? parsed.choices[0] : null;
+  const message = choice?.message ?? {};
+  const text = typeof message?.content === 'string'
+    ? message.content
+    : Array.isArray(message?.content)
+      ? message.content.map((x: any) => typeof x?.text === 'string' ? x.text : typeof x === 'string' ? x : '').filter(Boolean).join('\n')
+      : '';
+  const response = {
+    id: parsed?.id ?? `resp_${Date.now()}`,
+    object: 'response',
+    model: parsed?.model ?? '',
+    output: [
+      {
+        type: 'message',
+        role: 'assistant',
+        content: text ? [{ type: 'output_text', text, annotations: [] }] : [],
+      },
+    ],
+    usage: parsed?.usage ?? null,
+    output_text: text,
+  };
+  return JSON.stringify(response);
+}
+
 function buildUpstreamCurlEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key of ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "SHELL"]) {
@@ -175,7 +248,7 @@ async function requestUpstreamWithCurl(
   const curlEnv = buildUpstreamCurlEnv();
   const proxySettings = resolveUpstreamProxySettings();
   try {
-    await writeFile(bodyPath, JSON.stringify(payload), "utf8");
+    await writeFile(bodyPath, JSON.stringify(String(upstream.apiFamily ?? "openai-responses").toLowerCase().includes("completions") ? responsesPayloadToChatCompletions(payload) : payload), "utf8");
     await appendUpstreamTransportTrace(stateDir, {
       stage: "curl_start",
       upstreamBaseUrl: upstream.baseUrl,
@@ -186,11 +259,15 @@ async function requestUpstreamWithCurl(
     const { stdout } = await runExecFile(
       "curl",
       (() => {
+        const requestPayload = String(upstream.apiFamily ?? "openai-responses").toLowerCase().includes("completions")
+          ? responsesPayloadToChatCompletions(payload)
+          : payload;
+        writeFile(bodyPath, JSON.stringify(requestPayload), "utf8");
         const args = [
           "-sS",
           "-X",
           "POST",
-          `${upstream.baseUrl}/responses`,
+          upstreamEndpoint(upstream),
           "-H",
           "content-type: application/json",
           "-H",
@@ -204,7 +281,7 @@ async function requestUpstreamWithCurl(
           "--write-out",
           "\n__UPSTREAM_CURL_STATUS__:%{http_code}",
         ];
-        const targetUrl = new URL(`${upstream.baseUrl}/responses`);
+        const targetUrl = new URL(upstreamEndpoint(upstream));
         const chosenProxy = targetUrl.protocol === "https:"
           ? (proxySettings.httpsProxy || proxySettings.allProxy || proxySettings.httpProxy)
           : (proxySettings.httpProxy || proxySettings.allProxy || proxySettings.httpsProxy);
@@ -217,7 +294,10 @@ async function requestUpstreamWithCurl(
     const marker = "\n__UPSTREAM_CURL_STATUS__:";
     const idx = stdout.lastIndexOf(marker);
     if (idx < 0) throw new Error("curl missing status marker");
-    const text = stdout.slice(0, idx);
+    const rawText = stdout.slice(0, idx);
+    const text = String(upstream.apiFamily ?? "openai-responses").toLowerCase().includes("completions")
+      ? chatCompletionsToResponsesText(rawText)
+      : rawText;
     const status = Number.parseInt(stdout.slice(idx + marker.length).trim(), 10);
     const rawHeaders = await readFile(headersPath, "utf8");
     await appendUpstreamTransportTrace(stateDir, {
@@ -262,18 +342,26 @@ export async function requestUpstreamResponses(
     return requestUpstreamWithCurl(upstream, payload, stateDir, logger);
   }
   try {
-    const resp = await fetch(`${upstream.baseUrl}/responses`, {
+    const endpoint = upstreamEndpoint(upstream);
+    const requestPayload = String(upstream.apiFamily ?? "openai-responses").toLowerCase().includes("completions")
+      ? responsesPayloadToChatCompletions(payload)
+      : payload;
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${upstream.apiKey}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
+    const rawText = await resp.text();
+    const text = String(upstream.apiFamily ?? "openai-responses").toLowerCase().includes("completions")
+      ? chatCompletionsToResponsesText(rawText)
+      : rawText;
     return {
       status: resp.status,
       headers: Object.fromEntries(resp.headers.entries()),
-      text: await resp.text(),
+      text,
       transport: "fetch",
     };
   } catch (err) {
@@ -330,6 +418,7 @@ export async function detectUpstreamConfig(
       providerId: selectedProvider,
       baseUrl: String(p.baseUrl).replace(/\/+$/, ""),
       apiKey: String(p.apiKey),
+      apiFamily: typeof p.api === 'string' ? String(p.api) : 'openai-responses',
       models: normalized.length > 0 ? normalized : [{
         id: "gpt-5.4",
         name: "gpt-5.4",

@@ -9,13 +9,14 @@ normalize_openclaw_runtime_env() {
   local openclaw_home="${TOKENPILOT_OPENCLAW_HOME:-${ECOCLAW_OPENCLAW_HOME:-${HOME}}}"
   local runtime_local_bin="${openclaw_home}/.local/bin"
   export HOME="${openclaw_home}"
-  export XDG_CACHE_HOME="${HOME}/.cache"
+  export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/tmp/openclaw-cache}"
   export XDG_CONFIG_HOME="${HOME}/.config"
+  export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
   case ":${PATH}:" in
     *":${runtime_local_bin}:"*) ;;
     *) export PATH="${runtime_local_bin}:${PATH}" ;;
   esac
-  mkdir -p "${XDG_CACHE_HOME}" "${XDG_CACHE_HOME}/fontconfig" "${XDG_CONFIG_HOME}" "${runtime_local_bin}"
+  mkdir -p "${XDG_CACHE_HOME}" "${XDG_CACHE_HOME}/fontconfig" "${XDG_CONFIG_HOME}" "${runtime_local_bin}" "${UV_CACHE_DIR}"
 }
 
 normalize_openclaw_runtime_env
@@ -218,7 +219,7 @@ ensure_plugin_runtime_config() {
   local reduction_pass_html_slimming="${TOKENPILOT_REDUCTION_PASS_HTML_SLIMMING:-${ECOCLAW_REDUCTION_PASS_HTML_SLIMMING:-true}}"
   local reduction_pass_exec_output_truncation="${TOKENPILOT_REDUCTION_PASS_EXEC_OUTPUT_TRUNCATION:-${ECOCLAW_REDUCTION_PASS_EXEC_OUTPUT_TRUNCATION:-true}}"
   local reduction_pass_agents_startup_optimization="${TOKENPILOT_REDUCTION_PASS_AGENTS_STARTUP_OPTIMIZATION:-${ECOCLAW_REDUCTION_PASS_AGENTS_STARTUP_OPTIMIZATION:-true}}"
-  local default_model="${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-tokenpilot/gpt-5.4-mini}}"
+  local default_model="${TOKENPILOT_MODEL:-${ECOCLAW_MODEL:-}}"
   local exec_host="${TOKENPILOT_EXEC_HOST:-${ECOCLAW_EXEC_HOST:-gateway}}"
   local exec_security="${TOKENPILOT_EXEC_SECURITY:-${ECOCLAW_EXEC_SECURITY:-full}}"
   local exec_ask="${TOKENPILOT_EXEC_ASK:-${ECOCLAW_EXEC_ASK:-off}}"
@@ -226,17 +227,17 @@ ensure_plugin_runtime_config() {
   local eviction_policy="${TOKENPILOT_EVICTION_POLICY:-${ECOCLAW_EVICTION_POLICY:-lru}}"
   local eviction_min_block_chars="${TOKENPILOT_EVICTION_MIN_BLOCK_CHARS:-${ECOCLAW_EVICTION_MIN_BLOCK_CHARS:-256}}"
   local eviction_replacement_mode="${TOKENPILOT_EVICTION_REPLACEMENT_MODE:-${ECOCLAW_EVICTION_REPLACEMENT_MODE:-pointer_stub}}"
-  local task_state_estimator_enabled="${TOKENPILOT_TASK_STATE_ESTIMATOR_ENABLED:-${ECOCLAW_TASK_STATE_ESTIMATOR_ENABLED:-false}}"
-  local task_state_estimator_base_url="${TOKENPILOT_TASK_STATE_ESTIMATOR_BASE_URL:-${ECOCLAW_TASK_STATE_ESTIMATOR_BASE_URL:-}}"
-  local task_state_estimator_api_key="${TOKENPILOT_TASK_STATE_ESTIMATOR_API_KEY:-${ECOCLAW_TASK_STATE_ESTIMATOR_API_KEY:-}}"
-  local task_state_estimator_model="${TOKENPILOT_TASK_STATE_ESTIMATOR_MODEL:-${ECOCLAW_TASK_STATE_ESTIMATOR_MODEL:-}}"
-  local task_state_estimator_request_timeout_ms="${TOKENPILOT_TASK_STATE_ESTIMATOR_REQUEST_TIMEOUT_MS:-${ECOCLAW_TASK_STATE_ESTIMATOR_REQUEST_TIMEOUT_MS:-60000}}"
-  local task_state_estimator_batch_turns="${TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS:-${ECOCLAW_TASK_STATE_ESTIMATOR_BATCH_TURNS:-5}}"
-  local task_state_estimator_eviction_lookahead_turns="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_LOOKAHEAD_TURNS:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_LOOKAHEAD_TURNS:-3}}"
-  local task_state_estimator_input_mode="${TOKENPILOT_TASK_STATE_ESTIMATOR_INPUT_MODE:-${ECOCLAW_TASK_STATE_ESTIMATOR_INPUT_MODE:-sliding_window}}"
-  local task_state_estimator_lifecycle_mode="${TOKENPILOT_TASK_STATE_ESTIMATOR_LIFECYCLE_MODE:-${ECOCLAW_TASK_STATE_ESTIMATOR_LIFECYCLE_MODE:-coupled}}"
-  local task_state_estimator_eviction_promotion_policy="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_POLICY:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_POLICY:-fifo}}"
-  local task_state_estimator_eviction_promotion_hot_tail_size="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_HOT_TAIL_SIZE:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_HOT_TAIL_SIZE:-1}}"
+  local task_state_estimator_enabled="${TOKENPILOT_TASK_STATE_ESTIMATOR_ENABLED:-${ECOCLAW_TASK_STATE_ESTIMATOR_ENABLED:-__KEEP__}}"
+  local task_state_estimator_base_url="${TOKENPILOT_TASK_STATE_ESTIMATOR_BASE_URL:-${ECOCLAW_TASK_STATE_ESTIMATOR_BASE_URL:-__KEEP__}}"
+  local task_state_estimator_api_key="${TOKENPILOT_TASK_STATE_ESTIMATOR_API_KEY:-${ECOCLAW_TASK_STATE_ESTIMATOR_API_KEY:-__KEEP__}}"
+  local task_state_estimator_model="${TOKENPILOT_TASK_STATE_ESTIMATOR_MODEL:-${ECOCLAW_TASK_STATE_ESTIMATOR_MODEL:-__KEEP__}}"
+  local task_state_estimator_request_timeout_ms="${TOKENPILOT_TASK_STATE_ESTIMATOR_REQUEST_TIMEOUT_MS:-${ECOCLAW_TASK_STATE_ESTIMATOR_REQUEST_TIMEOUT_MS:-__KEEP__}}"
+  local task_state_estimator_batch_turns="${TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS:-${ECOCLAW_TASK_STATE_ESTIMATOR_BATCH_TURNS:-__KEEP__}}"
+  local task_state_estimator_eviction_lookahead_turns="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_LOOKAHEAD_TURNS:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_LOOKAHEAD_TURNS:-__KEEP__}}"
+  local task_state_estimator_input_mode="${TOKENPILOT_TASK_STATE_ESTIMATOR_INPUT_MODE:-${ECOCLAW_TASK_STATE_ESTIMATOR_INPUT_MODE:-__KEEP__}}"
+  local task_state_estimator_lifecycle_mode="${TOKENPILOT_TASK_STATE_ESTIMATOR_LIFECYCLE_MODE:-${ECOCLAW_TASK_STATE_ESTIMATOR_LIFECYCLE_MODE:-__KEEP__}}"
+  local task_state_estimator_eviction_promotion_policy="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_POLICY:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_POLICY:-__KEEP__}}"
+  local task_state_estimator_eviction_promotion_hot_tail_size="${TOKENPILOT_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_HOT_TAIL_SIZE:-${ECOCLAW_TASK_STATE_ESTIMATOR_EVICTION_PROMOTION_HOT_TAIL_SIZE:-__KEEP__}}"
   if [[ ! -f "${config_path}" ]]; then
     echo "WARN: openclaw config not found, skip plugin runtime config patch: ${config_path}" >&2
     return 0
@@ -297,10 +298,30 @@ pass_agents_startup_optimization = parse_bool(pass_agents_startup_optimization_r
 enable_eviction = parse_bool(enable_eviction_raw)
 eviction_min_block_chars = int(eviction_min_block_chars_raw)
 task_state_estimator_enabled = parse_bool(task_state_estimator_enabled_raw)
-task_state_estimator_request_timeout_ms = int(task_state_estimator_request_timeout_ms_raw)
-task_state_estimator_batch_turns = int(task_state_estimator_batch_turns_raw)
-task_state_estimator_eviction_lookahead_turns = int(task_state_estimator_eviction_lookahead_turns_raw)
-task_state_estimator_eviction_promotion_hot_tail_size = int(task_state_estimator_eviction_promotion_hot_tail_size_raw)
+keep_estimator_enabled = task_state_estimator_enabled_raw == "__KEEP__"
+keep_estimator_base_url = task_state_estimator_base_url == "__KEEP__"
+keep_estimator_api_key = task_state_estimator_api_key == "__KEEP__"
+keep_estimator_model = task_state_estimator_model == "__KEEP__"
+keep_estimator_request_timeout_ms = task_state_estimator_request_timeout_ms_raw == "__KEEP__"
+keep_estimator_batch_turns = task_state_estimator_batch_turns_raw == "__KEEP__"
+keep_estimator_eviction_lookahead_turns = task_state_estimator_eviction_lookahead_turns_raw == "__KEEP__"
+keep_estimator_input_mode = task_state_estimator_input_mode == "__KEEP__"
+keep_estimator_lifecycle_mode = task_state_estimator_lifecycle_mode == "__KEEP__"
+keep_estimator_eviction_promotion_policy = task_state_estimator_eviction_promotion_policy == "__KEEP__"
+keep_estimator_eviction_promotion_hot_tail_size = task_state_estimator_eviction_promotion_hot_tail_size_raw == "__KEEP__"
+
+if keep_estimator_enabled and (
+    (not keep_estimator_base_url and task_state_estimator_base_url.strip())
+    or (not keep_estimator_api_key and task_state_estimator_api_key.strip())
+    or (not keep_estimator_model and task_state_estimator_model.strip())
+):
+    keep_estimator_enabled = False
+    task_state_estimator_enabled = True
+
+task_state_estimator_request_timeout_ms = None if keep_estimator_request_timeout_ms else int(task_state_estimator_request_timeout_ms_raw)
+task_state_estimator_batch_turns = None if keep_estimator_batch_turns else int(task_state_estimator_batch_turns_raw)
+task_state_estimator_eviction_lookahead_turns = None if keep_estimator_eviction_lookahead_turns else int(task_state_estimator_eviction_lookahead_turns_raw)
+task_state_estimator_eviction_promotion_hot_tail_size = None if keep_estimator_eviction_promotion_hot_tail_size else int(task_state_estimator_eviction_promotion_hot_tail_size_raw)
 
 with open(config_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
@@ -317,8 +338,10 @@ slots["contextEngine"] = "layered-context"
 tokenpilot_cfg = tokenpilot.setdefault("config", {})
 tokenpilot_cfg["enabled"] = True
 tokenpilot_cfg["proxyAutostart"] = True
-tokenpilot_cfg["proxyPort"] = proxy_port
-tokenpilot_cfg["proxyBaseUrl"] = proxy_base_url
+if proxy_port:
+    tokenpilot_cfg["proxyPort"] = proxy_port
+if proxy_base_url:
+    tokenpilot_cfg["proxyBaseUrl"] = proxy_base_url
 if proxy_api_key:
     tokenpilot_cfg["proxyApiKey"] = proxy_api_key
 modules = tokenpilot_cfg.setdefault("modules", {})
@@ -383,7 +406,8 @@ maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_LINE_NUMB
 agents = cfg.setdefault("agents", {})
 defaults = agents.setdefault("defaults", {})
 model_defaults = defaults.setdefault("model", {})
-model_defaults["primary"] = default_model
+if default_model:
+    model_defaults["primary"] = default_model
 model_defaults["fallbacks"] = []
 
 tools = cfg.setdefault("tools", {})
@@ -395,36 +419,42 @@ exec_cfg["host"] = exec_host
 exec_cfg["security"] = exec_security
 exec_cfg["ask"] = exec_ask
 task_state_estimator = tokenpilot_cfg.setdefault("taskStateEstimator", {})
-task_state_estimator["enabled"] = task_state_estimator_enabled
-if task_state_estimator_base_url.strip():
+if not keep_estimator_enabled:
+    task_state_estimator["enabled"] = task_state_estimator_enabled
+if not keep_estimator_base_url and task_state_estimator_base_url.strip():
     task_state_estimator["baseUrl"] = task_state_estimator_base_url.strip()
-if task_state_estimator_api_key.strip():
+if not keep_estimator_api_key and task_state_estimator_api_key.strip():
     task_state_estimator["apiKey"] = task_state_estimator_api_key.strip()
-if task_state_estimator_model.strip():
+if not keep_estimator_model and task_state_estimator_model.strip():
     task_state_estimator["model"] = task_state_estimator_model.strip()
-task_state_estimator["requestTimeoutMs"] = max(1000, task_state_estimator_request_timeout_ms)
-task_state_estimator["batchTurns"] = max(1, task_state_estimator_batch_turns)
-task_state_estimator["evictionLookaheadTurns"] = max(1, task_state_estimator_eviction_lookahead_turns)
-task_state_estimator["inputMode"] = (
-    "completed_summary_plus_active_turns"
-    if task_state_estimator_input_mode == "completed_summary_plus_active_turns"
-    else "sliding_window"
-)
-task_state_estimator["lifecycleMode"] = (
-    "decoupled"
-    if task_state_estimator_lifecycle_mode == "decoupled"
-    else "coupled"
-)
-task_state_estimator["evictionPromotionPolicy"] = (
-    "fifo"
-    if task_state_estimator_eviction_promotion_policy == "fifo"
-    else "fifo"
-)
-task_state_estimator["evictionPromotionHotTailSize"] = max(0, task_state_estimator_eviction_promotion_hot_tail_size)
+if not keep_estimator_request_timeout_ms:
+    task_state_estimator["requestTimeoutMs"] = max(1000, task_state_estimator_request_timeout_ms)
+if not keep_estimator_batch_turns:
+    task_state_estimator["batchTurns"] = max(1, task_state_estimator_batch_turns)
+if not keep_estimator_eviction_lookahead_turns:
+    task_state_estimator["evictionLookaheadTurns"] = max(1, task_state_estimator_eviction_lookahead_turns)
+if not keep_estimator_input_mode:
+    task_state_estimator["inputMode"] = (
+        "completed_summary_plus_active_turns"
+        if task_state_estimator_input_mode == "completed_summary_plus_active_turns"
+        else "sliding_window"
+    )
+if not keep_estimator_lifecycle_mode:
+    task_state_estimator["lifecycleMode"] = (
+        "decoupled"
+        if task_state_estimator_lifecycle_mode == "decoupled"
+        else "coupled"
+    )
+if not keep_estimator_eviction_promotion_policy:
+    task_state_estimator["evictionPromotionPolicy"] = "fifo"
+if not keep_estimator_eviction_promotion_hot_tail_size:
+    task_state_estimator["evictionPromotionHotTailSize"] = max(0, task_state_estimator_eviction_promotion_hot_tail_size)
 
-with open(config_path, "w", encoding="utf-8") as f:
+tmp_path = f"{config_path}.tmp"
+with open(tmp_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
+os.replace(tmp_path, config_path)
 
 print(
     "Ensured plugin runtime config:",
@@ -462,6 +492,7 @@ sanitize_plugin_runtime_config() {
 
   python3 - "${config_path}" "${enable_eviction}" <<'SANITIZE_PY'
 import json
+import os
 import sys
 
 config_path, enable_eviction_raw = sys.argv[1:3]
@@ -506,9 +537,11 @@ tokenpilot_cfg["modules"] = {
     "eviction": enable_eviction,
 }
 
-with open(config_path, "w", encoding="utf-8") as f:
+tmp_path = f"{config_path}.tmp"
+with open(tmp_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
+os.replace(tmp_path, config_path)
 SANITIZE_PY
 }
 
@@ -793,13 +826,18 @@ recover_stale_openclaw_config_backup() {
 
 ensure_openclaw_gateway_running() {
   normalize_openclaw_runtime_env
+  ensure_plugin_runtime_config
+  sanitize_plugin_runtime_config
+  validate_openclaw_runtime_config
+  local config_path="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
   local force_restart="${TOKENPILOT_FORCE_GATEWAY_RESTART:-${ECOCLAW_FORCE_GATEWAY_RESTART:-false}}"
   local gateway_port="${ECOCLAW_GATEWAY_PORT:-}"
   if [[ -z "${gateway_port}" ]]; then
-    gateway_port="$(python3 - <<'PY'
+    gateway_port="$(python3 - "${config_path}" <<'PY'
 import json
+import sys
 from pathlib import Path
-p = Path("/mnt/20t/xubuqiang/.openclaw/openclaw.json")
+p = Path(sys.argv[1])
 try:
     obj = json.loads(p.read_text(encoding="utf-8"))
     print(obj.get("gateway", {}).get("port", 28789))
@@ -813,6 +851,7 @@ PY
     rm -f /tmp/openclaw_gateway.log
     nohup env \
       HOME="${HOME}" \
+      OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH}" \
       XDG_CACHE_HOME="${XDG_CACHE_HOME}" \
       XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
       ECOCLAW_UPSTREAM_HTTP_PROXY="${ECOCLAW_UPSTREAM_HTTP_PROXY:-}" \
@@ -823,6 +862,7 @@ PY
     local attempts=0
     while [[ ${attempts} -lt 30 ]]; do
       if openclaw gateway health >/dev/null 2>&1; then
+        assert_method_runtime_config
         echo "OpenClaw gateway restarted (pid=${gateway_pid})"
         return 0
       fi
@@ -837,6 +877,7 @@ PY
     rm -f /tmp/openclaw_gateway.log
     nohup env \
       HOME="${HOME}" \
+      OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH}" \
       XDG_CACHE_HOME="${XDG_CACHE_HOME}" \
       XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
       ECOCLAW_UPSTREAM_HTTP_PROXY="${ECOCLAW_UPSTREAM_HTTP_PROXY:-}" \
@@ -847,6 +888,7 @@ PY
     local attempts=0
     while [[ ${attempts} -lt 20 ]]; do
       if openclaw gateway health >/dev/null 2>&1; then
+        assert_method_runtime_config
         echo "OpenClaw gateway is ready (pid=${gateway_pid})"
         return 0
       fi
@@ -854,12 +896,14 @@ PY
       sleep 1
     done
     if openclaw gateway health >/dev/null 2>&1; then
+      assert_method_runtime_config
       echo "OpenClaw gateway became reachable after startup race."
       return 0
     fi
     echo "ERROR: OpenClaw gateway failed to become reachable. See /tmp/openclaw_gateway.log" >&2
     return 1
   fi
+  assert_method_runtime_config
   echo "OpenClaw gateway is reachable"
 }
 

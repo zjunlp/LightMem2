@@ -1022,6 +1022,7 @@ def execute_openclaw_task(
     skill_dir: Path,
     agent_workspace: Path | None = None,
     verbose: bool = False,
+    session_mode: str = "isolated",
     cleanup_sessions: bool = True,
     defer_transcript_load: bool = False,
     initial_session_id: str | None = None,

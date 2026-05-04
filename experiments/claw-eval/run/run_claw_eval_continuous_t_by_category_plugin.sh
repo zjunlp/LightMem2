@@ -5,6 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAW_EVAL_REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${CLAW_EVAL_REPO_ROOT}/../../.." && pwd)"
 
+if [[ -f "${CLAW_EVAL_REPO_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${CLAW_EVAL_REPO_ROOT}/.env"
+  set +a
+elif [[ -f "${CLAW_EVAL_REPO_ROOT}/../pinchbench/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${CLAW_EVAL_REPO_ROOT}/../pinchbench/.env"
+  set +a
+fi
+
 
 ROOT_DIR="${PROJECT_ROOT}"
 REPO_DIR="${CLAW_EVAL_REPO_ROOT}/../.."

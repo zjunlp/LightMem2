@@ -1103,6 +1103,7 @@ def _run_task_job(
             skill_dir=skill_dir,
             agent_workspace=agent_workspace,
             verbose=verbose,
+            session_mode=session_mode,
             cleanup_sessions=(session_mode != "continuous"),
             defer_transcript_load=bool(
                 (defer_continuous_grading and not generate_only) and session_mode == "continuous"
