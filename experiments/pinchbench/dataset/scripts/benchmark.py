@@ -1648,7 +1648,7 @@ def main():
         if parallel_jobs == 1:
             transcript_cursor_by_agent: Dict[str, int] = {}
             if session_mode == "continuous":
-                continuous_agent_id = f"bench-{model_slug}-{run_id}-serial"
+                continuous_agent_id = f"bench-{model_slug}-{run_id}-{int(time.time() * 1000)}-serial"
                 continuous_agent_workspace = PINCHBENCH_TMP_ROOT / run_id / "agent_workspace_serial"
                 continuous_session_id = f"bench-{model_slug}-{run_id}-continuous-s1-{int(time.time() * 1000)}"
                 ensure_agent_exists(continuous_agent_id, args.model, continuous_agent_workspace)

@@ -701,6 +701,27 @@ def ensure_agent_exists(agent_id: str, model_id: str, workspace_dir: Path, confi
             if current_workspace is not None and current_workspace.resolve() == workspace_dir.resolve():
                 _patch_agent_tool_restrictions(agent_id, task, config_path)
                 return
+            time.sleep(0.5)
+            existing_agents = _list_existing_agents(env)
+            if agent_id in existing_agents or normalized_id in existing_agents:
+                current_workspace = _get_agent_workspace(agent_id, env)
+                if current_workspace is not None and current_workspace.resolve() == workspace_dir.resolve():
+                    _patch_agent_tool_restrictions(agent_id, task, config_path)
+                    return
+                delete_name = normalized_id if normalized_id in existing_agents else agent_id
+                delete_result = subprocess.run(
+                    ["openclaw", "agents", "remove", delete_name, "--yes"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                )
+                if delete_result.returncode != 0:
+                    last_error = (delete_result.stderr or delete_result.stdout or "").strip() or add_error
+                    time.sleep(0.5)
+                    continue
+                time.sleep(0.5)
+                continue
         existing_agents = _list_existing_agents(env)
         if agent_id in existing_agents or normalized_id in existing_agents:
             _patch_agent_tool_restrictions(agent_id, task, config_path)

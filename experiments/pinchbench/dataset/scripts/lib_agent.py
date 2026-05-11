@@ -423,23 +423,23 @@ def ensure_agent_exists(agent_id: str, model_id: str, workspace_dir: Path) -> bo
 
 def cleanup_agent_sessions(agent_id: str) -> None:
     """Remove stored session transcripts for an agent to avoid unbounded growth."""
-    return
+    reset_agent_session_store(agent_id)
 
 
 def reset_agent_session_store(agent_id: str) -> None:
     """Clear an agent's persisted session store before starting a fresh benchmark run."""
-    sessions_dir = _get_agent_store_dir(agent_id) / "sessions"
-    if not sessions_dir.exists():
-        return
-
     removed = 0
-    for path in sessions_dir.iterdir():
-        try:
-            if path.is_file() or path.is_symlink():
-                path.unlink()
-                removed += 1
-        except OSError:
-            logger.warning("Failed to remove stale session store entry: %s", path)
+    for agent_dir in _candidate_agent_store_dirs(agent_id):
+        sessions_dir = agent_dir / "sessions"
+        if not sessions_dir.exists():
+            continue
+        for path in sessions_dir.iterdir():
+            try:
+                if path.is_file() or path.is_symlink():
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                logger.warning("Failed to remove stale session store entry: %s", path)
     if removed:
         logger.info("Removed %s stale OpenClaw session store entries for %s", removed, agent_id)
 

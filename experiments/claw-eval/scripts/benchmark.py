@@ -386,7 +386,9 @@ def main() -> None:
                 transcript_cursor = 0
                 if args.session_mode == "continuous":
                     model_slug = execution_model.replace("/", "-").replace(":", "-")
-                    shared_agent_id = f"ce-{model_slug}-{run_id}-serial"
+                    short_model_slug = model_slug[:24].rstrip("-")
+                    nonce = secrets.token_hex(3)
+                    shared_agent_id = f"ce-{short_model_slug}-{nonce}-serial"
                     shared_workspace = run_root / "_continuous" / "workspace"
                     shared_session_id = f"ce-continuous-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
                     if selected_tasks:

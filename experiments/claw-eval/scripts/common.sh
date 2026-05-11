@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAW_EVAL_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PROJECT_ROOT="$(cd "${CLAW_EVAL_ROOT}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${CLAW_EVAL_ROOT}/../.." && pwd)"
 CLAW_EVAL_BENCH_PY="${CLAW_EVAL_ROOT}/scripts/benchmark.py"
 CLAW_EVAL_TASKS_DIR="${CLAW_EVAL_ROOT}/dataset/tasks"
 CLAW_EVAL_SOURCE_DIR="${CLAW_EVAL_ROOT}/vendor"
@@ -97,6 +97,7 @@ ce_prepare_tmp_openclaw_home() {
 
   mkdir -p "${tmp_home}"
   cp -a "${source_state_dir}" "${tmp_state}"
+  rm -rf "${tmp_state}/agents" 2>/dev/null || true
 
   export TOKENPILOT_OPENCLAW_HOME="${tmp_home}"
   export OPENCLAW_CONFIG_PATH="${tmp_state}/openclaw.json"
