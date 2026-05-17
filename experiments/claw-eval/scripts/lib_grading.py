@@ -70,6 +70,44 @@ class GradeResult:
         }
 
 
+class JudgeCallError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        reason: str,
+        model: str,
+        messages: List[Dict[str, Any]],
+        raw_response: Dict[str, Any] | None = None,
+        response_text: str | None = None,
+        judge_method: str | None = None,
+        cause: str | None = None,
+    ) -> None:
+        self.reason = reason
+        self.model = model
+        self.messages = messages
+        self.raw_response = raw_response
+        self.response_text = response_text
+        self.judge_method = judge_method
+        self.cause = cause
+        detail = f"Judge call failed: {reason}"
+        if judge_method:
+            detail += f" method={judge_method}"
+        if cause:
+            detail += f" cause={cause}"
+        super().__init__(detail)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "reason": self.reason,
+            "model": self.model,
+            "judge_method": self.judge_method,
+            "cause": self.cause,
+            "response_text": self.response_text,
+            "raw_response": self.raw_response,
+            "messages": self.messages,
+        }
+
+
 class _CompatMessage:
     def __init__(self, content: str):
         self.content = content
@@ -122,12 +160,14 @@ class DirectJudge:
             f"## Actions Taken\n{actions_summary}\n\n"
             f"## Rubric\n{rubric}\n"
         )
+        request_messages = [
+            {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
         parsed = _chat_completion_json(
             model=self.model_id,
-            messages=[
-                {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
+            messages=request_messages,
+            judge_method="evaluate",
         )
         result = JudgeResult(score=float(parsed.get("score", 0.0)), reasoning=str(parsed.get("reasoning", "")))
         self._call_log.append({
@@ -145,12 +185,14 @@ class DirectJudge:
             f"## Agent Actions\n{artifacts}\n\n"
             f"## Rubric\n{rubric}\n"
         )
+        request_messages = [
+            {"role": "system", "content": _ACTIONS_JUDGE_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
         parsed = _chat_completion_json(
             model=self.model_id,
-            messages=[
-                {"role": "system", "content": _ACTIONS_JUDGE_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
+            messages=request_messages,
+            judge_method="evaluate_actions",
         )
         result = JudgeResult(score=float(parsed.get("score", 0.0)), reasoning=str(parsed.get("reasoning", "")))
         self._call_log.append({
@@ -190,12 +232,14 @@ class DirectJudge:
                     "type": "image_url",
                     "image_url": {"url": f"data:image/png;base64,{img_b64}"},
                 })
+        request_messages = [
+            {"role": "system", "content": _VISUAL_JUDGE_SYSTEM_PROMPT},
+            {"role": "user", "content": content_parts},
+        ]
         parsed = _chat_completion_json(
             model=self.model_id,
-            messages=[
-                {"role": "system", "content": _VISUAL_JUDGE_SYSTEM_PROMPT},
-                {"role": "user", "content": content_parts},
-            ],
+            messages=request_messages,
+            judge_method="evaluate_visual",
         )
         result = JudgeResult(score=float(parsed.get("score", 0.0)), reasoning=str(parsed.get("reasoning", "")))
         self._call_log.append({
@@ -314,23 +358,105 @@ def _chat_completion_raw(
     )
 
 
+def _extract_choice_text(raw: Dict[str, Any]) -> str:
+    choices = raw.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    first = choices[0] or {}
+    if not isinstance(first, dict):
+        return str(first)
+
+    message = first.get("message")
+    if isinstance(message, dict):
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: List[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                text_value = item.get("text")
+                if isinstance(text_value, str):
+                    parts.append(text_value)
+                    continue
+                if item.get("type") in {"output_text", "text"}:
+                    nested = item.get("content")
+                    if isinstance(nested, str):
+                        parts.append(nested)
+            if parts:
+                return "\n".join(parts)
+        for alt_key in ("reasoning_content", "reasoning", "refusal"):
+            alt = message.get(alt_key)
+            if isinstance(alt, str) and alt.strip():
+                return alt
+
+    text = first.get("text")
+    if isinstance(text, str):
+        return text
+
+    delta = first.get("delta")
+    if isinstance(delta, dict):
+        delta_content = delta.get("content")
+        if isinstance(delta_content, str):
+            return delta_content
+
+    return ""
+
+
 def _chat_completion_json(
     *,
     messages: List[Dict[str, Any]],
     model: str,
+    judge_method: str | None = None,
     timeout_seconds: float = 120.0,
     temperature: float = 0.0,
     max_tokens: int = 4096,
 ) -> Dict[str, Any]:
-    raw = _chat_completion_raw(
-        messages=messages,
-        model=model,
-        timeout_seconds=timeout_seconds,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    text = raw["choices"][0]["message"]["content"]
-    return _parse_judge_text(text)
+    try:
+        raw = _chat_completion_raw(
+            messages=messages,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except JudgeCallError:
+        raise
+    except Exception as exc:
+        raise JudgeCallError(
+            reason="request_failed",
+            model=model,
+            messages=messages,
+            judge_method=judge_method,
+            cause=str(exc),
+        ) from exc
+    text = _extract_choice_text(raw)
+    if not text.strip():
+        raise JudgeCallError(
+            reason="empty_response",
+            model=model,
+            messages=messages,
+            raw_response=raw,
+            response_text=text,
+            judge_method=judge_method,
+        )
+    try:
+        return _parse_judge_text(text)
+    except Exception as exc:
+        raise JudgeCallError(
+            reason="invalid_judge_json",
+            model=model,
+            messages=messages,
+            raw_response=raw,
+            response_text=text,
+            judge_method=judge_method,
+            cause=str(exc),
+        ) from exc
 
 
 def _parse_judge_text(text: str) -> Dict[str, Any]:
@@ -470,23 +596,15 @@ def _tool_result_block_from_openclaw_message(message: Dict[str, Any]) -> ToolRes
 
 
 def _tool_result_text_blocks(message: Dict[str, Any]) -> List[TextBlock]:
-    """Expose tool-result payloads to graders that only read TextBlock content.
+    """Keep parity with upstream claw-eval: do not mirror tool results as text.
 
-    Upstream graders commonly call ``format_conversation(messages)``, which only
-    renders ``TextBlock`` content and ignores ``ToolResultBlock`` objects.  Add a
-    compact text mirror so the judge can still see the service response content.
+    Official graders rely on ``Message.text``, which only concatenates top-level
+    ``TextBlock`` instances and does not automatically expand ``ToolResultBlock``
+    payloads into the conversation transcript.  Returning an empty list here keeps
+    judge input closer to upstream and avoids flooding the grading prompt with
+    raw tool outputs.
     """
-    if message.get("role") != "toolResult":
-        return []
-    tool_name = str(message.get("toolName") or "tool_result")
-    parts = _text_blocks_from_openclaw_content(message.get("content"))
-    if not parts:
-        return []
-    joined = "\n".join(part.text for part in parts if part.text.strip()).strip()
-    if not joined:
-        return []
-    prefix = f"[TOOL RESULT {tool_name}]"
-    return [TextBlock(text=f"{prefix}\n{joined}")]
+    return []
 
 
 def _load_session_trace_messages(session_file: str | Path | None, trace_id: str) -> List[TraceMessage]:
@@ -705,11 +823,45 @@ def _build_media_events(task: TaskDefinition, execution_result: Dict[str, Any]) 
     return events
 
 
+def _save_judge_failure_artifact(
+    *,
+    artifact_dir: str | Path | None,
+    task: TaskDefinition,
+    execution_result: Dict[str, Any],
+    judge_model: str,
+    error: JudgeCallError,
+) -> str | None:
+    if not artifact_dir:
+        return None
+    target_dir = Path(artifact_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    failure_path = target_dir / "judge_failure.json"
+    task_file = getattr(task, "task_file", None)
+    task_yaml_path = str(task_file) if task_file else None
+    payload = {
+        "task_id": task.task_id,
+        "task_yaml_path": task_yaml_path,
+        "judge_model": judge_model,
+        "judge_error": error.to_dict(),
+        "execution_usage": execution_result.get("usage"),
+        "transcript_span": execution_result.get("transcript_span"),
+        "status": execution_result.get("status"),
+        "saved_at": int(time.time()),
+    }
+    try:
+        failure_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return str(failure_path)
+    except Exception:
+        # Never let best-effort persistence break benchmark progress.
+        return None
+
+
 def grade_execution_result(
     *,
     task_yaml_path: str | Path,
     execution_result: Dict[str, Any],
     judge_model: str = DEFAULT_JUDGE_MODEL,
+    artifact_dir: str | Path | None = None,
 ) -> GradeResult:
     task = _load_task_definition(task_yaml_path)
     grader = _load_grader(task)
@@ -718,15 +870,40 @@ def grade_execution_result(
     dispatches = _build_dispatches(task, execution_result)
     audit_data = _enrich_audit_data(execution_result.get("audit_data") or {}, dispatches)
     media_events = _build_media_events(task, execution_result)
-    scores: DimensionScores = grader.grade(
-        messages,
-        dispatches,
-        task,
-        audit_data=audit_data,
-        judge=judge,
-        media_events=media_events,
-        env_snapshot=execution_result.get("env_snapshot"),
-    )
+    try:
+        scores: DimensionScores = grader.grade(
+            messages,
+            dispatches,
+            task,
+            audit_data=audit_data,
+            judge=judge,
+            media_events=media_events,
+            env_snapshot=execution_result.get("env_snapshot"),
+        )
+    except JudgeCallError as exc:
+        saved_path = _save_judge_failure_artifact(
+            artifact_dir=artifact_dir,
+            task=task,
+            execution_result=execution_result,
+            judge_model=judge_model,
+            error=exc,
+        )
+        note = f"judge_failed:{exc.reason}"
+        if saved_path:
+            note += f" saved={saved_path}"
+        return GradeResult(
+            task_id=task.task_id,
+            scores={
+                "completion": 0.0,
+                "robustness": 0.0,
+                "communication": 0.0,
+                "safety": 0.0,
+            },
+            task_score=0.0,
+            passed=False,
+            failure_modes=["judge_failed"],
+            notes=note,
+        )
     score_dict = {
         "completion": float(scores.completion),
         "robustness": float(scores.robustness),

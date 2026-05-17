@@ -8,6 +8,13 @@ CLAW_EVAL_BENCH_PY="${CLAW_EVAL_ROOT}/scripts/benchmark.py"
 CLAW_EVAL_TASKS_DIR="${CLAW_EVAL_ROOT}/dataset/tasks"
 CLAW_EVAL_SOURCE_DIR="${CLAW_EVAL_ROOT}/vendor"
 CLAW_EVAL_PLUGIN_ROOT="${CLAW_EVAL_ROOT}/plugins"
+if [[ -n "${CLAW_EVAL_UV_PROJECT_DIR:-}" ]]; then
+  CLAW_EVAL_UV_PROJECT_DIR="${CLAW_EVAL_UV_PROJECT_DIR}"
+elif [[ -f "/mnt/20t/xubuqiang/EcoClaw/claw-eval/pyproject.toml" ]]; then
+  CLAW_EVAL_UV_PROJECT_DIR="/mnt/20t/xubuqiang/EcoClaw/claw-eval"
+else
+  CLAW_EVAL_UV_PROJECT_DIR="${CLAW_EVAL_SOURCE_DIR}"
+fi
 
 # Reuse the pinchbench runtime/env/config stack and keep claw-eval-specific
 # naming as a compatibility shim for older run scripts.
@@ -30,6 +37,13 @@ ce_normalize_runtime_env() {
   export CLAW_EVAL_SOURCE_ROOT="${CLAW_EVAL_SOURCE_ROOT:-${CLAW_EVAL_SOURCE_DIR}}"
   export PYTHONUNBUFFERED="${PYTHONUNBUFFERED:-1}"
   export CLAW_EVAL_AGENT_TIMEOUT_SECONDS="${CLAW_EVAL_AGENT_TIMEOUT_SECONDS:-0}"
+  # Claw-eval does not need the built-in Gmail watcher or dev watch mode.
+  # Disabling them reduces file watchers and helps avoid EMFILE during long runs.
+  export OPENCLAW_SKIP_GMAIL_WATCHER="${OPENCLAW_SKIP_GMAIL_WATCHER:-1}"
+  export OPENCLAW_WATCH_MODE="${OPENCLAW_WATCH_MODE:-0}"
+  export OPENCLAW_SKILLS_WATCH="${OPENCLAW_SKILLS_WATCH:-0}"
+  # Raise the soft fd limit for long benchmark runs when the shell allows it.
+  ulimit -n 65536 >/dev/null 2>&1 || true
 }
 
 ce_apply_baseline_profile() {
@@ -63,7 +77,7 @@ ce_apply_method_profile() {
       ;;
   esac
 
-  export TOKENPILOT_FORCE_GATEWAY_RESTART="${TOKENPILOT_FORCE_GATEWAY_RESTART:-false}"
+  export TOKENPILOT_FORCE_GATEWAY_RESTART="${TOKENPILOT_FORCE_GATEWAY_RESTART:-true}"
   export TOKENPILOT_TASK_STATE_ESTIMATOR_BASE_URL="${TOKENPILOT_TASK_STATE_ESTIMATOR_BASE_URL:-https://www.dmxapi.cn/v1}"
   export TOKENPILOT_TASK_STATE_ESTIMATOR_MODEL="${TOKENPILOT_TASK_STATE_ESTIMATOR_MODEL:-qwen3.5-35b-a3b}"
   export TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS="${TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS:-${CLAW_EVAL_BATCH_TURNS:-1}}"
@@ -97,17 +111,133 @@ ce_prepare_tmp_openclaw_home() {
 
   mkdir -p "${tmp_home}"
   cp -a "${source_state_dir}" "${tmp_state}"
-  rm -rf "${tmp_state}/agents" 2>/dev/null || true
+  rm -rf \
+    "${tmp_state}/agents" \
+    "${tmp_state}/tokenpilot-plugin-state" \
+    "${tmp_state}/ecoclaw-plugin-state" \
+    "${tmp_state}/logs" \
+    "${tmp_state}/completions" \
+    "${tmp_state}/canvas" \
+    "${tmp_state}/cron" \
+    "${tmp_state}/workspace" \
+    "${tmp_state}/extensions/tokenpilot" \
+    "${tmp_state}/extensions/ecoclaw" 2>/dev/null || true
+  mkdir -p "${tmp_state}/agents"
 
   export TOKENPILOT_OPENCLAW_HOME="${tmp_home}"
   export OPENCLAW_CONFIG_PATH="${tmp_state}/openclaw.json"
+  export OPENCLAW_STATE_DIR="${tmp_state}"
   export HOME="${tmp_home}"
   export XDG_CONFIG_HOME="${tmp_home}/.config"
   mkdir -p "${XDG_CONFIG_HOME}"
 
+  local gateway_port proxy_port
+  gateway_port="$(python3 - <<'PY'
+import socket
+s=socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+  proxy_port="$(python3 - <<'PY'
+import socket
+s=socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+  export OPENCLAW_GATEWAY_PORT="${gateway_port}"
+  export TOKENPILOT_GATEWAY_PORT="${gateway_port}"
+  export TOKENPILOT_PROXY_PORT="${proxy_port}"
+
+  python3 - "${OPENCLAW_CONFIG_PATH}" "${gateway_port}" "${proxy_port}" <<'PY'
+import json
+import sys
+
+config_path = sys.argv[1]
+gateway_port = int(sys.argv[2])
+proxy_port = int(sys.argv[3])
+
+with open(config_path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+data.setdefault("gateway", {})["port"] = gateway_port
+data.setdefault("gateway", {}).setdefault("reload", {})["mode"] = "off"
+data.setdefault("gateway", {}).setdefault("reload", {})["debounceMs"] = 1000
+data.setdefault("canvasHost", {})["enabled"] = False
+data.setdefault("canvasHost", {})["liveReload"] = False
+
+agents = data.setdefault("agents", {})
+defaults = agents.setdefault("defaults", {})
+model_cfg = defaults.setdefault("model", {})
+models_cfg = defaults.setdefault("models", {})
+method_model = "tokenpilot/gpt-5.4-mini"
+model_cfg["primary"] = method_model
+model_cfg["fallbacks"] = []
+models_cfg.setdefault(method_model, {})
+
+plugins = data.setdefault("plugins", {})
+allow = plugins.get("allow")
+allow_ids = []
+if isinstance(allow, list):
+    allow_ids = [str(item) for item in allow if isinstance(item, str) and item.strip()]
+# At tmp-home bootstrap time, tokenpilot may not be installed yet.
+# Keep only already-present trusted plugins here; tokenpilot will be added later
+# by ensure_plugin_runtime_config after install succeeds.
+bootstrap_allow = set(allow_ids)
+bootstrap_allow.discard("tokenpilot")
+if "tavily-search" in bootstrap_allow:
+    plugins["allow"] = sorted(bootstrap_allow)
+elif bootstrap_allow:
+    plugins["allow"] = sorted(bootstrap_allow)
+else:
+    plugins.pop("allow", None)
+
+entries = plugins.get("entries")
+if isinstance(entries, dict):
+    entries.pop("tokenpilot", None)
+    entries.pop("ecoclaw", None)
+    if not entries:
+        plugins.pop("entries", None)
+
+installs = plugins.get("installs")
+if isinstance(installs, dict):
+    installs.pop("tokenpilot", None)
+    installs.pop("ecoclaw", None)
+    if not installs:
+        plugins.pop("installs", None)
+
+load_cfg = plugins.get("load")
+if isinstance(load_cfg, dict):
+    paths = load_cfg.get("paths")
+    if isinstance(paths, list):
+        filtered = []
+        for item in paths:
+            if not isinstance(item, str):
+                continue
+            lowered = item.lower()
+            if "/extensions/tokenpilot" in lowered or "/extensions/ecoclaw" in lowered:
+                continue
+            filtered.append(item)
+        if filtered:
+            load_cfg["paths"] = filtered
+        else:
+            plugins.pop("load", None)
+
+with open(config_path, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, ensure_ascii=False, indent=2)
+    fh.write("\n")
+PY
+
+  ce_install_release_plugin
+
   echo "[tmp-openclaw] source=${source_state_dir}"
   echo "[tmp-openclaw] home=${tmp_home}"
   echo "[tmp-openclaw] config=${OPENCLAW_CONFIG_PATH}"
+  echo "[tmp-openclaw] gateway_port=${gateway_port}"
+  echo "[tmp-openclaw] proxy_port=${proxy_port}"
 }
 
 ce_strip_foreground_arg() {
@@ -262,13 +392,14 @@ ce_run_benchmark() {
 
   local resolved_model resolved_judge
   apply_model_runtime_env "${model}"
+  apply_model_runtime_env "${judge}"
   require_method_runtime_env
   apply_runtime_env
   resolved_model="$(resolve_model_alias "${model}")"
   resolved_judge="$(resolve_model_alias "${judge}")"
 
   local -a cmd=(
-    uv run --directory "${CLAW_EVAL_SOURCE_DIR}" --extra mock python -u "${CLAW_EVAL_BENCH_PY}"
+    uv run --directory "${CLAW_EVAL_UV_PROJECT_DIR}" --extra mock python -u "${CLAW_EVAL_BENCH_PY}"
     --tasks-dir "${CLAW_EVAL_TASKS_DIR}"
     --suite "${suite}"
     --phase "${phase}"
@@ -291,6 +422,17 @@ ce_run_benchmark() {
   if [[ "$#" -gt 0 ]]; then
     cmd+=("$@")
   fi
+
+  ensure_plugin_runtime_config
+  sanitize_plugin_runtime_config
+  ensure_pinchbench_exec_approvals
+  validate_openclaw_runtime_config
+  assert_method_runtime_config
+  ensure_openclaw_gateway_running
+  sanitize_plugin_runtime_config
+  ensure_pinchbench_exec_approvals
+  validate_openclaw_runtime_config
+  assert_method_runtime_config
 
   "${cmd[@]}"
 }

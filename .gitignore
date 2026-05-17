@@ -12,6 +12,9 @@ log/
 experiments/pinchbench/save/
 experiments/pinchbench/dataset/save/
 experiments/pinchbench/run/estimator.local.env
+*.local.env
+*.local.sh
+nohup.out
 
 experiments/claw-eval/save/
 experiments/claw-eval/dataset/

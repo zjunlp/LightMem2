@@ -396,8 +396,36 @@ with open(config_path, "r", encoding="utf-8") as f:
 
 plugins = cfg.setdefault("plugins", {})
 load_cfg = plugins.setdefault("load", {})
-load_cfg["paths"] = [plugin_load_path]
-plugins["allow"] = ["tokenpilot"]
+existing_paths = load_cfg.get("paths")
+preserved_paths = []
+if isinstance(existing_paths, list):
+    preserved_paths = [
+        str(path)
+        for path in existing_paths
+        if isinstance(path, str) and path not in ("",)
+    ]
+legacy_roots = {
+    "/mnt/20t/xubuqiang/EcoClaw/代码打包/代码打包/plugins",
+}
+normalized_paths = []
+for path_str in preserved_paths + [plugin_load_path]:
+    if path_str in legacy_roots:
+        continue
+    if path_str not in normalized_paths:
+        normalized_paths.append(path_str)
+load_cfg["paths"] = normalized_paths
+existing_allow = plugins.get("allow")
+preserved_allow = []
+if isinstance(existing_allow, list):
+    preserved_allow = [
+        item for item in existing_allow
+        if isinstance(item, str) and item not in ("ecoclaw",)
+    ]
+next_allow = []
+for item in preserved_allow + ["tokenpilot"]:
+    if item not in next_allow:
+        next_allow.append(item)
+plugins["allow"] = next_allow
 entries = plugins.setdefault("entries", {})
 entries.pop("ecoclaw", None)
 tokenpilot = entries.setdefault("tokenpilot", {})
@@ -740,9 +768,21 @@ tokenpilot_cfg = tokenpilot.get("config")
 def compact(section):
     if not isinstance(section, dict):
         return section
+    task_state_estimator = section.get("taskStateEstimator")
+    if isinstance(task_state_estimator, dict) and "apiKey" in task_state_estimator:
+        task_state_estimator = dict(task_state_estimator)
+        task_state_estimator["apiKey"] = "***REDACTED***" if task_state_estimator.get("apiKey") else ""
+    memory = section.get("memory")
+    if isinstance(memory, dict):
+        memory = dict(memory)
+        distill_provider = memory.get("distillProvider")
+        if isinstance(distill_provider, dict) and "apiKey" in distill_provider:
+            distill_provider = dict(distill_provider)
+            distill_provider["apiKey"] = "***REDACTED***" if distill_provider.get("apiKey") else ""
+            memory["distillProvider"] = distill_provider
     return {
-        "taskStateEstimator": section.get("taskStateEstimator"),
-        "memory": section.get("memory"),
+        "taskStateEstimator": task_state_estimator,
+        "memory": memory,
     }
 
 print(

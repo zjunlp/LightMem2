@@ -1,0 +1,7 @@
+{
+    "id": "claw-eval-mock-tools-ocr",
+    "name": "Claw-Eval Mock Tools: ocr",
+    "description": "Registers only the ocr mock service tools as OpenClaw tools.",
+    "version": "0.1.0",
+    "configSchema": {}
+}

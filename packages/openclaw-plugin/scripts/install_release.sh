@@ -33,6 +33,7 @@ openclaw_cmd() {
 }
 
 sanitize_plugin_config() {
+  local post_install="${1:-0}"
   if [[ ! -f "${CONFIG_PATH}" ]]; then
     return 0
   fi
@@ -59,12 +60,13 @@ sanitize_plugin_config() {
   fi
   fi
 
-  python3 - "${CONFIG_PATH}" <<'PY'
+  python3 - "${CONFIG_PATH}" "${post_install}" <<'PY'
 import json
 import os
 import sys
 
 config_path = sys.argv[1]
+post_install = sys.argv[2] == "1"
 
 with open(config_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
@@ -89,44 +91,53 @@ if isinstance(load_cfg, dict):
 allow = plugins.get("allow")
 if isinstance(allow, list):
     next_allow = [item for item in allow if item != "ecoclaw"]
-    if "tokenpilot" not in next_allow:
+    if post_install and "tokenpilot" not in next_allow:
         next_allow.append("tokenpilot")
     plugins["allow"] = next_allow
 
 entries = plugins.setdefault("entries", {})
 entries.pop("ecoclaw", None)
-tokenpilot = entries.setdefault("tokenpilot", {})
-tokenpilot["enabled"] = True
-tokenpilot_cfg = tokenpilot.setdefault("config", {})
+tokenpilot = entries.get("tokenpilot")
+if not post_install:
+    tokenpilot = None
+    entries.pop("tokenpilot", None)
+else:
+    tokenpilot = entries.setdefault("tokenpilot", {})
+    tokenpilot["enabled"] = True
+    tokenpilot_cfg = tokenpilot.setdefault("config", {})
 
-allowed_top_level = {
-    "enabled",
-    "proxyAutostart",
-    "proxyPort",
-    "proxyBaseUrl",
-    "proxyApiKey",
-    "modules",
-    "eviction",
-    "reduction",
-    "taskStateEstimator",
-    "memory",
-}
-for key in list(tokenpilot_cfg.keys()):
-    if key not in allowed_top_level:
-        tokenpilot_cfg.pop(key, None)
+if post_install:
+    allowed_top_level = {
+        "enabled",
+        "proxyAutostart",
+        "proxyPort",
+        "proxyBaseUrl",
+        "proxyApiKey",
+        "modules",
+        "eviction",
+        "reduction",
+        "taskStateEstimator",
+        "memory",
+    }
+    for key in list(tokenpilot_cfg.keys()):
+        if key not in allowed_top_level:
+            tokenpilot_cfg.pop(key, None)
 
-tokenpilot_cfg["enabled"] = True
-tokenpilot_cfg["proxyAutostart"] = True
+    tokenpilot_cfg["enabled"] = True
+    tokenpilot_cfg["proxyAutostart"] = True
 
-modules = tokenpilot_cfg.get("modules")
-if not isinstance(modules, dict):
-    modules = {}
-tokenpilot_cfg["modules"] = {
-    "stabilizer": bool(modules.get("stabilizer", True)),
-    "policy": bool(modules.get("policy", True)),
-    "reduction": bool(modules.get("reduction", True)),
-    "eviction": bool(modules.get("eviction", False)),
-}
+    modules = tokenpilot_cfg.get("modules")
+    if not isinstance(modules, dict):
+        modules = {}
+    tokenpilot_cfg["modules"] = {
+        "stabilizer": bool(modules.get("stabilizer", True)),
+        "policy": bool(modules.get("policy", True)),
+        "reduction": bool(modules.get("reduction", True)),
+        "eviction": bool(modules.get("eviction", False)),
+    }
+
+if isinstance(entries, dict) and not entries:
+    plugins.pop("entries", None)
 
 with open(config_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -185,14 +196,18 @@ with open(config_path, "w", encoding="utf-8") as f:
 PY
 }
 
-sanitize_plugin_config
+sanitize_plugin_config 0
 
 archive_path="$("${SCRIPT_DIR}/pack_release.sh")"
 prepare_config_for_install
 rm -rf "${INSTALLED_PLUGIN_PATH}" "${LEGACY_INSTALLED_PLUGIN_PATH}"
 
-openclaw_cmd plugins install "${archive_path}"
-sanitize_plugin_config
+mkdir -p "${INSTALLED_PLUGIN_PATH}"
+tmp_extract_dir="$(mktemp -d)"
+tar -xzf "${archive_path}" -C "${tmp_extract_dir}"
+cp -R "${tmp_extract_dir}/package/." "${INSTALLED_PLUGIN_PATH}/"
+rm -rf "${tmp_extract_dir}"
+sanitize_plugin_config 1
 openclaw_cmd gateway restart
 
 printf 'Installed release plugin from %s\n' "${archive_path}"

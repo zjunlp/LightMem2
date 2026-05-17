@@ -95,22 +95,33 @@ function normalizeContentValue(value: any): { value: any; changed: boolean } {
   return normalizeContentNode(value);
 }
 
-function summarizeToolsFingerprint(tools: any): string[] {
-  if (!Array.isArray(tools)) return [];
-  return tools.map((tool) => {
-    if (!tool || typeof tool !== "object") return "unknown";
-    const name = String((tool as any).name ?? (tool as any).type ?? "unknown");
-    const type = String((tool as any).type ?? "unknown");
-    const params = JSON.stringify((tool as any).parameters ?? {});
-    return `${type}:${name}:${params.length}`;
-  });
-}
-
 function findDeveloperPromptText(input: any): string {
   if (!Array.isArray(input)) return "";
   const developer = input.find((item) => item && typeof item === "object" && String(item.role) === "developer");
   if (!developer) return "";
   return extractInputText([developer]);
+}
+
+function stripToolingSectionForKey(text: string): string {
+  const raw = String(text ?? "");
+  const markerA = "## Tooling";
+  const markerB = "\nTOOLS.md does not control tool availability; it is user guidance for how to use external tools.";
+  const start = raw.indexOf(markerA);
+  if (start < 0) return raw;
+  const end = raw.indexOf(markerB, start);
+  if (end < 0) return raw;
+  const toolingEnd = end + markerB.length;
+  const before = raw.slice(0, start).trimEnd();
+  const after = raw.slice(toolingEnd).trimStart();
+  return [before, after].filter(Boolean).join("\n\n").trim();
+}
+
+function stripRuntimeTailForKey(text: string): string {
+  return String(text ?? "")
+    .replace(/(?:\n|^)-\s*WORKDIR:\s*[^\n\r]+/g, "")
+    .replace(/(?:\n|^)-\s*AGENT_ID:\s*[^\n\r]+/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function normalizeStableText(input: string): string {
@@ -126,14 +137,12 @@ function computeStablePromptCacheKey(
   model: string,
   instructions: string,
   developerText: string,
-  tools: any,
 ): string {
   const seed = JSON.stringify({
     v: 3,
     model,
-    instructions: normalizeStableText(instructions),
-    developer: normalizeStableText(developerText),
-    tools: summarizeToolsFingerprint(tools),
+    instructions: "",
+    developer: "",
   });
   const digest = createHash("sha256").update(seed).digest("hex").slice(0, 24);
   return `runtime-pfx-${digest}`;
@@ -170,6 +179,7 @@ export function rewritePayloadForStablePrefix(
   model: string,
   options?: {
     dynamicContextTarget?: "developer" | "user";
+    developerTextForKeyOverride?: string;
   },
 ): {
   promptCacheKey: string;
@@ -260,12 +270,15 @@ export function rewritePayloadForStablePrefix(
     }
   }
 
-  const developerTextForKey = findDeveloperPromptText(payload?.input);
+  const developerTextForKey =
+    typeof options?.developerTextForKeyOverride === "string" && options.developerTextForKeyOverride.trim().length > 0
+      ? options.developerTextForKeyOverride
+      : findDeveloperPromptText(payload?.input);
+  const developerTextForKeyNormalized = stripRuntimeTailForKey(stripToolingSectionForKey(developerTextForKey));
   const stablePromptCacheKey = computeStablePromptCacheKey(
     model,
     String(payload?.instructions ?? ""),
-    developerTextForKey,
-    payload?.tools,
+    developerTextForKeyNormalized,
   );
   payload.prompt_cache_key = stablePromptCacheKey;
   return {
@@ -273,7 +286,7 @@ export function rewritePayloadForStablePrefix(
     userContentRewrites,
     senderMetadataBlocksBefore,
     senderMetadataBlocksAfter,
-    developerTextForKey,
+    developerTextForKey: developerTextForKeyNormalized,
   };
 }
 

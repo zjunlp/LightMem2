@@ -1107,6 +1107,14 @@ const plugin = {
     "Registers Claw-Eval mock service HTTP endpoints as OpenClaw tools.",
 
   register(api) {
+    const shimRegister = api && api.__clawEvalShimRegister === true;
+    const allowDirectRegister = String(process.env.CLAW_EVAL_ENABLE_MAIN_MOCK_TOOLS || "").trim() === "1";
+    if (!shimRegister && !allowDirectRegister) {
+      if (api?.logger) {
+        api.logger.info("[claw-eval-mock-tools] direct registration disabled; use service-specific shim plugins.");
+      }
+      return;
+    }
     if (typeof api.registerTool !== "function") {
       if (api.logger) {
         api.logger.warn("[claw-eval-mock-tools] registerTool unavailable in this OpenClaw version.");

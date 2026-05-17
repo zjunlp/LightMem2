@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+import json
 
 from ..config import PromptConfig
 from ..models.task import TaskDefinition
@@ -37,6 +37,26 @@ def _load_file(path_str: str | None, *, strict: bool) -> tuple[str, str | None]:
     return p.read_text(encoding="utf-8"), str(p)
 
 
+def _render_behavior_rules(cfg: PromptConfig) -> str:
+    r = cfg.behavior_rules
+    return "\n".join([
+        "## Tool Call Style",
+        "Default: do not narrate routine, low-risk tool calls (just call the tool).",
+        "Narrate only when it helps: multi-step work, complex tasks, or sensitive actions.",
+        "Keep narration brief and value-dense.",
+        "Tool-call protocol is strict: use native API tool/function calls only.",
+        "Never emit tool calls as plain text markup (for example: <tool_call>, <function=...>, <parameter=...>).",
+        "If a tool is needed, issue a real tool call block instead of describing or simulating it in text.",
+        "",
+        "## Safety",
+        f"- Safety: {r.safety}",
+        f"- Tool Call Style: {r.tool_call_style}",
+        f"- Reply Tags: {r.reply_tags}",
+        f"- Silent Reply: {r.silent_reply}",
+        f"- Heartbeat: {r.heartbeat}",
+    ])
+
+
 def _render_tool_definitions(task: TaskDefinition, extra_tools: list | None = None) -> str:
     all_tools = list(task.tools) + (extra_tools or [])
     if not all_tools:
@@ -56,26 +76,6 @@ def _render_tool_definitions(task: TaskDefinition, extra_tools: list | None = No
         lines.append(f"- {tool.name}: {tool.description}")
     lines.append("When a first-class tool exists for an action, use the tool directly.")
     return "\n".join(lines)
-
-
-def _render_behavior_rules(cfg: PromptConfig) -> str:
-    r = cfg.behavior_rules
-    return "\n".join([
-        "## Tool Call Style",
-        "Default: do not narrate routine, low-risk tool calls (just call the tool).",
-        "Narrate only when it helps: multi-step work, complex tasks, or sensitive actions.",
-        "Keep narration brief and value-dense.",
-        "Tool-call protocol is strict: use native API tool/function calls only.",
-        "Never emit tool calls as plain text markup (for example: <tool_call>, <function=...>, <parameter=...>).",
-        "If a tool is needed, issue a real tool call block instead of describing or simulating it in text.",
-        "",
-        "## Safety",
-        f"- Safety: {r.safety}",
-        f"- Tool Call Style: {r.tool_call_style}",
-        f"- Reply Tags: {r.reply_tags}",
-        f"- Silent Reply: {r.silent_reply}",
-        f"- Heartbeat: {r.heartbeat}",
-    ])
 
 
 def _render_skills(cfg: PromptConfig) -> str:
@@ -147,30 +147,35 @@ def _render_tool_schemas(task: TaskDefinition, extra_tools: list | None = None) 
         lines.append("```")
     return "\n".join(lines)
 
-
-def build_system_prompt(
+def build_tooling_prompt(
     task: TaskDefinition,
     prompt_cfg: PromptConfig | None,
     *,
     extra_tools: list | None = None,
 ) -> str:
-    """Build a dynamic system prompt from runtime config + task tools.
+    """Build the tool definitions block for the initial user prompt."""
+    if prompt_cfg is None or not prompt_cfg.enabled:
+        return ""
 
-    Args:
-        extra_tools: Additional tool specs (e.g. sandbox tools) to include
-            in the tool definitions and schema sections of the prompt.
-    """
+    blocks: list[str] = [
+        _render_tool_definitions(task, extra_tools),
+    ]
+    if prompt_cfg.include_tool_schema:
+        blocks.append(_render_tool_schemas(task, extra_tools))
+    return "\n\n".join(blocks).strip()
+
+def build_system_prompt(
+    task: TaskDefinition,
+    prompt_cfg: PromptConfig | None,
+) -> str:
+    """Build a dynamic system prompt from runtime config."""
     if prompt_cfg is None or not prompt_cfg.enabled:
         return _LEGACY_SYSTEM_PROMPT
 
     blocks: list[str] = [
         "You are a personal assistant running inside OpenClaw.",
-        _render_tool_definitions(task, extra_tools),
+        _render_behavior_rules(prompt_cfg),
+        _render_skills(prompt_cfg),
+        _render_workspace_blocks(prompt_cfg),
     ]
-    if prompt_cfg.include_tool_schema:
-        blocks.append(_render_tool_schemas(task, extra_tools))
-    blocks.append(_render_behavior_rules(prompt_cfg))
-    blocks.append(_render_skills(prompt_cfg))
-    blocks.append(_render_workspace_blocks(prompt_cfg))
     return "\n\n".join(blocks).strip()
-

@@ -8,9 +8,11 @@ import os
 import random
 import re
 import shutil
+import shlex
 import socket
 import stat
 import subprocess
+import sys
 import time
 import uuid
 import urllib.error
@@ -25,6 +27,20 @@ from lib_tasks import ClawEvalTask
 
 
 DEFAULT_USER_AGENT_MODEL = "tokenpilot/gpt-5.4-mini"
+
+_CLOSURE_TASK_IDS = {
+    "T030_cross_service_meeting",
+    "T031zh_escalation_budget_triage",
+    "T032_escalation_budget_triage",
+    "T033zh_ops_review_dashboard",
+    "T034_ops_review_dashboard",
+    "T035zh_vendor_procurement",
+    "T036_vendor_procurement",
+    "T037zh_incident_postmortem",
+    "T038_incident_postmortem",
+    "T039zh_onboarding_coordinator",
+    "T040_onboarding_coordinator",
+}
 
 
 def _slugify(value: str) -> str:
@@ -148,6 +164,36 @@ def _inject_mock_service_urls(env: Dict[str, str], task: ClawEvalTask) -> Dict[s
             continue
         updated[f"CLAW_EVAL_{name.upper()}_URL"] = f"http://localhost:{port}"
     return updated
+
+
+def _parse_tool_closure_override() -> set[str]:
+    raw = os.environ.get("CLAW_EVAL_TOOL_CLOSURE_TOOLS", "").strip()
+    if not raw:
+        return set()
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _parse_tool_closure_task_scope() -> set[str]:
+    raw = os.environ.get("CLAW_EVAL_TOOL_CLOSURE_TASKS", "").strip()
+    if not raw:
+        return set(_CLOSURE_TASK_IDS)
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _apply_declared_tool_closure(task: ClawEvalTask) -> ClawEvalTask:
+    closure_tools = _parse_tool_closure_override()
+    if not closure_tools:
+        return task
+    scoped_tasks = _parse_tool_closure_task_scope()
+    if task.task_id not in scoped_tasks:
+        return task
+    cloned = copy.deepcopy(task)
+    ordered = sorted(closure_tools)
+    cloned.declared_tools = ordered
+    frontmatter = dict(cloned.frontmatter or {})
+    frontmatter["_declared_tool_closure"] = ordered
+    cloned.frontmatter = frontmatter
+    return cloned
 
 
 def _read_json_with_retry(path: Path, *, attempts: int = 6, sleep_seconds: float = 0.2) -> Dict[str, Any]:
@@ -360,8 +406,6 @@ def _patch_agent_tool_restrictions(agent_id: str, task: ClawEvalTask, config_pat
         "exec",
         "process",
         "browser",
-        "web_search",
-        "web_fetch",
         "pdf",
         "image",
         "memory_search",
@@ -407,8 +451,6 @@ def patch_agent_tool_restrictions_for_tasks(
         "exec",
         "process",
         "browser",
-        "web_search",
-        "web_fetch",
         "pdf",
         "image",
         "memory_search",
@@ -525,8 +567,15 @@ def start_task_services(
             env.setdefault("WEB_SEARCH_FIXTURES", str((task_fixtures_dir / "web" / "search_results.json").resolve()))
             env.setdefault("WEB_FETCH_FIXTURES", str((task_fixtures_dir / "web" / "pages.json").resolve()))
 
+        launch_command = command
+        if command.startswith("python mock_services/") or command.startswith("python3 mock_services/"):
+            suffix = command.split(" ", 1)[1].strip()
+            launch_command = (
+                f"{shlex.quote(sys.executable)} -u {shlex.quote(suffix)}"
+            )
+
         proc = subprocess.Popen(
-            command,
+            launch_command,
             shell=True,
             cwd=str(service_code_root),
             stdout=log_fp,
@@ -1368,7 +1417,9 @@ def execute_task(
 
     for attempt in range(1, max(1, max_attempts) + 1):
         service_offset = (int(time.time() * 1000) % 1000) + (attempt * 1000)
-        run_task = _task_with_available_service_ports(_task_with_service_port_offset(task, service_offset))
+        run_task = _apply_declared_tool_closure(
+            _task_with_available_service_ports(_task_with_service_port_offset(task, service_offset))
+        )
         agent_id = agent_id_override or _make_agent_id(model_id, task.task_id)
         if ensure_agent:
             ensure_agent_exists(agent_id, model_id, workspace_dir, config_path, run_task)
@@ -1458,6 +1509,7 @@ def execute_task(
                     "workspace": str(workspace_dir),
                     "logs_dir": str(logs_dir),
                     "session_file": str(session_file) if session_file else None,
+                    "transcript": transcript,
                     "transcript_entries": len(transcript),
                     "usage": usage,
                     "audit_data": audit_data,

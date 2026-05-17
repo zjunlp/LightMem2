@@ -98,7 +98,7 @@ export type CanonicalEvictionAdapter = (params: {
   stateDir: string;
   sessionId: string;
   messages: any[];
-  registry: { evictableTaskIds: string[] };
+  registry: { evictableTaskIds: string[]; tasks?: Record<string, { title?: string; objective?: string }> };
   enabled: boolean;
   policy: string;
   minBlockChars: number;

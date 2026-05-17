@@ -10,6 +10,10 @@ const MEMORY_FAULT_PROTOCOL_INSTRUCTIONS = [
 
 export function injectMemoryFaultProtocolInstructions(payload: any): boolean {
   if (!payload || typeof payload !== "object") return false;
+  const disableRecoveryProtocol = String(process.env.TOKENPILOT_DISABLE_RECOVERY_PROTOCOL ?? "").trim().toLowerCase();
+  if (disableRecoveryProtocol === "1" || disableRecoveryProtocol === "true" || disableRecoveryProtocol === "yes" || disableRecoveryProtocol === "on") {
+    return false;
+  }
   const current = typeof payload.instructions === "string" ? payload.instructions : "";
   if (current.includes("[Recovery Protocol]")) return false;
   payload.instructions = current

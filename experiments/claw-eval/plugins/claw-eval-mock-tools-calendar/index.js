@@ -17,6 +17,7 @@ export default {
 
     const filteredApi = new Proxy(api, {
       get(target, prop) {
+        if (prop === "__clawEvalShimRegister") return true;
         if (prop !== "registerTool") return target[prop];
         return (factory, opts) => {
           const toolName = (opts && opts.name) || "";

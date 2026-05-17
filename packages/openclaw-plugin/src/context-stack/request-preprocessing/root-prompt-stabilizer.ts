@@ -88,6 +88,22 @@ export function prependTextToContent(content: any, extraText: string): any {
   return extra;
 }
 
+function relocateToolingSectionToEnd(text: string): string {
+  const markerA = "## Tooling";
+  const markerB = "\nTOOLS.md does not control tool availability; it is user guidance for how to use external tools.";
+  const start = text.indexOf(markerA);
+  if (start < 0) return text;
+  const end = text.indexOf(markerB, start);
+  if (end < 0) return text;
+  const toolingEnd = end + markerB.length;
+  const tooling = text.slice(start, toolingEnd).trim();
+  const before = text.slice(0, start).trimEnd();
+  const after = text.slice(toolingEnd).trimStart();
+  const body = [before, after].filter(Boolean).join("\n\n").trim();
+  if (!body) return tooling;
+  return `${body}\n\n${tooling}`;
+}
+
 export function rewriteRootPromptForStablePrefix(promptText: string): RootPromptRewrite {
   const raw = String(promptText ?? "");
   if (!raw.trim()) {
@@ -104,6 +120,7 @@ export function rewriteRootPromptForStablePrefix(promptText: string): RootPrompt
   const agentId = runtimeAgentMatch?.[1]?.trim();
 
   let canonical = raw;
+  canonical = relocateToolingSectionToEnd(canonical);
   if (workdir) {
     canonical = canonical.split(workdir).join("<WORKDIR>");
   }

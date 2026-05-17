@@ -19,6 +19,7 @@ import secrets
 import signal
 import subprocess
 import tempfile
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -142,6 +143,10 @@ def _apply_tokenpilot_runtime_settings(config_path: Path, *, execution_model: st
 
     summary_script = """
 set -euo pipefail
+export OPENCLAW_CONFIG_PATH="$2"
+export HOME="$(dirname "$(dirname "$2")")"
+export XDG_CACHE_HOME="${HOME}/.cache"
+export XDG_CONFIG_HOME="${HOME}/.config"
 source "$1"
 ensure_plugin_runtime_config
 sanitize_plugin_runtime_config
@@ -173,12 +178,19 @@ PY
         handle.write(summary_script)
         helper_script = Path(handle.name)
     try:
-        proc = subprocess.run(
-            ["bash", str(helper_script), str(common_sh), str(config_path)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        try:
+            proc = subprocess.run(
+                ["bash", str(helper_script), str(common_sh), str(config_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            if exc.stdout:
+                print("[runtime-patch:stdout]", exc.stdout, sep="\n", file=sys.stderr)
+            if exc.stderr:
+                print("[runtime-patch:stderr]", exc.stderr, sep="\n", file=sys.stderr)
+            raise
     finally:
         helper_script.unlink(missing_ok=True)
 
@@ -368,6 +380,17 @@ def main() -> None:
             runtime_patch = _apply_tokenpilot_runtime_settings(config_path, execution_model=execution_model)
             if runtime_patch:
                 print(f"[tokenpilot] runtime patch applied: {runtime_patch}")
+            if install_plan.required_plugins:
+                activation_plan = activate_plugins_for_run(
+                    install_plan.required_plugins,
+                    Path(args.plugin_root),
+                    config_path,
+                    runner=run_shell,
+                    backup_path=activation_plan.backup_path,
+                )
+                run_tools = _synchronize_run_tool_allowlist(config_path, selected, all_declared_tools)
+                if run_tools:
+                    print(f"[tools] run-scoped allow entries (post-runtime-patch): {run_tools}")
             print("[status] plugin plan applied")
             if args.execute_tasks:
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -406,6 +429,7 @@ def main() -> None:
                         )
                 for task in selected_tasks:
                     print(f"[task] {task.task_id} ({task.category})")
+                    task_run_dir = run_root / task.task_id
                     raw_result = execute_task(
                         task,
                         model_id=execution_model,
@@ -430,9 +454,10 @@ def main() -> None:
                         task_yaml_path=task.task_yaml_path,
                         execution_result=result,
                         judge_model=judge_model,
+                        artifact_dir=task_run_dir,
                     )
                     result["grading"] = grade.to_dict()
-                    result_path = run_root / task.task_id / "result.json"
+                    result_path = task_run_dir / "result.json"
                     result_path.write_text(
                         json.dumps(result, ensure_ascii=False, indent=2),
                         encoding="utf-8",
@@ -442,7 +467,8 @@ def main() -> None:
                         f"requests={result['usage']['request_count']} "
                         f"input={result['usage']['input_tokens']} "
                         f"cache={result['usage']['cache_read_tokens']} "
-                        f"score={grade.task_score}"
+                        f"score={grade.task_score} "
+                        f"failure_modes={','.join(grade.failure_modes) if grade.failure_modes else '-'}"
                     )
                     results.append(result)
                 summary_path = run_root / "summary.json"

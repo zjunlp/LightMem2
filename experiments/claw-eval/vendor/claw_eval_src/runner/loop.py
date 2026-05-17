@@ -36,7 +36,7 @@ from .compact import (
 from .dispatcher import ToolDispatcher
 from .media_loader import collect_media_references, load_media_from_ref, model_supports_modality, to_content_block
 from .providers.openai_compat import OpenAICompatProvider
-from .system_prompt import build_system_prompt
+from .system_prompt import build_system_prompt, build_tooling_prompt
 from .todo import TodoManager
 
 
@@ -316,11 +316,12 @@ def run_task(
         ))
 
         # Build initial messages
-        system_prompt = build_system_prompt(task, prompt_cfg, extra_tools=sandbox_tool_list)
+        system_prompt = build_system_prompt(task, prompt_cfg)
         if model_cfg and model_cfg.system_prompt_prefix:
             system_prompt = model_cfg.system_prompt_prefix + "\n\n" + system_prompt
         if ua_enabled and ua_cfg.system_prompt_suffix:
             system_prompt = system_prompt + "\n\n" + ua_cfg.system_prompt_suffix
+        tooling_prompt = build_tooling_prompt(task, prompt_cfg, extra_tools=sandbox_tool_list)
         user_content = _build_initial_user_content(
             task,
             trace_id=trace_id,
@@ -328,6 +329,8 @@ def run_task(
             model_cfg=model_cfg,
             media_cfg=media_cfg,
         )
+        if tooling_prompt:
+            user_content = [TextBlock(text=tooling_prompt), *user_content]
         messages: list[Message] = [
             Message(role="system", content=[TextBlock(text=system_prompt)]),
             Message(role="user", content=user_content),

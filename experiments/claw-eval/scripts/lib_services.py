@@ -68,12 +68,12 @@ TOOL_NAME_TO_PLUGIN_IDS: Dict[str, List[str]] = {
     "crm_list_customers": ["claw-eval-mock-tools-crm"],
     "crm_get_customer": ["claw-eval-mock-tools-crm"],
     "crm_export_report": ["claw-eval-mock-tools-crm"],
-    "caption_describe_image": ["claw-eval-mock-tools"],
-    "ocr_extract_text": ["claw-eval-mock-tools"],
-    "config_list_integrations": ["claw-eval-mock-tools"],
-    "config_get_integration": ["claw-eval-mock-tools"],
-    "config_update_integration": ["claw-eval-mock-tools"],
-    "config_notify": ["claw-eval-mock-tools"],
+    "caption_describe_image": ["claw-eval-mock-tools-caption"],
+    "ocr_extract_text": ["claw-eval-mock-tools-ocr"],
+    "config_list_integrations": ["claw-eval-mock-tools-config"],
+    "config_get_integration": ["claw-eval-mock-tools-config"],
+    "config_update_integration": ["claw-eval-mock-tools-config"],
+    "config_notify": ["claw-eval-mock-tools-config"],
     "scheduler_create": ["claw-eval-mock-tools-scheduler"],
     "scheduler_create_job": ["claw-eval-mock-tools-scheduler"],
     "scheduler_delete_job": ["claw-eval-mock-tools-scheduler"],
@@ -99,23 +99,26 @@ SERVICE_NAME_TO_PLUGIN_IDS: Dict[str, List[str]] = {
     "inventory": ["claw-eval-mock-tools-inventory"],
     "rss": ["claw-eval-mock-tools-rss"],
     "crm": ["claw-eval-mock-tools-crm"],
-    "caption": ["claw-eval-mock-tools"],
-    "ocr": ["claw-eval-mock-tools"],
-    "ocr_paper": ["claw-eval-mock-tools"],
-    "ocr_t50": ["claw-eval-mock-tools"],
-    "ocr_t51": ["claw-eval-mock-tools"],
-    "ocr_t52": ["claw-eval-mock-tools"],
-    "ocr_t53": ["claw-eval-mock-tools"],
-    "ocr_t54": ["claw-eval-mock-tools"],
-    "ocr_t55": ["claw-eval-mock-tools"],
-    "ocr_t56": ["claw-eval-mock-tools"],
-    "ocr_t57": ["claw-eval-mock-tools"],
-    "ocr_t58": ["claw-eval-mock-tools"],
-    "ocr_t59": ["claw-eval-mock-tools"],
-    "config": ["claw-eval-mock-tools"],
+    "caption": ["claw-eval-mock-tools-caption"],
+    "ocr": ["claw-eval-mock-tools-ocr"],
+    "ocr_paper": ["claw-eval-mock-tools-ocr"],
+    "ocr_t50": ["claw-eval-mock-tools-ocr"],
+    "ocr_t51": ["claw-eval-mock-tools-ocr"],
+    "ocr_t52": ["claw-eval-mock-tools-ocr"],
+    "ocr_t53": ["claw-eval-mock-tools-ocr"],
+    "ocr_t54": ["claw-eval-mock-tools-ocr"],
+    "ocr_t55": ["claw-eval-mock-tools-ocr"],
+    "ocr_t56": ["claw-eval-mock-tools-ocr"],
+    "ocr_t57": ["claw-eval-mock-tools-ocr"],
+    "ocr_t58": ["claw-eval-mock-tools-ocr"],
+    "ocr_t59": ["claw-eval-mock-tools-ocr"],
+    "config": ["claw-eval-mock-tools-config"],
     "scheduler": ["claw-eval-mock-tools-scheduler"],
     "web_real": [],
 }
+
+
+AUXILIARY_PLUGIN_IDS: Set[str] = {"claw-eval-mock-tools"}
 
 
 @dataclass
@@ -253,20 +256,7 @@ def build_plugin_activation_plan(
     backup_path = backup_path.resolve()
 
     required_plugins = sorted({plugin_id for plugin_id in required_plugin_ids if plugin_id})
-    known_plugin_ids = sorted(
-        {
-            pid
-            for ids in TOOL_NAME_TO_PLUGIN_IDS.values()
-            for pid in ids
-            if pid
-        }
-        | {
-            pid
-            for ids in SERVICE_NAME_TO_PLUGIN_IDS.values()
-            for pid in ids
-            if pid
-        }
-    )
+    known_plugin_ids = sorted(_all_known_claw_eval_plugin_ids())
 
     return PluginActivationPlan(
         required_plugins=required_plugins,
@@ -290,7 +280,7 @@ def _all_known_claw_eval_plugin_ids() -> Set[str]:
         for ids in SERVICE_NAME_TO_PLUGIN_IDS.values()
         for pid in ids
         if pid
-    }
+    } | AUXILIARY_PLUGIN_IDS
 
 
 def _all_known_claw_eval_tool_names() -> Set[str]:
@@ -389,6 +379,8 @@ def activate_plugins_for_run(
     allow = plugins.setdefault("allow", [])
     if not isinstance(allow, list):
         allow = []
+    # Keep non-claw-eval trusted plugins (for example tokenpilot / tavily-search)
+    # and only replace the run-scoped claw-eval mock plugin subset.
     allow = [plugin_id for plugin_id in allow if plugin_id not in _all_known_claw_eval_plugin_ids()]
     for plugin_id in plan.enable_plugin_ids:
         if plugin_id not in allow:

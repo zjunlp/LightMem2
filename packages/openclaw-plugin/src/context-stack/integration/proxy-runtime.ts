@@ -115,7 +115,10 @@ export async function startEmbeddedResponsesProxy(
         }
       }
       const stableRewrite = !proxyPureForward
-        ? helpers.rewritePayloadForStablePrefix(payload, model, { dynamicContextTarget })
+        ? helpers.rewritePayloadForStablePrefix(payload, model, {
+          dynamicContextTarget,
+          developerTextForKeyOverride: developerCanonicalText,
+        })
         : {
           promptCacheKey: typeof payload?.prompt_cache_key === "string" && payload.prompt_cache_key.trim().length > 0
             ? String(payload.prompt_cache_key)

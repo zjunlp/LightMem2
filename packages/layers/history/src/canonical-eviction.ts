@@ -3,12 +3,12 @@ import { createHash } from "node:crypto";
 import { readdir } from "node:fs/promises";
 import {
   archiveContent,
-  buildRecoveryHint,
   readArchive,
 } from "@tokenpilot/runtime-core";
 
 type RegistryLike = {
   evictableTaskIds: string[];
+  tasks?: Record<string, { title?: string; objective?: string }>;
 };
 
 type CanonicalTaskArchiveInfo = {
@@ -130,8 +130,43 @@ function parseEvictedTaskIdFromMessage(
   contentToText: (value: unknown) => string,
 ): string | undefined {
   const text = contentToText(message.content);
-  const match = text.match(/\[Evicted completed task `([^`]+)`\]/);
-  return typeof match?.[1] === "string" && match[1].trim().length > 0 ? match[1].trim() : undefined;
+  const patterns = [
+    /\[Completed task paged out: `([^`]+)`\]/,
+    /\[Evicted completed task `([^`]+)`\]/,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (typeof match?.[1] === "string" && match[1].trim().length > 0) {
+      return match[1].trim();
+    }
+  }
+  return undefined;
+}
+
+function truncateInlineLabel(value: string, maxChars = 96): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+}
+
+function humanizeTaskId(taskId: string): string {
+  return truncateInlineLabel(
+    taskId
+      .replace(/^task[_-]/i, "")
+      .replace(/[_-]+/g, " ")
+      .trim(),
+  );
+}
+
+function visibleTaskLabel(taskId: string, registry: RegistryLike): string | undefined {
+  const task = registry.tasks?.[taskId];
+  const title = typeof task?.title === "string" ? truncateInlineLabel(task.title) : "";
+  if (title) return title;
+  const objective = typeof task?.objective === "string" ? truncateInlineLabel(task.objective) : "";
+  if (objective) return objective;
+  const fallback = humanizeTaskId(taskId);
+  return fallback || undefined;
 }
 
 const canonicalEvictionLocks = new Map<string, Promise<void>>();
@@ -362,15 +397,11 @@ export async function applyCanonicalEviction(params: {
           });
       const originalSize = existingArchive?.originalSize ?? bundle.totalChars;
       if (params.replacementMode === "pointer_stub") {
+        const taskLabel = visibleTaskLabel(taskId, params.registry);
         const stub =
-          `[Evicted completed task \`${taskId}\`] ` +
-          `This earlier task was paged out from canonical context after completion. ` +
-          buildRecoveryHint({
-            dataKey,
-            originalSize,
-            archivePath: archived.archivePath,
-            sourceLabel: params.archiveSourceLabel,
-          });
+          taskLabel
+            ? `[Completed task paged out] We previously completed a task about ${taskLabel}, and it has been paged out from the active context to save space.`
+            : `[Completed task paged out] We previously completed an earlier task, and it has been paged out from the active context to save space.`;
         const representativeStopReason =
           typeof representative.stopReason === "string" && representative.stopReason.trim().length > 0
             ? representative.stopReason
