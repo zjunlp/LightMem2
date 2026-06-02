@@ -42,13 +42,26 @@ type ArchiveLocationParams = {
   archiveDir?: string;
 };
 
+const TRUE_ENV_VALUES = new Set(["1", "true", "yes", "on"]);
+
+export function isMemoryFaultRecoveryEnabled(): boolean {
+  const raw = process.env.TOKENPILOT_MEMORY_FAULT_RECOVERY_ENABLED;
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return true;
+  }
+  return TRUE_ENV_VALUES.has(raw.trim().toLowerCase());
+}
+
 export function buildRecoveryHint(params: {
   dataKey: string;
   originalSize: number;
   archivePath: string;
   sourceLabel: string;
+  enabled?: boolean;
 }): string {
-  const { dataKey, originalSize, archivePath, sourceLabel } = params;
+  const { dataKey, originalSize, archivePath, sourceLabel, enabled } = params;
+  const effectiveEnabled = (enabled ?? true) && isMemoryFaultRecoveryEnabled();
+  if (!effectiveEnabled) return "";
   return (
     `\n\n[${sourceLabel}] Full content omitted to save context (${originalSize.toLocaleString()} chars).\n` +
     `To recover it, call the tool memory_fault_recover with {\"dataKey\":\"${dataKey}\"}.\n` +

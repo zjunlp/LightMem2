@@ -158,6 +158,7 @@ export function planToolResultPersistence(params: {
         originalSize: text.length,
         archivePath: outputFile,
         sourceLabel: "tool_result_persist",
+        enabled: true,
       })
     : "";
 

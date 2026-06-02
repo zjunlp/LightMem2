@@ -128,6 +128,7 @@ const buildDedupStub = (
       originalSize,
       archivePath,
       sourceLabel: "Repeated read deduplicated",
+      enabled: true,
     })
   );
 };

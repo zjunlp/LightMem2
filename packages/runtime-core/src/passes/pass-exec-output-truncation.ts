@@ -144,6 +144,7 @@ const buildTruncationStub = (
       originalSize,
       archivePath,
       sourceLabel: `${toolName} output truncated`,
+      enabled: true,
     })
   );
 };

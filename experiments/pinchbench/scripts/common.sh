@@ -268,12 +268,13 @@ ensure_plugin_runtime_config() {
   local memory_distill_api_key="${TOKENPILOT_MEMORY_DISTILL_API_KEY:-__KEEP__}"
   local memory_distill_model="${TOKENPILOT_MEMORY_DISTILL_MODEL:-__KEEP__}"
   local memory_distill_timeout_ms="${TOKENPILOT_MEMORY_DISTILL_TIMEOUT_MS:-__KEEP__}"
+  local memory_fault_recovery_enabled="${TOKENPILOT_MEMORY_FAULT_RECOVERY_ENABLED:-true}"
   if [[ ! -f "${config_path}" ]]; then
     echo "WARN: openclaw config not found, skip plugin runtime config patch: ${config_path}" >&2
     return 0
   fi
 
-  python3 - "${config_path}" "${proxy_base_url}" "${proxy_api_key}" "${proxy_port}" "${plugin_load_path}" "${proxy_pure_forward}" "${enable_reduction}" "${reduction_trigger_min_chars}" "${reduction_max_tool_chars}" "${reduction_pass_repeated_read_dedup}" "${reduction_pass_tool_payload_trim}" "${reduction_pass_html_slimming}" "${reduction_pass_exec_output_truncation}" "${reduction_pass_agents_startup_optimization}" "${reduction_pass_format_slimming}" "${reduction_pass_format_cleaning}" "${reduction_pass_path_truncation}" "${reduction_pass_image_downsample}" "${reduction_pass_line_number_strip}" "${dynamic_context_target}" "${default_model}" "${exec_host}" "${exec_security}" "${exec_ask}" "${elevated_enabled}" "${elevated_allow_from}" "${enable_eviction}" "${eviction_policy}" "${eviction_min_block_chars}" "${eviction_replacement_mode}" "${task_state_estimator_enabled}" "${task_state_estimator_base_url}" "${task_state_estimator_api_key}" "${task_state_estimator_model}" "${task_state_estimator_request_timeout_ms}" "${task_state_estimator_batch_turns}" "${task_state_estimator_eviction_lookahead_turns}" "${task_state_estimator_completed_summary_max_raw_turns}" "${task_state_estimator_input_mode}" "${task_state_estimator_lifecycle_mode}" "${task_state_estimator_evidence_mode}" "${task_state_estimator_eviction_promotion_policy}" "${task_state_estimator_eviction_promotion_hot_tail_size}" "${memory_enabled}" "${memory_auto_distill}" "${memory_distiller_type}" "${memory_batch_size}" "${memory_top_k}" "${memory_inject_as_system_hint}" "${memory_distill_base_url}" "${memory_distill_api_key}" "${memory_distill_model}" "${memory_distill_timeout_ms}" <<'PATCH_PY'
+  python3 - "${config_path}" "${proxy_base_url}" "${proxy_api_key}" "${proxy_port}" "${plugin_load_path}" "${proxy_pure_forward}" "${enable_reduction}" "${reduction_trigger_min_chars}" "${reduction_max_tool_chars}" "${reduction_pass_repeated_read_dedup}" "${reduction_pass_tool_payload_trim}" "${reduction_pass_html_slimming}" "${reduction_pass_exec_output_truncation}" "${reduction_pass_agents_startup_optimization}" "${reduction_pass_format_slimming}" "${reduction_pass_format_cleaning}" "${reduction_pass_path_truncation}" "${reduction_pass_image_downsample}" "${reduction_pass_line_number_strip}" "${dynamic_context_target}" "${default_model}" "${exec_host}" "${exec_security}" "${exec_ask}" "${elevated_enabled}" "${elevated_allow_from}" "${enable_eviction}" "${eviction_policy}" "${eviction_min_block_chars}" "${eviction_replacement_mode}" "${task_state_estimator_enabled}" "${task_state_estimator_base_url}" "${task_state_estimator_api_key}" "${task_state_estimator_model}" "${task_state_estimator_request_timeout_ms}" "${task_state_estimator_batch_turns}" "${task_state_estimator_eviction_lookahead_turns}" "${task_state_estimator_completed_summary_max_raw_turns}" "${task_state_estimator_input_mode}" "${task_state_estimator_lifecycle_mode}" "${task_state_estimator_evidence_mode}" "${task_state_estimator_eviction_promotion_policy}" "${task_state_estimator_eviction_promotion_hot_tail_size}" "${memory_enabled}" "${memory_auto_distill}" "${memory_distiller_type}" "${memory_batch_size}" "${memory_top_k}" "${memory_inject_as_system_hint}" "${memory_distill_base_url}" "${memory_distill_api_key}" "${memory_distill_model}" "${memory_distill_timeout_ms}" "${memory_fault_recovery_enabled}" <<'PATCH_PY'
 import json
 import os
 import sys
@@ -332,7 +333,8 @@ import sys
     memory_distill_api_key,
     memory_distill_model,
     memory_distill_timeout_ms_raw,
-) = sys.argv[1:54]
+    memory_fault_recovery_enabled_raw,
+) = sys.argv[1:55]
 
 proxy_port = int(proxy_port_raw)
 proxy_pure_forward = str(proxy_pure_forward_raw).strip().lower() in ("1", "true", "yes", "on")
@@ -377,6 +379,7 @@ keep_memory_distill_base_url = memory_distill_base_url == "__KEEP__"
 keep_memory_distill_api_key = memory_distill_api_key == "__KEEP__"
 keep_memory_distill_model = memory_distill_model == "__KEEP__"
 keep_memory_distill_timeout_ms = memory_distill_timeout_ms_raw == "__KEEP__"
+memory_fault_recovery_enabled = str(memory_fault_recovery_enabled_raw).strip().lower() in ("1", "true", "yes", "on")
 
 if keep_estimator_enabled and (
     (not keep_estimator_base_url and task_state_estimator_base_url.strip())
@@ -527,7 +530,7 @@ model_defaults["fallbacks"] = []
 
 tools = cfg.setdefault("tools", {})
 allow = tools.setdefault("allow", [])
-tools["allow"] = ["memory_fault_recover"]
+tools["allow"] = ["memory_fault_recover"] if memory_fault_recovery_enabled else []
 tools["deny"] = []
 exec_cfg = tools.setdefault("exec", {})
 exec_cfg["host"] = exec_host
