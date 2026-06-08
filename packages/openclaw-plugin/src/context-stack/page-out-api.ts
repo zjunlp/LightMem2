@@ -1,4 +1,14 @@
-export * from "./page-out/transcript-sync.js";
+export {
+  extractTurnObservations,
+  inferObservationPayloadKind,
+  readTranscriptEntriesForSession,
+  readTranscriptMessagesForSession,
+  syncRawSemanticTurnsFromTranscript,
+  transcriptMessageStableId,
+  type StructuredTurnObservation,
+  type TranscriptHelpers,
+  type TranscriptSessionRow,
+} from "./page-out/transcript-sync.js";
 export {
   appendCanonicalTranscript,
   canonicalStatePath,
@@ -8,7 +18,7 @@ export {
   annotateCanonicalMessagesWithTaskAnchors,
   sortedRegistryTurnAnchors,
 } from "@tokenpilot/history";
-export * from "./page-out/canonical-rewrite-adapter.js";
-export * from "./page-out/canonical-eviction-adapter.js";
-export * from "../session/topology.js";
-export * from "../session/turn-bindings.js";
+export { rewriteCanonicalState, syncCanonicalStateFromTranscript } from "./page-out/canonical-rewrite-adapter.js";
+export { applyCanonicalEviction } from "./page-out/canonical-eviction-adapter.js";
+export { createSessionTopologyManager } from "../session/topology.js";
+export { loadRecentTurnBindingsFromState, persistRecentTurnBindingsToState } from "../session/turn-bindings.js";
