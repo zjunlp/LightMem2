@@ -21,7 +21,7 @@ export async function startEmbeddedResponsesProxy(
     `[plugin-runtime] resolved upstream provider=${upstream.providerId} api=${upstream.apiFamily ?? "unknown"} baseUrl=${upstream.baseUrl}`,
   );
 
-  const policyModule = helpers.createPolicyModule(helpers.buildPolicyModuleConfigFromPluginConfig(cfg));
+  const policyModule = helpers.createPolicyModule(helpers.buildPolicyModuleConfigFromPluginConfig(cfg, upstream));
   const reductionPassOptions = cfg.reduction.passOptions ?? {};
   const dynamicContextTarget = cfg.hooks.dynamicContextTarget === "user" ? "user" : "developer";
 

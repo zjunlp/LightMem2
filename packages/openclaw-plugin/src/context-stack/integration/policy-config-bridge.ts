@@ -2,6 +2,7 @@ import type { RuntimeModule, RuntimeModuleRuntime, RuntimeTurnContext } from "@t
 import type { PolicyModuleConfig } from "@tokenpilot/decision";
 import { applyPolicyMonitors } from "./runtime-policy-monitors.js";
 import { asRecord, type NormalizedPluginRuntimeConfig, type PluginLogger } from "./config-types.js";
+import type { UpstreamConfig } from "./upstream-types.js";
 
 const NULL_RUNTIME: RuntimeModuleRuntime = {
   async callModel() {
@@ -9,7 +10,15 @@ const NULL_RUNTIME: RuntimeModuleRuntime = {
   },
 };
 
-export function buildPolicyModuleConfigFromPluginConfig(cfg: NormalizedPluginRuntimeConfig): PolicyModuleConfig {
+export function buildPolicyModuleConfigFromPluginConfig(
+  cfg: NormalizedPluginRuntimeConfig,
+  upstream?: UpstreamConfig | null,
+): PolicyModuleConfig {
+  const fallbackEstimatorModel = upstream?.models?.[0]?.id;
+  const estimatorBaseUrl = cfg.taskStateEstimator.baseUrl ?? upstream?.baseUrl;
+  const estimatorApiKey = cfg.taskStateEstimator.apiKey ?? upstream?.apiKey;
+  const estimatorModel = cfg.taskStateEstimator.model ?? fallbackEstimatorModel;
+
   return {
     localityEnabled: true,
     stateDir: cfg.stateDir,
@@ -22,9 +31,9 @@ export function buildPolicyModuleConfigFromPluginConfig(cfg: NormalizedPluginRun
     taskStateEstimator: cfg.taskStateEstimator.enabled
       ? {
           enabled: true,
-          baseUrl: cfg.taskStateEstimator.baseUrl,
-          apiKey: cfg.taskStateEstimator.apiKey,
-          model: cfg.taskStateEstimator.model,
+          baseUrl: estimatorBaseUrl,
+          apiKey: estimatorApiKey,
+          model: estimatorModel,
           requestTimeoutMs: cfg.taskStateEstimator.requestTimeoutMs,
           batchTurns: cfg.taskStateEstimator.batchTurns,
           evictionLookaheadTurns: cfg.taskStateEstimator.evictionLookaheadTurns,

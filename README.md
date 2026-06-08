@@ -51,6 +51,9 @@ You need:
 
 If OpenClaw itself is not working yet, fix that first. TokenPilot is a runtime plugin on top of OpenClaw, not a standalone agent framework.
 
+The installer expects the `openclaw` command to already be available in your shell.
+By default it uses the standard OpenClaw home and config location under `~/.openclaw`, unless you override that with environment variables such as `TOKENPILOT_OPENCLAW_HOME` or `OPENCLAW_CONFIG_PATH`.
+
 ### Installation Steps
 
 ```bash
@@ -337,9 +340,9 @@ The plugin entry usually lives under:
 | `reduction.passes.memoryFaultRecovery` | `boolean` | `false` | Enable recovery-aware reduction fallback behavior. |
 | `eviction.enabled` | `boolean` | `false` | Enable task-level canonical history eviction. |
 | `taskStateEstimator.enabled` | `boolean` | `false` | Enable the estimator used by lifecycle-aware eviction. |
-| `taskStateEstimator.baseUrl` | `string` | unset | OpenAI-compatible base URL for the estimator model. |
-| `taskStateEstimator.apiKey` | `string` | unset | API key for estimator requests. |
-| `taskStateEstimator.model` | `string` | unset | Model name used by the estimator. |
+| `taskStateEstimator.baseUrl` | `string` | inherited from upstream when unset | OpenAI-compatible base URL for the estimator model. |
+| `taskStateEstimator.apiKey` | `string` | inherited from upstream when unset | API key for estimator requests. |
+| `taskStateEstimator.model` | `string` | inherited from upstream when unset | Model name used by the estimator. |
 | `taskStateEstimator.batchTurns` | `number` | `5` | Minimum turns before running one estimator update. |
 | `taskStateEstimator.evictionLookaheadTurns` | `number` | `3` | Lookahead horizon for completed-to-evictable decisions. |
 | `taskStateEstimator.lifecycleMode` | `string` | `coupled` | Supported values: `coupled`, `decoupled`. |
@@ -388,6 +391,26 @@ If you only want a practical starting point, configure these first:
 - `modules.stabilizer`
 - `modules.reduction`
 - `modules.eviction`
+
+If you enable `taskStateEstimator`, you can either configure its `baseUrl`, `apiKey`, and `model` explicitly, or leave them unset and let TokenPilot fall back to the currently detected upstream provider and its first mirrored model.
+
+Minimal example with upstream fallback:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "tokenpilot": {
+        "config": {
+          "taskStateEstimator": {
+            "enabled": true
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 If you need the full raw schema, see:
 
