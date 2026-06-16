@@ -10,10 +10,10 @@ the plugin, start here.
 
 The public experiment surface is organized by benchmark:
 
-- [`pinchbench/`](./pinchbench/README.md)
+- [`pinchbench/`](./tokenpilot/pinchbench/README.md)
   - LightMem2 runtime baseline/method runners for PinchBench
   - isolated and continuous session modes
-- [`claw-eval/`](./claw-eval/README.md)
+- [`claw-eval/`](./tokenpilot/claw-eval/README.md)
   - LightMem2 OpenClaw runtime adapter for Claw-Eval
   - isolated and continuous execution paths
 
@@ -44,10 +44,10 @@ The benchmark directories assume the runtime path is already working.
 
 The canonical public entrypoints are:
 
-- `experiments/pinchbench/scripts/run_baseline.sh`
-- `experiments/pinchbench/scripts/run_method.sh`
-- `experiments/claw-eval/scripts/run_baseline.sh`
-- `experiments/claw-eval/scripts/run_method.sh`
+- `experiments/tokenpilot/pinchbench/scripts/run_baseline.sh`
+- `experiments/tokenpilot/pinchbench/scripts/run_method.sh`
+- `experiments/tokenpilot/claw-eval/scripts/run_baseline.sh`
+- `experiments/tokenpilot/claw-eval/scripts/run_method.sh`
 
 ## Benchmark index
 
@@ -55,7 +55,7 @@ The canonical public entrypoints are:
 
 See:
 
-- [experiments/pinchbench/README.md](./pinchbench/README.md)
+- [experiments/tokenpilot/pinchbench/README.md](./tokenpilot/pinchbench/README.md)
 
 What it currently covers:
 
@@ -69,7 +69,7 @@ Minimal examples:
 
 ```bash
 cd /path/to/LightMem2
-bash experiments/pinchbench/scripts/run_baseline.sh \
+bash experiments/tokenpilot/pinchbench/scripts/run_baseline.sh \
   --suite automated-only \
   --session-mode isolated \
   --model gpt-5.4-mini
@@ -77,7 +77,7 @@ bash experiments/pinchbench/scripts/run_baseline.sh \
 
 ```bash
 cd /path/to/LightMem2
-bash experiments/pinchbench/scripts/run_method.sh \
+bash experiments/tokenpilot/pinchbench/scripts/run_method.sh \
   --suite automated-only \
   --session-mode continuous \
   --model tokenpilot/gpt-5.4-mini
@@ -87,7 +87,7 @@ bash experiments/pinchbench/scripts/run_method.sh \
 
 See:
 
-- [experiments/claw-eval/README.md](./claw-eval/README.md)
+- [experiments/tokenpilot/claw-eval/README.md](./tokenpilot/claw-eval/README.md)
 
 What it currently covers:
 
@@ -99,7 +99,7 @@ Minimal examples:
 
 ```bash
 cd /path/to/LightMem2
-bash experiments/claw-eval/scripts/run_baseline.sh \
+bash experiments/tokenpilot/claw-eval/scripts/run_baseline.sh \
   --scope suite \
   --suite T001zh_email_triage \
   --session-mode isolated \
@@ -108,7 +108,7 @@ bash experiments/claw-eval/scripts/run_baseline.sh \
 
 ```bash
 cd /path/to/LightMem2
-bash experiments/claw-eval/scripts/run_method.sh \
+bash experiments/tokenpilot/claw-eval/scripts/run_method.sh \
   --scope suite \
   --suite T001zh_email_triage \
   --session-mode isolated \

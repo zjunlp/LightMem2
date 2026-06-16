@@ -12,14 +12,9 @@
   <img src="https://img.shields.io/badge/License-MIT-brightgreen" alt="license">
 </p>
 
-<p align="center">
-  A practical foundation for long-running agent memory and context management
-</p>
 
 ---
 
-**LightMem2** is a modular framework for long-running agent memory and context management.
-This repository currently exposes the OpenClaw-based runtime path of LightMem2, where **TokenPilot** is the current context-management and runtime-optimization component.
 
 <span id='contents'/>
 
@@ -28,8 +23,9 @@ This repository currently exposes the OpenClaw-based runtime path of LightMem2, 
 * <a href='#news'>📢 News</a>
 * <a href='#installation'>🔧 Installation</a>
 * <a href='#quickstart'>⚡ Quick Start</a>
+* <a href='#components'>🧩 Components</a>
 * <a href='#architecture'>🏗️ Architecture</a>
-* <a href='#experiments'>🧪 Experiments & Reproduction</a>
+* <a href='#experiments'>🧪 Experiments</a>
 * <a href='#examples'>💡 Examples</a>
 * <a href='#experimental-results'>📁 Experimental Results</a>
 * <a href='#configuration'>⚙️ Configuration</a>
@@ -160,30 +156,54 @@ The smoke script will:
 - start a local gateway
 - send a minimal `Reply with exactly: pong` request
 
+### 4. Go Deeper
+
+Once the basic runtime path is working, use these component-level docs:
+
+- [components/tokenpilot/README.md](./components/tokenpilot/README.md) for TokenPilot commands, configuration, runtime state, and debugging
+- [experiments/README.md](./experiments/README.md) for benchmark reproduction entrypoints
+
+<span id='components'/>
+
+## 🧩 Components
+
+LightMem2 is intended to host multiple long-running-agent components over time.
+The current public repository is centered on the first released component:
+
+| Component | Role | Main Docs | Experiments |
+| :-- | :-- | :-- | :-- |
+| `TokenPilot` | OpenClaw runtime component for context stabilization, reduction, and lifecycle-aware eviction | [components/tokenpilot/README.md](./components/tokenpilot/README.md) | [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md) |
+
+The root README stays focused on the fastest path to a successful first run.
+Component-specific details live under each component subtree so the repo can scale without turning the root page into a full manual.
+
 <span id='architecture'/>
 
 ## 🏗️ Architecture
 
-The current LightMem2 runtime path is organized around the TokenPilot component, with the OpenClaw adapter, runtime engine, shared contracts, and stateful layers kept separate.
+The current public repository layout is still centered on the TokenPilot runtime workspace inside LightMem2.
+At this stage, the OpenClaw adapter, runtime engine, shared contracts, and stateful layers are kept as separate packages under one repo root.
 
 ```text
 LightMem2/
-├── packages/
-│   ├── openclaw-plugin/    # OpenClaw adapter, hooks, commands, embedded proxy
-│   ├── runtime-core/       # Host-agnostic runtime engine and shared execution logic
-│   ├── kernel/             # Shared types, interfaces, events, and runtime contracts
-│   └── layers/             # Stateful and policy-oriented logic
-│       ├── history/        # Canonical state, raw semantic turns, task registry
-│       ├── decision/       # Policy analysis, reduction/eviction decisions, estimator
-│       └── memory/         # Experimental memory layer; distillation and retrieval are still in progress
-├── docs/                   # Public-facing notes and smoke helpers
-├── experiments/            # Benchmark adapters and evaluation scripts
+├── components/
+│   └── tokenpilot/
+│       └── packages/
+│           ├── openclaw-plugin/  # OpenClaw adapter, hooks, commands, embedded proxy
+│           ├── runtime-core/     # Host-agnostic runtime engine and shared execution logic
+│           ├── kernel/           # Shared types, interfaces, events, and runtime contracts
+│           └── layers/           # Stateful and policy-oriented logic
+│               ├── history/      # Canonical state, raw semantic turns, task registry
+│               ├── decision/     # Policy analysis, reduction/eviction decisions, estimator
+│               └── memory/       # Experimental memory layer; distillation and retrieval are still in progress
+├── docs/                         # Public-facing notes and smoke helpers for the current runtime path
+├── experiments/                  # Benchmark adapters and evaluation scripts for the current runtime path
 └── README.md
 ```
 
 <span id='experiments'/>
 
-## 🧪 Experiments & Reproduction
+## 🧪 Experiments
 
 LightMem2 keeps benchmark adapters, datasets, and runner scripts under:
 
@@ -193,17 +213,17 @@ experiments/
 
 The root entry for experiment reproduction is:
 
-- [experiments/README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/README.md)
+- [experiments/README.md](./experiments/README.md)
 
 The currently documented benchmark subtrees are:
 
-- [experiments/pinchbench/README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/pinchbench/README.md)
-- [experiments/claw-eval/README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/claw-eval/README.md)
+- [experiments/tokenpilot/pinchbench/README.md](./experiments/tokenpilot/pinchbench/README.md)
+- [experiments/tokenpilot/claw-eval/README.md](./experiments/tokenpilot/claw-eval/README.md)
 
 Recommended reproduction flow:
 
 1. Finish the installation steps in this root README and verify the plugin in a real OpenClaw session.
-2. Open [experiments/README.md](/mnt/20t/xubuqiang/EcoClaw/TokenPilot/experiments/README.md) and choose the benchmark you want to reproduce.
+2. Open [experiments/README.md](./experiments/README.md) and choose the benchmark you want to reproduce.
 3. Follow the benchmark-specific README for dataset assets, environment setup, and official runner commands.
 4. Run the benchmark from its `scripts/run_baseline.sh` or `scripts/run_method.sh` entrypoint.
 
@@ -216,9 +236,7 @@ Detailed setup notes, benchmark-specific assets, and exact commands live inside 
 
 ### Runtime Commands
 
-The current TokenPilot component exposes a small command surface inside OpenClaw sessions.
-
-Status and report:
+For a first successful run, the most useful commands are:
 
 ```text
 /tokenpilot status
@@ -226,36 +244,15 @@ Status and report:
 /tokenpilot help
 ```
 
-Stabilizer:
+Typical usage:
 
-```text
-/tokenpilot stabilizer on
-/tokenpilot stabilizer off
-/tokenpilot stabilizer target developer
-/tokenpilot stabilizer target user
-```
+- run `/tokenpilot status` to confirm the component is active
+- run `/tokenpilot report` after a few turns to inspect runtime savings and optimization activity
+- run `/tokenpilot help` to view the full command entrypoint in-session
 
-Reduction:
+For the full TokenPilot command surface and package-level notes, see:
 
-```text
-/tokenpilot reduction on
-/tokenpilot reduction off
-/tokenpilot reduction mode balanced
-/tokenpilot reduction pass toolPayloadTrim off
-```
-
-Eviction:
-
-```text
-/tokenpilot eviction on
-/tokenpilot eviction off
-```
-
-For most users, the recommended default is:
-
-- keep **stabilizer** on
-- keep **reduction** on
-- leave **eviction** for longer continuous workflows or benchmark reproduction
+- [components/tokenpilot/README.md](./components/tokenpilot/README.md)
 
 <span id='experimental-results'/>
 
@@ -282,7 +279,7 @@ The tables below summarize the current LightMem2 runtime path, implemented today
 | AgentSwing | 78.4 | 89.8 | 71.9 | 80.2 | 79.5 | 83.5 | 80.8 | 83.7 | 77.9 | 92.5 | 65.7 | 35.0 | 4.534 | 7.129 | 0.241 | 6.77 |
 | Keep-Last-N | 80.4 | 86.0 | 70.0 | 82.4 | 80.1 | 77.6 | 78.3 | 91.5 | 84.3 | 92.5 | 70.1 | 87.8 | 12.813 | 2.657 | 0.291 | 4.26 |
 | MemOS | 79.4 | 84.2 | 54.4 | 83.1 | 82.3 | 78.2 | 81.1 | 97.2 | 77.6 | 92.5 | 85.9 | 80.2 | 29.018 | 4.573 | 0.492 | 7.81 |
-| **TokenPilot** | **81.0** | 89.0 | 71.2 | 80.0 | 72.6 | 88.9 | 85.3 | 95.2 | 79.4 | 95.0 | 95.2 | 58.0 | 8.893 | 1.933 | 0.244 | **3.22** |
+| **LightMem2** | **81.0** | 89.0 | 71.2 | 80.0 | 72.6 | 88.9 | 85.3 | 95.2 | 79.4 | 95.0 | 95.2 | 58.0 | 8.893 | 1.933 | 0.244 | **3.22** |
 
 #### Continuous Mode
 
@@ -298,9 +295,9 @@ The tables below summarize the current LightMem2 runtime path, implemented today
 | AgentSwing | 78.5 | 86.3 | 67.3 | 89.0 | 79.1 | 82.4 | 87.4 | 68.1 | 72.4 | 93.8 | 61.7 | 83.8 | 12.680 | 5.476 | 0.314 | 6.47 |
 | Keep-Last-N | 79.1 | 86.3 | 67.0 | 87.8 | 87.0 | 77.0 | 85.4 | 77.3 | 75.9 | 95.0 | 56.8 | 75.1 | 18.117 | 4.481 | 0.209 | 5.66 |
 | MemOS | 80.9 | 87.5 | 59.0 | 85.4 | 87.1 | 82.0 | 81.0 | 95.0 | 78.1 | 92.5 | 87.4 | 84.1 | 30.859 | 8.939 | 0.308 | 10.41 |
-| **TokenPilot** | **81.3** | 76.7 | 76.9 | 90.6 | 84.1 | 86.0 | 85.6 | 89.1 | 73.6 | 95.0 | 77.2 | 80.1 | 8.551 | 1.549 | 0.219 | **2.79** |
+| **LightMem2** | **81.3** | 76.7 | 76.9 | 90.6 | 84.1 | 86.0 | 85.6 | 89.1 | 73.6 | 95.0 | 77.2 | 80.1 | 8.551 | 1.549 | 0.219 | **2.79** |
 
-PinchBench abbreviations: Prod=Productivity, Res=Research, Anal=Analysis, Meet=Meeting Analysis, Mem=Memory, Integ=Integrations.
+PinchBench abbreviations: Prod=Productivity, Res=Research, Write=Writing, Code=Coding, Anal=Analysis, CSV=CSV Analysis, Log=Log Analysis, Meet=Meeting Analysis, Mem=Memory, Skill=Skills, Integ=Integrations.
 
 ### Claw-Eval
 
@@ -318,7 +315,7 @@ PinchBench abbreviations: Prod=Productivity, Res=Research, Anal=Analysis, Meet=M
 | AgentSwing | 60.9 | 64.2 | 66.5 | 44.1 | 45.7 | 67.8 | 52.8 | 85.8 | 57.2 | 25.6 | 53.6 | 68.8 | 4.580 | 3.585 | 0.194 | 3.91 |
 | Keep-Last-N | 61.8 | 67.1 | 73.8 | 44.7 | 21.6 | 54.5 | 63.6 | 86.2 | 38.4 | 39.4 | 55.0 | 69.1 | 4.229 | 1.845 | 0.186 | 2.54 |
 | MemOS | 61.6 | 64.7 | 74.2 | 40.9 | 25.2 | 71.2 | 32.0 | 73.6 | 80.2 | 20.0 | 56.2 | 74.6 | 12.582 | 2.709 | 0.363 | 4.61 |
-| **TokenPilot** | 63.1 | 68.1 | 75.4 | 47.0 | 22.3 | 71.8 | 65.0 | 72.0 | 47.8 | 37.0 | 45.6 | 69.9 | 4.436 | 1.154 | 0.239 | **2.27** |
+| **LightMem2** | 63.1 | 68.1 | 75.4 | 47.0 | 22.3 | 71.8 | 65.0 | 72.0 | 47.8 | 37.0 | 45.6 | 69.9 | 4.436 | 1.154 | 0.239 | **2.27** |
 
 #### Continuous Mode
 
@@ -334,9 +331,9 @@ PinchBench abbreviations: Prod=Productivity, Res=Research, Anal=Analysis, Meet=M
 | AgentSwing | 62.2 | 67.6 | 66.5 | 48.6 | 36.8 | 70.0 | 63.8 | 90.7 | 31.7 | 22.4 | 41.0 | 72.8 | 53.776 | 10.027 | 0.907 | 15.63 |
 | Keep-Last-N | 60.7 | 65.3 | 74.0 | 35.5 | 20.8 | 54.1 | 73.6 | 91.9 | 35.7 | 59.5 | 42.4 | 64.7 | 44.812 | 9.106 | 0.780 | 13.70 |
 | MemOS | 57.7 | 55.9 | 65.0 | 56.3 | 22.2 | 44.8 | 64.6 | 68.8 | 89.0 | 20.0 | 39.6 | 71.5 | 49.742 | 25.432 | 0.293 | 24.12 |
-| **TokenPilot** | 60.8 | 58.8 | 61.8 | 52.5 | 32.1 | 64.2 | 57.3 | 89.2 | 65.8 | 76.8 | 45.2 | 70.9 | 21.430 | 9.928 | 0.338 | **10.58** |
+| **LightMem2** | 60.8 | 58.8 | 61.8 | 52.5 | 32.1 | 64.2 | 57.3 | 89.2 | 65.8 | 76.8 | 45.2 | 70.9 | 21.430 | 9.928 | 0.338 | **10.58** |
 
-Claw-Eval abbreviations: Wkfl=Workflow, Off=Office QA, Oprn=Operations, Safe=Safety, Term=Terminal, MM=Multimodal, Oth=Others.
+Claw-Eval abbreviations: Wkfl=Workflow, Ops=Ops, Fin=Finance, Off=Office QA, Comm=Communication, Prod=Productivity, Oprn=Operations, Safe=Safety, Term=Terminal, MM=Multimodal, Oth=Others.
 
 <span id='configuration'/>
 
@@ -375,23 +372,12 @@ The plugin entry usually lives under:
         "enabled": true,
         "config": {
           "enabled": true,
-          "proxyAutostart": true,
-          "proxyPort": 17667,
-          "stateDir": "~/.openclaw/tokenpilot-plugin-state",
+          "proxyBaseUrl": "https://your-openai-compatible-endpoint/v1",
+          "proxyApiKey": "your_api_key",
           "modules": {
             "stabilizer": true,
-            "policy": true,
             "reduction": true,
             "eviction": false
-          },
-          "hooks": {
-            "beforeToolCall": true,
-            "dynamicContextTarget": "developer"
-          },
-          "reduction": {
-            "engine": "layered",
-            "triggerMinChars": 2200,
-            "maxToolChars": 1200
           }
         }
       }
@@ -399,76 +385,6 @@ The plugin entry usually lives under:
   }
 }
 ```
-
-### Common Configuration
-
-| Key | Type | Default | Description |
-| :-- | :-- | :-- | :-- |
-| `enabled` | `boolean` | `true` | Enable TokenPilot plugin hooks. |
-| `proxyBaseUrl` | `string` | unset | OpenAI-compatible upstream base URL used by the embedded proxy. |
-| `proxyApiKey` | `string` | unset | API key used with `proxyBaseUrl`. |
-| `stateDir` | `string` | `~/.openclaw/tokenpilot-plugin-state` | Root directory for TokenPilot runtime state. |
-| `proxyAutostart` | `boolean` | `true` after install | Whether the embedded responses proxy starts automatically. |
-| `proxyPort` | `number` | `17667` | Local port used by the embedded proxy. |
-| `hooks.beforeToolCall` | `boolean` | `true` after install | Enable before-tool-call safety/default injection. |
-| `hooks.dynamicContextTarget` | `string` | `developer` | Where dynamic context is injected. Supported values: `developer`, `user`. |
-| `modules.stabilizer` | `boolean` | `true` | Enable stable-prefix related runtime behavior. |
-| `modules.policy` | `boolean` | `true` | Enable policy/decision plumbing. |
-| `modules.reduction` | `boolean` | `true` | Enable observation reduction execution. |
-| `modules.eviction` | `boolean` | `false` | Enable lifecycle-aware eviction execution. |
-| `reduction.engine` | `string` | `layered` | Reduction engine. Current public value is `layered`. |
-| `reduction.triggerMinChars` | `number` | `2200` | Minimum chars before reduction candidate generation is triggered. |
-| `reduction.maxToolChars` | `number` | `1200` | Target maximum chars for trimmed tool payloads. |
-| `reduction.passes.repeatedReadDedup` | `boolean` | `true` | Deduplicate repeated reads. |
-| `reduction.passes.toolPayloadTrim` | `boolean` | `true` | Trim oversized tool payloads. |
-| `reduction.passes.htmlSlimming` | `boolean` | `true` | Compact noisy HTML content. |
-| `reduction.passes.execOutputTruncation` | `boolean` | `true` | Truncate long execution outputs. |
-| `reduction.passes.agentsStartupOptimization` | `boolean` | `true` | Apply agent startup optimization pass. |
-| `reduction.passes.memoryFaultRecovery` | `boolean` | `false` | Enable recovery-aware reduction fallback behavior. |
-| `eviction.enabled` | `boolean` | `false` | Enable task-level canonical history eviction. |
-| `taskStateEstimator.enabled` | `boolean` | `false` | Enable the estimator used by lifecycle-aware eviction. |
-| `taskStateEstimator.baseUrl` | `string` | inherited from upstream when unset | OpenAI-compatible base URL for the estimator model. |
-| `taskStateEstimator.apiKey` | `string` | inherited from upstream when unset | API key for estimator requests. |
-| `taskStateEstimator.model` | `string` | inherited from upstream when unset | Model name used by the estimator. |
-| `taskStateEstimator.batchTurns` | `number` | `5` | Minimum turns before running one estimator update. |
-| `taskStateEstimator.evictionLookaheadTurns` | `number` | `3` | Lookahead horizon for completed-to-evictable decisions. |
-| `taskStateEstimator.lifecycleMode` | `string` | `coupled` | Supported values: `coupled`, `decoupled`. |
-| `taskStateEstimator.evidenceMode` | `string` | `three_state` | Supported values: `three_state`, `two_state`. |
-| `taskStateEstimator.inputMode` | `string` | `completed_summary_plus_active_turns` | Supported values: `sliding_window`, `completed_summary_plus_active_turns`. |
-| `ux.details` | `boolean` | `false` | Show module-level details in TokenPilot report surfaces. |
- 
-### Advanced Configuration
-
-| Key | Type | Default | Description |
-| :-- | :-- | :-- | :-- |
-| `logLevel` | `string` | `info` | Plugin log verbosity. Supported values: `info`, `debug`. |
-| `debugTapProviderTraffic` | `boolean` | `false` | Debug-only provider traffic tap. |
-| `debugTapPath` | `string` | unset | Optional output path for tapped provider traffic. |
-| `proxyMode.pureForward` | `boolean` | `false` | Disable proxy-side rewriting and only forward traffic. |
-| `hooks.toolResultPersist` | `boolean` | `false` | Persist oversized tool results as external artifacts. |
-| `reduction.passOptions.formatSlimming.enabled` | `boolean` | `true` | Enable lightweight formatting cleanup. |
-| `reduction.passOptions.formatCleaning.enabled` | `boolean` | `true` | Enable additional formatting cleanup. |
-| `reduction.passOptions.pathTruncation.enabled` | `boolean` | `true` | Enable path shortening. |
-| `reduction.passOptions.imageDownsample.enabled` | `boolean` | `true` | Enable image downsampling. |
-| `reduction.passOptions.lineNumberStrip.enabled` | `boolean` | `true` | Enable line-number removal for noisy reads. |
-| `eviction.policy` | `string` | `noop` | Eviction policy. Supported values: `noop`, `lru`, `lfu`, `gdsf`, `model_scored`. |
-| `eviction.maxCandidateBlocks` | `number` | `128` after install | Upper bound on eviction candidates. |
-| `eviction.minBlockChars` | `number` | `256` after install | Minimum block size considered for eviction. |
-| `eviction.replacementMode` | `string` | `pointer_stub` | How evicted content is replaced. Supported values: `pointer_stub`, `drop`. |
-| `taskStateEstimator.requestTimeoutMs` | `number` | `60000` | Estimator request timeout. |
-| `taskStateEstimator.completedSummaryMaxRawTurns` | `number` | `0` | Optional cap for raw turns before completed-task summaries are used. |
-| `taskStateEstimator.evictionPromotionPolicy` | `string` | `fifo` | Promotion policy used in decoupled mode. |
-| `taskStateEstimator.evictionPromotionHotTailSize` | `number` | `1` | Number of most-recent completed tasks kept hot before promotion. |
-| `contextEngine.enabled` | `boolean` | `true` after install | Enable canonical-state context pruning logic. |
-| `contextEngine.pruneThresholdChars` | `number` | `100000` | Prune older tool results when canonical chars exceed this threshold. |
-| `contextEngine.keepRecentToolResults` | `number` | `5` | Number of recent tool results to keep unpruned. |
-| `contextEngine.placeholder` | `string` | `[pruned]` | Placeholder used after canonical pruning. |
-| `memory.enabled` | `boolean` | `false` | Enable procedural memory features. |
-| `memory.autoDistill` | `boolean` | `false` | Distill evicted tasks into skills asynchronously. |
-| `memory.distillerType` | `string` | `prompting` | Supported values: `prompting`, `autoskill`, `ctx2skill`. |
-| `memory.batchSize` | `number` | `2` | Background distillation batch size. |
-| `memory.topK` | `number` | `0` | Maximum number of retrieved skills injected per request. |
-| `memory.injectAsSystemHint` | `boolean` | `false` | Inject retrieved skills as a system hint instead of a user-prefix. |
 
 If you only want a practical starting point, configure these first:
 
@@ -479,22 +395,9 @@ If you only want a practical starting point, configure these first:
 - `modules.reduction`
 - `modules.eviction`
 
-If you enable `taskStateEstimator`, you can either configure its `baseUrl`, `apiKey`, and `model` explicitly, or leave them unset and let TokenPilot fall back to the currently detected upstream provider and its first mirrored model.
+For most first-time users, that is enough to validate the runtime path end-to-end.
+Estimator options, advanced reduction passes, memory settings, runtime state layout, and debugging details are intentionally documented at the component level rather than duplicated here.
 
-Minimal example with upstream fallback:
+For the full TokenPilot configuration reference, advanced options, runtime state layout, and debugging notes, see:
 
-```json
-{
-  "plugins": {
-    "entries": {
-      "tokenpilot": {
-        "config": {
-          "taskStateEstimator": {
-            "enabled": true
-          }
-        }
-      }
-    }
-  }
-}
-```
+- [components/tokenpilot/README.md](./components/tokenpilot/README.md)
