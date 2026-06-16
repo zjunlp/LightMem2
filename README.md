@@ -24,6 +24,7 @@
 * <a href='#installation'>🔧 Installation</a>
 * <a href='#quickstart'>⚡ Quick Start</a>
 * <a href='#components'>🧩 Components</a>
+* <a href='#visual-results'>🖼️ Visual Results</a>
 * <a href='#architecture'>🏗️ Architecture</a>
 * <a href='#experiments'>🧪 Experiments</a>
 * <a href='#examples'>💡 Examples</a>
@@ -86,7 +87,6 @@ lightmem2/gpt-5.4-mini
 ```
 
 For the current LightMem2 runtime path, use a `lightmem2/...` model instead of your original provider model.
-The legacy `tokenpilot/...` model namespace is still supported for compatibility.
 
 ### 2. Verify It in a Real Session
 
@@ -112,11 +112,13 @@ For a fuller runtime summary, run:
 ```text
 /lightmem2 report
 /lightmem2 doctor
+/lightmem2 visual
 ```
 
-The legacy `/tokenpilot ...` command surface is still supported for compatibility.
 `/lightmem2 doctor` is the quickest integration self-check for the current
 OpenClaw adapter surface.
+`/lightmem2 visual` opens the local visual inspector for stability, reduction,
+and eviction snapshots.
 
 ### 3. Run the Built-In Smoke Test
 
@@ -137,7 +139,6 @@ If your machine does **not** need an upstream HTTP proxy, also clear:
 export LIGHTMEM2_UPSTREAM_HTTP_PROXY=
 export LIGHTMEM2_UPSTREAM_HTTPS_PROXY=
 ```
-The legacy `TOKENPILOT_*` environment variable names are still supported for compatibility.
 
 The smoke script will:
 
@@ -164,6 +165,35 @@ LightMem2 is intended to host multiple long-running-agent components over time.
 | Component | Role | Main Docs | Experiments |
 | :-- | :-- | :-- | :-- |
 | `TokenPilot` | Runtime component for context stabilization, reduction, and lifecycle-aware eviction | [components/tokenpilot/README.md](./components/tokenpilot/README.md) | [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md) |
+
+<span id='visual-results'/>
+
+## 🖼️ Visual Results
+
+The screenshots below come from the built-in visual inspector opened with:
+
+```text
+/lightmem2 visual
+```
+
+<details>
+<summary><strong>TokenPilot</strong> runtime effects</summary>
+
+<br>
+
+Stable-prefix view:
+
+![TokenPilot stabilizer view](./figs/tokenpilot/stabilizer.png)
+
+Reduction view:
+
+![TokenPilot reduction view](./figs/tokenpilot/reduction.png)
+
+Eviction view:
+
+![TokenPilot eviction view](./figs/tokenpilot/eviction.png)
+
+</details>
 
 <span id='architecture'/>
 
@@ -238,6 +268,7 @@ The first in-session commands to care about are:
 /lightmem2 status
 /lightmem2 report
 /lightmem2 doctor
+/lightmem2 visual
 /lightmem2 help
 ```
 
@@ -246,6 +277,7 @@ Use them in that order:
 - `/lightmem2 status` confirms the component is active
 - `/lightmem2 report` shows savings after a few turns
 - `/lightmem2 doctor` checks the current OpenClaw adapter installation and config surface
+- `/lightmem2 visual` opens the local visualization page for runtime effects
 - `/lightmem2 help` shows the full command surface
 
 For full command details, runtime state, and debugging notes, see:
@@ -342,13 +374,15 @@ Claw-Eval abbreviations: Wkfl=Workflow, Ops=Ops, Fin=Finance, Off=Office QA, Com
 
 ## ⚙️ Configuration
 
-The configuration below is for the current **LightMem2 OpenClaw runtime path**, which is currently surfaced through the TokenPilot component in your OpenClaw config:
+For the current public runtime path, LightMem2 is configured through the
+OpenClaw plugin entry in:
 
 ```text
 ~/.openclaw/openclaw.json
 ```
 
-The plugin entry usually lives under:
+At the moment, the runtime component is still mounted under the `tokenpilot`
+plugin entry:
 
 ```json
 {
@@ -365,7 +399,7 @@ The plugin entry usually lives under:
 }
 ```
 
-### Minimal Example
+### Minimal Runtime Config
 
 ```json
 {
@@ -389,7 +423,7 @@ The plugin entry usually lives under:
 }
 ```
 
-If you only want a practical starting point, configure these first:
+For a first successful run, only these fields matter:
 
 - `enabled`
 - `proxyBaseUrl`
@@ -398,9 +432,33 @@ If you only want a practical starting point, configure these first:
 - `modules.reduction`
 - `modules.eviction`
 
-For most first-time users, that is enough to validate the runtime path end-to-end.
-Estimator options, advanced reduction passes, memory settings, runtime state layout, and debugging details are intentionally documented at the component level rather than duplicated here.
+Recommended starting behavior:
 
-For the full TokenPilot configuration reference, advanced options, runtime state layout, and debugging notes, see:
+- keep `stabilizer` enabled
+- keep `reduction` enabled
+- leave `eviction` off until the basic runtime path is already working
+
+If you do not want to hardcode provider credentials in `openclaw.json`, you can
+also supply them through environment variables before starting OpenClaw:
+
+```bash
+export LIGHTMEM2_API_KEY="your_api_key"
+export LIGHTMEM2_BASE_URL="https://your-openai-compatible-endpoint/v1"
+```
+
+If your OpenClaw home or config path is not under the default location, you can
+also override:
+
+```bash
+export LIGHTMEM2_OPENCLAW_HOME="/path/to/openclaw-home"
+export OPENCLAW_CONFIG_PATH="/path/to/openclaw.json"
+```
+
+
+Advanced estimator options, reduction-pass tuning, memory settings, runtime
+state layout, and debugging details are intentionally kept out of the root
+README.
+
+For the full component-level configuration reference, see:
 
 - [components/tokenpilot/README.md](./components/tokenpilot/README.md)
