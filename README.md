@@ -528,14 +528,11 @@ Please cite our paper if you use LightMem2 in your work.
   url={https://openreview.net/forum?id=dyJ0GWpjJB}
 }
 
-@misc{xu2026tokenpilotcacheefficientcontextmanagement,
+@article{xu2026tokenpilot,
   title={TokenPilot: Cache-Efficient Context Management for LLM Agents},
-  author={Buqiang Xu and Zirui Xue and Dianmou Chen and Chenyang Fu and Chiyu Wu and Caiying Huang and Chen Jiang and Jizhan Fang and Xinle Deng and Yijun Chen and Yunzhi Yao and Xuehai Wang and Jin Shang and Gong Yu and Ningyu Zhang},
-  year={2026},
-  eprint={2606.17016},
-  archivePrefix={arXiv},
-  primaryClass={cs.CL},
-  url={https://arxiv.org/abs/2606.17016},
+  author={Xu, Buqiang and Xue, Zirui and Chen, Dianmou and Fu, Chenyang and Wu, Chiyu and Huang, Caiying and Jiang, Chen and Fang, Jizhan and Deng, Xinle and Chen, Yijun and others},
+  journal={arXiv preprint arXiv:2606.17016},
+  year={2026}
 }
 ```
 
