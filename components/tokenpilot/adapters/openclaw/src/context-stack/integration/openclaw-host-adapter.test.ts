@@ -185,7 +185,7 @@ test("syncOpenClawPayloadFromEnvelope preserves object identity while replacing 
   const originalRef = rawPayload;
   const envelope = codec.decodeRequest(rawPayload);
   envelope.messages = [
-    { role: "developer", content: "rewritten" },
+    { role: "system", content: "rewritten" },
     { role: "user", content: "after" },
   ];
   envelope.instructions = "updated instructions";
@@ -195,7 +195,7 @@ test("syncOpenClawPayloadFromEnvelope preserves object identity while replacing 
   assert.equal(synced, originalRef);
   assert.equal(rawPayload.instructions, "updated instructions");
   assert.deepEqual(rawPayload.input, [
-    { role: "developer", content: "rewritten" },
+    { role: "system", content: "rewritten" },
     { role: "user", content: "after" },
   ]);
 });

@@ -40,6 +40,7 @@ function createMockResponse() {
   res.getHeader = (name: string) => headers.get(name.toLowerCase());
   res.hasHeader = (name: string) => headers.has(name.toLowerCase());
   const originalOn = res.on.bind(res);
+  const originalEnd = res.end.bind(res);
   res.on = ((event: string, handler: () => void) => {
     if (event in events) {
       events[event].push(handler);
@@ -48,7 +49,7 @@ function createMockResponse() {
   }) as any;
   res.end = ((chunk?: string) => {
     if (typeof chunk === "string") body += chunk;
-    Writable.prototype.end.call(res);
+    return originalEnd();
   }) as any;
   res.body = () => body;
   res.closeNow = () => {
