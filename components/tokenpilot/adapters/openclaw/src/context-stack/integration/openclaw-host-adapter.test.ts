@@ -80,6 +80,44 @@ test("openclaw payload codec decodes and re-encodes request envelope", () => {
   assert.equal(encoded.previous_response_id, "resp-next");
 });
 
+test("openclaw payload codec removes cleared request metadata on encode", () => {
+  const sessionResolver = createOpenClawSessionResolver({
+    resolveSessionIdForPayload: () => "session-codec-clear",
+    extractInputText: () => "",
+  });
+  const codec = createOpenClawPayloadCodec(
+    {
+      resolveSessionIdForPayload: () => "session-codec-clear",
+      extractInputText: () => "",
+    },
+    sessionResolver,
+  );
+
+  const decoded = codec.decodeRequest({
+    model: "tokenpilot/gpt-5.4-mini",
+    stream: false,
+    instructions: "developer instructions",
+    input: [{ role: "user", content: "hello" }],
+    prompt_cache_key: "runtime-pfx-demo",
+    prompt_cache_retention: "24h",
+    previous_response_id: "resp-prev",
+  });
+
+  decoded.instructions = undefined;
+  decoded.metadata = {
+    ...(decoded.metadata ?? {}),
+    promptCacheKey: undefined,
+    promptCacheRetention: undefined,
+    previousResponseId: undefined,
+  };
+
+  const encoded = codec.encodeRequest(decoded) as any;
+  assert.equal("instructions" in encoded, false);
+  assert.equal("prompt_cache_key" in encoded, false);
+  assert.equal("prompt_cache_retention" in encoded, false);
+  assert.equal("previous_response_id" in encoded, false);
+});
+
 test("syncOpenClawPayloadFromEnvelope mutates raw payload in place", () => {
   const sessionResolver = createOpenClawSessionResolver({
     resolveSessionIdForPayload: () => "session-sync",
@@ -123,6 +161,43 @@ test("syncOpenClawPayloadFromEnvelope mutates raw payload in place", () => {
   assert.equal("prompt_cache_retention" in rawPayload, false);
   assert.equal("previous_response_id" in rawPayload, false);
   assert.equal(rawPayload.staleField, "remove-me");
+});
+
+test("syncOpenClawPayloadFromEnvelope preserves object identity while replacing synchronized fields", () => {
+  const sessionResolver = createOpenClawSessionResolver({
+    resolveSessionIdForPayload: () => "session-sync-identity",
+    extractInputText: () => "",
+  });
+  const codec = createOpenClawPayloadCodec(
+    {
+      resolveSessionIdForPayload: () => "session-sync-identity",
+      extractInputText: () => "",
+    },
+    sessionResolver,
+  );
+  const rawPayload: any = {
+    model: "tokenpilot/gpt-5.4-mini",
+    stream: false,
+    instructions: "before instructions",
+    input: [{ role: "user", content: "before" }],
+    tools: [{ type: "function", name: "search" }],
+  };
+  const originalRef = rawPayload;
+  const envelope = codec.decodeRequest(rawPayload);
+  envelope.messages = [
+    { role: "developer", content: "rewritten" },
+    { role: "user", content: "after" },
+  ];
+  envelope.instructions = "updated instructions";
+
+  const synced = syncOpenClawPayloadFromEnvelope(rawPayload, envelope, codec);
+
+  assert.equal(synced, originalRef);
+  assert.equal(rawPayload.instructions, "updated instructions");
+  assert.deepEqual(rawPayload.input, [
+    { role: "developer", content: "rewritten" },
+    { role: "user", content: "after" },
+  ]);
 });
 
 test("openclaw payload codec decodes response envelope metadata and tool calls", () => {

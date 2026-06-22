@@ -38,7 +38,7 @@ import { makeLogger } from "./context-stack/integration/runtime-helpers.js";
 import { detectUpstreamConfig, normalizeProxyModelId } from "./context-stack/integration/upstream-config.js";
 import { requestUpstreamResponses, requestUpstreamResponsesStream } from "./context-stack/integration/upstream-transport.js";
 import { responsesPayloadToChatCompletions, chatCompletionsToResponsesText } from "./context-stack/integration/upstream-adapter.js";
-import { isSseContentType } from "./context-stack/integration/upstream-sse.js";
+import { convertChatCompletionsSseToResponsesSse, isSseContentType } from "./context-stack/integration/upstream-sse.js";
 import { normalizeConfig } from "./context-stack/integration/config-normalize.js";
 import { prepareProxyRequest } from "./context-stack/integration/proxy-runtime-request.js";
 import { recordStreamingUxEffect } from "./context-stack/integration/proxy-runtime-stream.js";
@@ -112,6 +112,7 @@ export const proxyRuntimeHelpers = {
   requestUpstreamResponsesStream,
   applyLayeredReductionAfterCall,
   applyLayeredReductionAfterCallToSse,
+  convertChatCompletionsSseToResponsesSse,
   isSseContentType,
   countTokensWithFallback,
   recordUxEffect,
@@ -247,6 +248,7 @@ export const __testHooks = {
   normalizeConfig,
   responsesPayloadToChatCompletions,
   chatCompletionsToResponsesText,
+  convertChatCompletionsSseToResponsesSse,
   prepareProxyRequest: (args: {
     cfg: any;
     logger?: any;
@@ -279,6 +281,8 @@ export const __testHooks = {
     dynamicContextTarget: args.dynamicContextTarget ?? "developer",
   }),
   recordStreamingUxEffect,
+  applyLayeredReductionAfterCall,
+  applyLayeredReductionAfterCallToSse,
   appendStabilityVisualSnapshot,
   appendReductionVisualSnapshot,
   appendEvictionVisualSnapshot,

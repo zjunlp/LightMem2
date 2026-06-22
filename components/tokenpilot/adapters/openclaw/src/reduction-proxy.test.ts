@@ -40,6 +40,7 @@ const hooks = plugin.__testHooks as {
   normalizeConfig: (raw: unknown) => any;
   responsesPayloadToChatCompletions: (payload: any) => any;
   chatCompletionsToResponsesText: (raw: string) => string;
+  convertChatCompletionsSseToResponsesSse: (rawSse: string) => string;
   prepareProxyRequest: (args: {
     cfg: any;
     logger?: any;
@@ -76,6 +77,43 @@ const hooks = plugin.__testHooks as {
     streamChunks: Buffer[];
     reductionApplied?: { savedChars?: number } | null;
   }) => Promise<void>;
+  applyLayeredReductionAfterCall: (
+    requestPayload: any,
+    parsedResponse: any,
+    maxToolChars: number,
+    triggerMinChars: number,
+    sessionId: string,
+    passToggles: Record<string, unknown> | undefined,
+    passOptions: Record<string, Record<string, unknown>> | undefined,
+    helpers: any,
+  ) => Promise<{
+    changed: boolean;
+    savedChars: number;
+    passCount: number;
+    skippedReason?: string;
+    report?: Array<any>;
+  }>;
+  applyLayeredReductionAfterCallToSse: (
+    requestPayload: any,
+    rawSse: string,
+    maxToolChars: number,
+    triggerMinChars: number,
+    sessionId: string,
+    passToggles: Record<string, unknown> | undefined,
+    passOptions: Record<string, Record<string, unknown>> | undefined,
+    helpers: any,
+  ) => Promise<{
+    text: string;
+    reduction: {
+      changed: boolean;
+      savedChars: number;
+      passCount: number;
+      skippedReason?: string;
+      mode?: "json" | "sse";
+      patchedEvents?: number;
+      report?: Array<any>;
+    };
+  }>;
   appendStabilityVisualSnapshot: (stateDir: string, snapshot: any) => Promise<void>;
   appendReductionVisualSnapshot: (stateDir: string, snapshot: any) => Promise<void>;
   appendEvictionVisualSnapshot: (stateDir: string, snapshot: any) => Promise<void>;
@@ -498,6 +536,303 @@ test("prepareProxyRequest does not roll back payload mutations made after stable
   );
   assert.equal(prepared.payload.input[prepared.payload.input.length - 1].content, "reduction mutation survives");
   assert.equal(prepared.requestEnvelope.messages[prepared.requestEnvelope.messages.length - 1].content, "reduction mutation survives");
+  assert.equal(prepared.payload.prompt_cache_key, "runtime-pfx-test");
+  assert.equal(prepared.payload.prompt_cache_retention, "24h");
+  assert.equal(prepared.requestEnvelope.metadata?.promptCacheKey, "runtime-pfx-test");
+  assert.equal(prepared.requestEnvelope.metadata?.promptCacheRetention, "24h");
+});
+
+test("prepareProxyRequest preserves stable prefix, memory injection, and reduction mutations together", async () => {
+  const cfg = hooks.normalizeConfig({
+    modules: {
+      policy: false,
+      reduction: true,
+    },
+    memory: {
+      enabled: true,
+      topK: 2,
+      injectAsSystemHint: false,
+    },
+  });
+
+  const payload: any = {
+    model: "tokenpilot/gpt-5.4-mini",
+    input: [
+      {
+        role: "developer",
+        content: "Runtime: agent=test-agent | host=demo\nYour working directory is: /tmp/demo\n\nDeveloper prompt",
+      },
+      {
+        role: "user",
+        content: "Please continue the task.",
+      },
+      {
+        role: "tool",
+        content: "T".repeat(3000),
+      },
+    ],
+  };
+
+  const prepared = await hooks.prepareProxyRequest({
+    cfg,
+    payload,
+    resolveSessionIdForPayload: () => "session-stable-memory-reduction",
+    helpers: {
+      ...hooks,
+      injectMemoryFaultProtocolInstructions: () => false,
+      rewritePayloadForStablePrefix: (inputPayload: any) => {
+        inputPayload.prompt_cache_key = "runtime-pfx-combined";
+        const developer = inputPayload.input[0];
+        developer.content = String(developer.content).replace("/tmp/demo", "<WORKDIR>");
+        return {
+          promptCacheKey: "runtime-pfx-combined",
+          userContentRewrites: 0,
+          senderMetadataBlocksBefore: 0,
+          senderMetadataBlocksAfter: 0,
+        };
+      },
+      appendTaskStateTrace: async () => undefined,
+      applyProxyReductionToInput: async (inputPayload: any) => {
+        inputPayload.input.push({
+          role: "user",
+          content: "reduction mutation survives",
+        });
+        return {
+          changedItems: 1,
+          changedBlocks: 1,
+          savedChars: 1234,
+          diagnostics: {
+            skippedReason: "none",
+          },
+        };
+      },
+    },
+    logger: {
+      info: () => undefined,
+      warn: () => undefined,
+      error: () => undefined,
+      debug: () => undefined,
+    } as any,
+  });
+
+  const userMessages = prepared.payload.input.filter((item: any) => item.role === "user");
+  assert.match(String(prepared.payload.input[0].content), /<WORKDIR>/);
+  assert.equal(prepared.payload.prompt_cache_key, "runtime-pfx-combined");
+  assert.equal(prepared.requestEnvelope.metadata?.promptCacheKey, "runtime-pfx-combined");
+  assert.equal(prepared.requestEnvelope.metadata?.promptCacheRetention, "24h");
+  assert.equal(String(userMessages[0]?.content), "Please continue the task.");
+  assert.equal(String(userMessages[userMessages.length - 1]?.content), "reduction mutation survives");
+  assert.equal(
+    prepared.requestEnvelope.messages[prepared.requestEnvelope.messages.length - 1]?.content,
+    "reduction mutation survives",
+  );
+});
+
+test("applyLayeredReductionAfterCall rewrites responses JSON output text through after-call passes", async () => {
+  const requestPayload: any = {
+    input: [
+      { role: "user", content: "Summarize the results." },
+    ],
+  };
+  const parsedResponse: any = {
+    id: "resp_after_1",
+    output: [
+      {
+        type: "message",
+        content: [
+          {
+            type: "output_text",
+            text: "  Result path: /very/long/workspace/path/project/src/app.ts  \n\n\nDone.  ",
+          },
+        ],
+      },
+    ],
+    output_text: "  Result path: /very/long/workspace/path/project/src/app.ts  \n\n\nDone.  ",
+  };
+
+  const result = await hooks.applyLayeredReductionAfterCall(
+    requestPayload,
+    parsedResponse,
+    1200,
+    2200,
+    "after-call-json-session",
+    {
+      formatSlimming: true,
+      formatCleaning: true,
+      pathTruncation: true,
+      imageDownsample: false,
+      lineNumberStrip: false,
+      readStateCompaction: false,
+      toolPayloadTrim: false,
+      htmlSlimming: false,
+      execOutputTruncation: false,
+      agentsStartupOptimization: false,
+    },
+    {},
+    {
+      buildLayeredReductionContext: (
+        payload: any,
+        triggerMinChars: number,
+        sessionId: string,
+        passToggles: any,
+        passOptions: any,
+      ) => ({
+        turnCtx: {
+          sessionId,
+          sessionMode: "single",
+          provider: "test",
+          model: "gpt-5.4-mini",
+          prompt: "",
+          budget: { maxInputTokens: 100000, reserveOutputTokens: 1000 },
+          segments: [
+            {
+              id: "user-1",
+              kind: "volatile",
+              priority: 1,
+              text: JSON.stringify({ payload, triggerMinChars, passToggles, passOptions }).slice(0, 200),
+            },
+          ],
+          metadata: {
+            workspaceDir: "/tmp",
+            policy: {
+              decisions: {
+                reduction: {
+                  instructions: [
+                    {
+                      strategy: "format_slimming",
+                      segmentIds: ["response-1"],
+                      parameters: {},
+                    },
+                    {
+                      strategy: "path_truncation",
+                      segmentIds: ["response-1"],
+                      parameters: { maxPathLength: 40 },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      }),
+      isReductionPassEnabled: (passId: string, toggles?: Record<string, unknown>) => {
+        const map: Record<string, string> = {
+          format_slimming: "formatSlimming",
+          format_cleaning: "formatCleaning",
+          path_truncation: "pathTruncation",
+          image_downsample: "imageDownsample",
+          line_number_strip: "lineNumberStrip",
+        };
+        const key = map[passId];
+        return key ? toggles?.[key] !== false : true;
+      },
+    },
+  );
+
+  assert.equal(result.changed, true);
+  assert.ok(result.savedChars > 0);
+  assert.ok(result.passCount > 0);
+  assert.notEqual(parsedResponse.output_text, "  Result path: /very/long/workspace/path/project/src/app.ts  \n\n\nDone.  ");
+  assert.equal(parsedResponse.output[0].content[0].text, parsedResponse.output_text);
+});
+
+test("applyLayeredReductionAfterCallToSse rewrites completed responses SSE payload", async () => {
+  const requestPayload: any = {
+    input: [
+      { role: "user", content: "Summarize the results." },
+    ],
+  };
+  const rawSse = [
+    'data: {"type":"response.output_text.delta","delta":"Result path: /very/long/workspace/path/project/src/app.ts"}',
+    "",
+    'data: {"type":"response.output_text.done","text":"Result path: /very/long/workspace/path/project/src/app.ts"}',
+    "",
+    'data: {"type":"response.completed","response":{"id":"resp_sse_1","output":[{"type":"message","content":[{"type":"output_text","text":"Result path: /very/long/workspace/path/project/src/app.ts"}]}],"output_text":"Result path: /very/long/workspace/path/project/src/app.ts"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await hooks.applyLayeredReductionAfterCallToSse(
+    requestPayload,
+    rawSse,
+    1200,
+    2200,
+    "after-call-sse-session",
+    {
+      formatSlimming: true,
+      formatCleaning: true,
+      pathTruncation: true,
+      imageDownsample: false,
+      lineNumberStrip: false,
+      readStateCompaction: false,
+      toolPayloadTrim: false,
+      htmlSlimming: false,
+      execOutputTruncation: false,
+      agentsStartupOptimization: false,
+    },
+    {},
+    {
+      buildLayeredReductionContext: (
+        payload: any,
+        triggerMinChars: number,
+        sessionId: string,
+        passToggles: any,
+        passOptions: any,
+      ) => ({
+        turnCtx: {
+          sessionId,
+          sessionMode: "single",
+          provider: "test",
+          model: "gpt-5.4-mini",
+          prompt: "",
+          budget: { maxInputTokens: 100000, reserveOutputTokens: 1000 },
+          segments: [
+            {
+              id: "user-1",
+              kind: "volatile",
+              priority: 1,
+              text: JSON.stringify({ payload, triggerMinChars, passToggles, passOptions }).slice(0, 200),
+            },
+          ],
+          metadata: {
+            workspaceDir: "/tmp",
+            policy: {
+              decisions: {
+                reduction: {
+                  instructions: [
+                    {
+                      strategy: "path_truncation",
+                      segmentIds: ["response-1"],
+                      parameters: { maxPathLength: 40 },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      }),
+      isReductionPassEnabled: (passId: string, toggles?: Record<string, unknown>) => {
+        const map: Record<string, string> = {
+          format_slimming: "formatSlimming",
+          format_cleaning: "formatCleaning",
+          path_truncation: "pathTruncation",
+          image_downsample: "imageDownsample",
+          line_number_strip: "lineNumberStrip",
+        };
+        const key = map[passId];
+        return key ? toggles?.[key] !== false : true;
+      },
+    },
+  );
+
+  assert.equal(result.reduction.mode, "sse");
+  assert.equal(result.reduction.changed, true);
+  assert.ok((result.reduction.patchedEvents ?? 0) > 0);
+  assert.ok(result.reduction.savedChars > 0);
+  assert.notEqual(result.text, rawSse);
+  assert.match(result.text, /response\.completed/);
 });
 
 test("recordStreamingUxEffect uses canonical request snapshots in char mode", async () => {
@@ -725,4 +1060,27 @@ test("chatCompletionsToResponsesText converts tool calls back into responses out
     output_tokens: 12,
     total_tokens: 112,
   });
+});
+
+test("convertChatCompletionsSseToResponsesSse preserves output text and usage in responses events", () => {
+  const rawSse = [
+    'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{"content":"Hello "}}]}',
+    "",
+    'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{"content":"world"}}]}',
+    "",
+    'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":12,"total_tokens":112}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const out = hooks.convertChatCompletionsSseToResponsesSse(rawSse);
+
+  assert.match(out, /response\.output_text\.delta/);
+  assert.match(out, /response\.output_text\.done/);
+  assert.match(out, /response\.completed/);
+  assert.match(out, /Hello world/);
+  assert.match(out, /"input_tokens":100/);
+  assert.match(out, /"output_tokens":12/);
+  assert.match(out, /"total_tokens":112/);
 });
