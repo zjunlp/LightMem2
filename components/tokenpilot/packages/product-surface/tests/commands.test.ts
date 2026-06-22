@@ -175,6 +175,58 @@ test("createProductSurfaceCommandHandler returns shared payload for built-only h
   });
 });
 
+test("createProductSurfaceCommandHandler returns built host payloads for report and visual fallbacks", async () => {
+  const config: Record<string, unknown> = {
+    pluginConfig: {},
+    pluginEntry: {},
+  };
+  const handler = createProductSurfaceCommandHandler({
+    bridge: {
+      loadConfig() {
+        return structuredClone(config);
+      },
+      async writeConfig(nextConfig) {
+        Object.assign(config, structuredClone(nextConfig));
+      },
+      buildReportPayload() {
+        return {
+          kind: "report",
+          data: {
+            sessionId: "session-1",
+          },
+        };
+      },
+      buildVisualPayload() {
+        return {
+          kind: "visual",
+          data: {
+            url: "http://127.0.0.1:18789/tokenpilot/visual",
+          },
+        };
+      },
+    },
+    configAdapter: createTestConfigAdapter(),
+  });
+
+  const report = await handler({ args: "report" });
+  const visual = await handler({ args: "visual" });
+
+  assert.match(report.text, /TokenPilot commands:/);
+  assert.deepEqual(report.payload, {
+    kind: "report",
+    data: {
+      sessionId: "session-1",
+    },
+  });
+  assert.match(visual.text, /TokenPilot commands:/);
+  assert.deepEqual(visual.payload, {
+    kind: "visual",
+    data: {
+      url: "http://127.0.0.1:18789/tokenpilot/visual",
+    },
+  });
+});
+
 test("createProductSurfaceCommandHandler updates reduction pass and settings details", async () => {
   const config: Record<string, unknown> = {
     pluginConfig: {},
