@@ -320,3 +320,118 @@ test("runReductionBeforeCall executes read_state_compaction and rewrites stale r
   assert.equal(result.report[0]?.id, "read_state_compaction");
   assert.equal(result.report[0]?.changed, true);
 });
+
+test("runReductionBeforeCall leaves non-nominated stale reads untouched", async () => {
+  const original = "const a = 1;\n".repeat(200);
+  const turnCtx: RuntimeTurnContext = {
+    sessionId: "test-session",
+    sessionMode: "single",
+    provider: "test",
+    model: "test",
+    prompt: "",
+    budget: {
+      maxInputTokens: 100000,
+      reserveOutputTokens: 1000,
+    },
+    segments: [
+      buildSegment("read-1-output", "read", "/repo/a.ts", original, "output"),
+      buildSegment("edit-1-arguments", "edit", "/repo/a.ts", "{\"replace\":\"1\",\"with\":\"2\"}", "arguments"),
+    ],
+    metadata: {
+      workspaceDir: "/tmp",
+      policy: {
+        decisions: {
+          reduction: {
+            instructions: [
+              {
+                strategy: "read_state_compaction",
+                segmentIds: ["some-other-segment"],
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+
+  const result = await runReductionBeforeCall({
+    turnCtx,
+    passes: [
+      {
+        id: "read_state_compaction",
+        phase: "before_call",
+        target: "context_segment",
+        options: {},
+      },
+    ],
+  });
+
+  const updated = result.turnCtx.segments.find((segment) => segment.id === "read-1-output");
+  assert.ok(updated);
+  assert.equal(updated?.text, original);
+  assert.equal(result.report.length, 1);
+  assert.equal(result.report[0]?.id, "read_state_compaction");
+  assert.equal(result.report[0]?.changed, false);
+  assert.equal(result.report[0]?.skippedReason, "no_segments_replaced");
+});
+
+test("runReductionBeforeCall continues after disabled pass and still executes later passes", async () => {
+  const turnCtx: RuntimeTurnContext = {
+    sessionId: "test-session",
+    sessionMode: "single",
+    provider: "test",
+    model: "test",
+    prompt: "",
+    budget: {
+      maxInputTokens: 100000,
+      reserveOutputTokens: 1000,
+    },
+    segments: [
+      buildSegment("read-1-output", "read", "/repo/a.ts", "const a = 1;\n".repeat(200), "output"),
+      buildSegment("edit-1-arguments", "edit", "/repo/a.ts", "{\"replace\":\"1\",\"with\":\"2\"}", "arguments"),
+    ],
+    metadata: {
+      workspaceDir: "/tmp",
+      policy: {
+        decisions: {
+          reduction: {
+            instructions: [
+              {
+                strategy: "read_state_compaction",
+                segmentIds: ["read-1-output"],
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+
+  const result = await runReductionBeforeCall({
+    turnCtx,
+    passes: [
+      {
+        id: "tool_payload_trim",
+        phase: "before_call",
+        target: "tool_payload",
+        enabled: false,
+      },
+      {
+        id: "read_state_compaction",
+        phase: "before_call",
+        target: "context_segment",
+        options: {},
+      },
+    ],
+  });
+
+  const updated = result.turnCtx.segments.find((segment) => segment.id === "read-1-output");
+  assert.ok(updated);
+  assert.match(updated?.text ?? "", /\[Read stale\]/);
+  assert.equal(result.report.length, 2);
+  assert.equal(result.report[0]?.id, "tool_payload_trim");
+  assert.equal(result.report[0]?.changed, false);
+  assert.equal(result.report[0]?.skippedReason, "disabled");
+  assert.equal(result.report[1]?.id, "read_state_compaction");
+  assert.equal(result.report[1]?.changed, true);
+});

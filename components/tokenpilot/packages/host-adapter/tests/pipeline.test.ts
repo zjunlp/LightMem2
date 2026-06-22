@@ -8,6 +8,7 @@ import type { HostRequestEnvelope } from "../src/model/host-request.js";
 import { prepareBeforeCall } from "../src/pipeline/before-call.js";
 import { runBeforeCallReductionOrchestrator } from "../src/pipeline/reduction-orchestrator.js";
 import { stripInternalPayloadFields } from "../src/pipeline/recovery.js";
+import { prependTextToContent } from "../src/pipeline/message-text.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -170,4 +171,19 @@ test("runBeforeCallReductionOrchestrator executes reduction when enabled", async
   assert.equal(result.changedItems, 2);
   assert.equal(result.changedBlocks, 3);
   assert.equal(result.savedChars, 400);
+});
+
+test("prependTextToContent inserts input_text block when content array has no writable text fields", () => {
+  const content = [
+    { type: "input_image", image_url: "https://example.com/demo.png" },
+    { type: "input_file", file_id: "file-123" },
+  ];
+
+  const result = prependTextToContent(content, "dynamic context");
+
+  assert.deepEqual(result, [
+    { type: "input_text", text: "dynamic context" },
+    { type: "input_image", image_url: "https://example.com/demo.png" },
+    { type: "input_file", file_id: "file-123" },
+  ]);
 });
