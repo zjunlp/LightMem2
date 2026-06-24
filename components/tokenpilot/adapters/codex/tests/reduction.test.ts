@@ -1,0 +1,107 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { createCodexResponsesPayloadCodec } from "../src/responses-codec.js";
+import {
+  applyBeforeCallReductionToPayload,
+  normalizeResponsesInputForUpstream,
+  reduceCodexRequestEnvelope,
+} from "../src/reduction.js";
+import { normalizeTokenPilotCodexConfig } from "../src/config.js";
+
+test("normalizeResponsesInputForUpstream stringifies structured function payloads", () => {
+  const input: any[] = [
+    {
+      type: "function_call",
+      arguments: { command: "git status" },
+    },
+    {
+      type: "function_call_output",
+      output: { stdout: "ok" },
+    },
+  ];
+
+  normalizeResponsesInputForUpstream(input);
+
+  assert.equal(input[0].arguments, "{\"command\":\"git status\"}");
+  assert.equal(input[1].output, "{\"stdout\":\"ok\"}");
+});
+
+test("applyBeforeCallReductionToPayload skips below-threshold payloads", async () => {
+  const config = normalizeTokenPilotCodexConfig({
+    reduction: {
+      triggerMinChars: 5000,
+      maxToolChars: 1200,
+      passes: {
+        readStateCompaction: true,
+        toolPayloadTrim: true,
+        htmlSlimming: true,
+        execOutputTruncation: true,
+        agentsStartupOptimization: true,
+      },
+    },
+  });
+
+  const payload: any = {
+    model: "tokenpilot/gpt-5.4-mini",
+    input: [
+      { role: "tool", type: "function_call_output", output: "short tool output" },
+    ],
+  };
+
+  const result = await applyBeforeCallReductionToPayload({
+    payload,
+    sessionId: "session-small",
+    config,
+  });
+
+  assert.equal(result.changedItems, 0);
+  assert.equal(result.savedChars, 0);
+  assert.equal(result.skippedReason, "below_trigger_min_chars");
+});
+
+test("reduceCodexRequestEnvelope trims large tool output and preserves developer role", async () => {
+  const config = normalizeTokenPilotCodexConfig({
+    reduction: {
+      triggerMinChars: 256,
+      maxToolChars: 400,
+      passes: {
+        readStateCompaction: false,
+        toolPayloadTrim: true,
+        htmlSlimming: false,
+        execOutputTruncation: true,
+        agentsStartupOptimization: false,
+      },
+      passOptions: {
+        execOutputTruncation: {
+          toolThresholds: {
+            bash: 400,
+          },
+        },
+      },
+    },
+  });
+  const codec = createCodexResponsesPayloadCodec();
+  const longOutput = `HEAD\n${"line\n".repeat(600)}`;
+  const envelope = codec.decodeRequest({
+    model: "tokenpilot/gpt-5.4-mini",
+    stream: false,
+    input: [
+      { role: "developer", content: "root prompt" },
+      { role: "user", content: "check status" },
+      { role: "tool", type: "function_call_output", name: "bash", output: longOutput },
+    ],
+  });
+
+  const reduced = await reduceCodexRequestEnvelope({
+    envelope,
+    codec,
+    config,
+  });
+
+  assert.ok(reduced.summary.savedChars > 0);
+  assert.ok(reduced.summary.changedBlocks > 0);
+  const encoded = codec.encodeRequest(reduced.envelope) as any;
+  assert.equal(encoded.input[0].role, "developer");
+  assert.ok(String(encoded.input[2].output).length < longOutput.length);
+});

@@ -1,0 +1,45 @@
+{
+  "name": "@tokenpilot/codex-adapter",
+  "version": "0.1.0",
+  "description": "TokenPilot adapter for Codex via an OpenAI-compatible Responses proxy.",
+  "main": "dist/index.js",
+  "bin": {
+    "tokenpilot-codex": "dist/cli.js"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zjunlp/LightMem2.git",
+    "directory": "components/tokenpilot/adapters/codex"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@tokenpilot/decision": "workspace:*",
+    "@tokenpilot/host-adapter": "workspace:*",
+    "@tokenpilot/kernel": "workspace:*",
+    "@tokenpilot/runtime-core": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsx build.ts",
+    "start": "node dist/cli.js serve",
+    "doctor:codex": "node --import tsx scripts/doctor-codex.ts",
+    "install:codex": "node --import tsx scripts/install-codex.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "codex",
+    "tokenpilot",
+    "responses-api",
+    "context-management",
+    "token-efficiency"
+  ]
+}
