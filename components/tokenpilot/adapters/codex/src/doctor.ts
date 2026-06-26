@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { TOKENPILOT_MCP_SERVER_NAME } from "@tokenpilot/mcp";
 import type { TokenPilotCodexConfig } from "./config.js";
-import { readCodexProviderFromToml } from "./config.js";
+import { readCodexMcpServerFromToml, readCodexProviderFromToml } from "./config.js";
 import { readDaemonStatus } from "./daemon.js";
 
 export type CodexDoctorReport = {
@@ -15,6 +16,7 @@ export type CodexDoctorReport = {
   proxyHealthy: boolean;
   stateDir: string;
   upstreamProvider?: string;
+  mcpInstalled: boolean;
 };
 
 async function checkHealth(baseUrl: string): Promise<boolean> {
@@ -34,6 +36,7 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- hooks config: ${report.hooksConfigPath}`,
     `- stateDir: ${report.stateDir}`,
     `- provider installed: ${report.providerInstalled ? "yes" : "no"}`,
+    `- recovery MCP installed: ${report.mcpInstalled ? "yes" : "no"}`,
     `- hooks installed: ${report.hooksInstalled ? "yes" : "no"}`,
     `- daemon running: ${report.daemonRunning ? "yes" : "no"}`,
     `- proxy healthy: ${report.proxyHealthy ? "yes" : "no"}`,
@@ -52,6 +55,7 @@ export async function inspectCodexDoctor(params: {
   const proxyBaseUrl = `http://127.0.0.1:${params.config.proxyPort}/v1`;
   const providerName = params.config.providerName || "tokenpilot";
   const tokenpilotProvider = await readCodexProviderFromToml(providerName, params.configPath);
+  const mcp = await readCodexMcpServerFromToml(TOKENPILOT_MCP_SERVER_NAME, params.configPath);
   const hooksText = existsSync(params.hooksConfigPath)
     ? await readFile(params.hooksConfigPath, "utf8").catch(() => "")
     : "";
@@ -67,5 +71,6 @@ export async function inspectCodexDoctor(params: {
     proxyHealthy: await checkHealth(proxyBaseUrl),
     stateDir: params.config.stateDir,
     upstreamProvider: params.config.upstreamProvider,
+    mcpInstalled: Boolean(mcp?.command),
   };
 }

@@ -1,0 +1,20 @@
+{
+  "name": "@tokenpilot/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsx build.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@tokenpilot/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

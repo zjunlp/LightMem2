@@ -9,6 +9,7 @@ installCodexTokenPilot({
   console.log(`Codex config: ${result.codexConfigPath}`);
   console.log(`TokenPilot config: ${result.tokenPilotConfigPath}`);
   console.log(`Codex hooks config: ${result.hooksConfigPath} (${result.hooksInstalled ? "installed" : "skipped"})`);
+  console.log(`Recovery MCP server: ${result.mcpServerName}`);
   console.log(`Proxy base URL: ${result.baseUrl}`);
   console.log("TokenPilot will auto-start from Codex SessionStart hooks after hooks are trusted.");
   console.log("Default Codex model_provider has been switched to tokenpilot.");

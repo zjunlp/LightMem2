@@ -18,6 +18,7 @@ Implemented today:
 - Codex provider installation into `config.toml`
 - TokenPilot runtime config in `~/.codex/tokenpilot.json`
 - Codex hook registration in `~/.codex/hooks.json`
+- recovery MCP registration for real `memory_fault_recover`
 - local Responses proxy lifecycle
 - stable-prefix rewriting
 - request-time reduction
@@ -60,6 +61,7 @@ The installer will:
 
 - add a TokenPilot provider entry to Codex config
 - switch the default `model_provider` to that TokenPilot provider
+- register a `tokenpilot_memory_fault_recover` MCP server in Codex config
 - write TokenPilot runtime config
 - register TokenPilot hooks for `SessionStart`, `PreToolUse`, `PostToolUse`, and `Stop`
 
@@ -80,6 +82,10 @@ lightmem2 codex doctor
 lightmem2 codex mode normal
 lightmem2 codex reduction status
 ```
+
+Once installed, Codex can use the real internal recovery tool named
+`memory_fault_recover` through the registered MCP server. Recovery hints in
+trimmed payloads are no longer just protocol text.
 
 For daemon-level checks:
 
@@ -171,6 +177,7 @@ Useful checks:
 cat ~/.codex/tokenpilot.json
 cat ~/.codex/hooks.json
 rg "model_provider|model_providers.tokenpilot" ~/.codex/config.toml
+rg "mcp_servers.tokenpilot_memory_fault_recover" ~/.codex/config.toml
 npm --prefix components/tokenpilot/adapters/codex run doctor:codex
 tokenpilot-codex status
 ```

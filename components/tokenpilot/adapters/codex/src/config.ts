@@ -67,6 +67,12 @@ export function defaultHooksConfigPath(): string {
   return join(homedir(), ".codex", "hooks.json");
 }
 
+export type CodexMcpServerConfig = {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -228,6 +234,45 @@ export async function readCodexProviderFromToml(
     wireApi: wireApi === "chat" ? "chat" : "responses",
     requiresOpenAIAuth: section.values.requires_openai_auth !== "false",
   };
+}
+
+export async function readCodexMcpServerFromToml(
+  serverName: string,
+  configPath = defaultCodexConfigPath(),
+): Promise<CodexMcpServerConfig | undefined> {
+  if (!existsSync(configPath)) return undefined;
+  const text = await readFile(configPath, "utf8");
+  const sections: TomlSection[] = [];
+  let current: TomlSection | null = null;
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    const sectionMatch = /^\[([^\]]+)\]$/.exec(trimmed);
+    if (sectionMatch) {
+      current = { name: sectionMatch[1], values: {} };
+      sections.push(current);
+      continue;
+    }
+    if (!current || trimmed.startsWith("#")) continue;
+    const assignment = /^([A-Za-z0-9_.-]+)\s*=\s*(.+)$/.exec(trimmed);
+    if (!assignment) continue;
+    current.values[assignment[1]] = assignment[2].replace(/\s+#.*$/, "").trim();
+  }
+  const section = sections.find((item) => item.name === `mcp_servers.${serverName}`);
+  if (!section) return undefined;
+  const envSection = sections.find((item) => item.name === `mcp_servers.${serverName}.env`);
+  const command = parseTomlStringValue(section.values.command);
+  if (!command) return undefined;
+  const argsValue = section.values.args?.trim();
+  const args = argsValue
+    ? Array.from(argsValue.matchAll(/"((?:\\.|[^"])*)"|'([^']*)'/g)).map((match) =>
+      (match[1] ?? match[2] ?? "").replace(/\\"/g, "\"").replace(/\\\\/g, "\\"))
+    : [];
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(envSection?.values ?? {})) {
+    const parsed = parseTomlStringValue(value);
+    if (parsed) env[key] = parsed;
+  }
+  return { command, args, env };
 }
 
 export async function resolveUpstreamProvider(

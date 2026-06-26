@@ -3,6 +3,7 @@ import {
   defaultHooksConfigPath,
   defaultTokenPilotConfigPath,
   loadTokenPilotCodexConfig,
+  readCodexMcpServerFromToml,
   readCodexProviderFromToml,
   resolveUpstreamProvider,
 } from "../src/config.js";
@@ -22,7 +23,8 @@ async function main() {
     tokenPilotConfigPath,
     hooksConfigPath,
   });
-  const tokenpilotProvider = await readCodexProviderFromToml("tokenpilot", codexConfigPath);
+  const tokenpilotProvider = await readCodexProviderFromToml(config.providerName, codexConfigPath);
+  const recoveryMcp = await readCodexMcpServerFromToml("tokenpilot_memory_fault_recover", codexConfigPath);
   const upstream = await resolveUpstreamProvider(config, codexConfigPath).catch((err) => ({ error: err instanceof Error ? err.message : String(err) }));
   const daemon = await readDaemonStatus(config);
   const hooksText = existsSync(hooksConfigPath) ? await readFile(hooksConfigPath, "utf8").catch(() => "") : "";
@@ -40,6 +42,7 @@ async function main() {
         ? "multiple TokenPilot hooks are registered; rerun install to dedupe hooks.json"
         : undefined,
     },
+    recoveryMcp,
     upstream,
     proxy: {
       baseUrl: doctor.proxyBaseUrl,

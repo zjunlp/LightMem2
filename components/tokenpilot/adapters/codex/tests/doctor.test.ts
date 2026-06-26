@@ -94,3 +94,48 @@ test("inspectCodexDoctor checks the configured provider name", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("inspectCodexDoctor detects installed recovery MCP entry", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-doctor-mcp-"));
+  try {
+    const proxyPort = await reserveUnusedPort();
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+
+    await writeFile(codexConfigPath, [
+      "model_provider = \"tokenpilot\"",
+      "",
+      "[model_providers.tokenpilot]",
+      "name = \"TokenPilot\"",
+      "base_url = \"http://127.0.0.1:17667/v1\"",
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+      "[mcp_servers.tokenpilot_memory_fault_recover]",
+      `command = ${JSON.stringify(process.execPath)}`,
+      `args = [${JSON.stringify("/tmp/server.js")}]`,
+      "",
+      "[mcp_servers.tokenpilot_memory_fault_recover.env]",
+      `TOKENPILOT_STATE_DIR = ${JSON.stringify(join(dir, "state"))}`,
+      "",
+    ].join("\n"), "utf8");
+    await writeFile(hooksConfigPath, JSON.stringify({ hooks: {} }, null, 2), "utf8");
+    await mkdir(join(dir, "state"), { recursive: true });
+
+    const report = await inspectCodexDoctor({
+      config: normalizeTokenPilotCodexConfig({
+        stateDir: join(dir, "state"),
+        proxyPort,
+      }),
+      configPath: codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+    });
+
+    assert.equal(report.providerInstalled, true);
+    assert.equal(report.mcpInstalled, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

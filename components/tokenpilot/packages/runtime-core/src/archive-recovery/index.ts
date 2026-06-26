@@ -5,6 +5,7 @@ import {
   defaultArchiveDir,
   defaultArchiveLookupDirs,
   defaultPluginStateDir,
+  pluginStateSubdirCandidates,
   hashText,
   sanitizePathPart,
 } from "./archive-paths.js";
@@ -195,6 +196,26 @@ export async function resolveArchivePathFromLookup(
           await updateArchiveLookup(dataKey, archivePath, archiveDir);
           return archivePath;
         }
+      }
+    } catch {
+      // Try next candidate.
+    }
+  }
+  return null;
+}
+
+export async function resolveArchivePathAcrossSessions(
+  dataKey: string,
+  stateDir: string,
+): Promise<string | null> {
+  const sessionRootCandidates = pluginStateSubdirCandidates(stateDir, "tool-result-archives");
+  for (const sessionRoot of sessionRootCandidates) {
+    try {
+      const entries = await readdir(sessionRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const found = await resolveArchivePathFromLookup(dataKey, stateDir, entry.name);
+        if (found) return found;
       }
     } catch {
       // Try next candidate.

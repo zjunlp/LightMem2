@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { resolveTokenPilotMcpServerSpec } from "@tokenpilot/mcp";
 import {
   defaultCodexConfigPath,
   defaultHooksConfigPath,
@@ -42,6 +43,37 @@ function upsertProviderSection(text: string, params: {
     "requires_openai_auth = true",
   ].join("\n");
   const sectionRe = new RegExp(`\\n?\\[model_providers\\.${params.providerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\][\\s\\S]*?(?=\\n\\[[^\\]]+\\]|$)`);
+  if (sectionRe.test(text)) {
+    return text.replace(sectionRe, `\n${section}\n`);
+  }
+  return `${text.replace(/\s*$/, "")}\n\n${section}\n`;
+}
+
+function upsertMcpServerSection(text: string, params: {
+  serverName: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}): string {
+  const escape = (value: string) => JSON.stringify(value);
+  const sectionHeader = `[mcp_servers.${params.serverName}]`;
+  const lines = [
+    sectionHeader,
+    `command = ${escape(params.command)}`,
+  ];
+  if (params.args.length > 0) {
+    lines.push(`args = [${params.args.map((value) => escape(value)).join(", ")}]`);
+  }
+  const envEntries = Object.entries(params.env);
+  if (envEntries.length > 0) {
+    lines.push("", `[mcp_servers.${params.serverName}.env]`);
+    for (const [key, value] of envEntries) {
+      lines.push(`${key} = ${escape(value)}`);
+    }
+  }
+  const section = lines.join("\n");
+  const escapedServer = params.serverName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionRe = new RegExp(`\\n?\\[mcp_servers\\.${escapedServer}\\][\\s\\S]*?(?=\\n\\[[^\\]]+\\]|$)`);
   if (sectionRe.test(text)) {
     return text.replace(sectionRe, `\n${section}\n`);
   }
@@ -161,6 +193,7 @@ export async function installCodexTokenPilot(params?: {
   providerName: string;
   baseUrl: string;
   hooksInstalled: boolean;
+  mcpServerName: string;
 }> {
   const codexConfigPath = params?.codexConfigPath ?? defaultCodexConfigPath();
   const tokenPilotConfigPath = params?.tokenPilotConfigPath ?? defaultTokenPilotConfigPath();
@@ -170,6 +203,9 @@ export async function installCodexTokenPilot(params?: {
   tokenPilotConfig.providerName = providerName;
   await writeTokenPilotCodexConfig(tokenPilotConfig, tokenPilotConfigPath);
   const baseUrl = `http://127.0.0.1:${tokenPilotConfig.proxyPort}/v1`;
+  const mcpServer = resolveTokenPilotMcpServerSpec({
+    stateDir: tokenPilotConfig.stateDir,
+  });
 
   await mkdir(dirname(codexConfigPath), { recursive: true });
   const existing = existsSync(codexConfigPath) ? await readFile(codexConfigPath, "utf8") : "";
@@ -178,6 +214,12 @@ export async function installCodexTokenPilot(params?: {
   }
   let next = replaceOrInsertRootAssignment(existing, "model_provider", quoteToml(providerName));
   next = upsertProviderSection(next, { providerName, baseUrl });
+  next = upsertMcpServerSection(next, {
+    serverName: mcpServer.serverName,
+    command: mcpServer.command,
+    args: mcpServer.args,
+    env: mcpServer.env,
+  });
   await writeFile(codexConfigPath, next.endsWith("\n") ? next : `${next}\n`, "utf8");
   const hooksInstalled = params?.installHooks !== false;
   if (hooksInstalled) {
@@ -193,5 +235,6 @@ export async function installCodexTokenPilot(params?: {
     providerName,
     baseUrl,
     hooksInstalled,
+    mcpServerName: mcpServer.serverName,
   };
 }
