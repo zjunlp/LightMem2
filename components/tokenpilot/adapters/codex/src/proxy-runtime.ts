@@ -2,7 +2,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Server } from "node:http";
 import { mkdir } from "node:fs/promises";
-import { prepareBeforeCall } from "@tokenpilot/host-adapter";
+import { createStaticStatePathResolver, prepareBeforeCall } from "@tokenpilot/host-adapter";
+import { configureStatePathResolver } from "@tokenpilot/runtime-core";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   defaultCodexConfigPath,
@@ -82,6 +83,12 @@ export async function startCodexResponsesProxy(params: {
   if (!config.enabled) {
     throw new Error("TokenPilot Codex adapter is disabled by config");
   }
+  configureStatePathResolver(createStaticStatePathResolver({
+    hostId: "codex",
+    displayName: "Codex",
+    stateDir: config.stateDir,
+    namespaceDir: "tokenpilot",
+  }));
   await mkdir(config.stateDir, { recursive: true });
   const upstream = await resolveUpstreamProvider(config, params.codexConfigPath ?? defaultCodexConfigPath());
   const codec = createCodexResponsesPayloadCodec();
