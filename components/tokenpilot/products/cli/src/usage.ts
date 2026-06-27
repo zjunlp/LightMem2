@@ -8,6 +8,7 @@ export function formatCliUsage(): string {
     "Hosts:",
     "  openclaw",
     "  codex",
+    "  claude-code",
     "",
     "Top-level commands:",
     "  status",
@@ -26,6 +27,7 @@ export function formatCliUsage(): string {
     "Examples:",
     "  lightmem2 report",
     "  lightmem2 openclaw doctor",
+    "  lightmem2 claude-code doctor",
     "  lightmem2 openclaw session 123e4567-e89b-12d3-a456-426614174000 report",
     "  lightmem2 use openclaw",
   ].join("\n");

@@ -5,6 +5,7 @@ import {
   readCliContextState,
   updateCliContextState,
 } from "./context-store.js";
+import { createClaudeCodeCliBridge } from "./hosts/claude-code.js";
 import { createCodexCliBridge } from "./hosts/codex.js";
 import { createOpenClawCliBridge } from "./hosts/openclaw.js";
 import { formatCliUsage } from "./usage.js";
@@ -15,7 +16,7 @@ type HostTarget = {
 };
 
 function parseHost(value: string | undefined): CliHostId | undefined {
-  if (value === "openclaw" || value === "codex") return value;
+  if (value === "openclaw" || value === "codex" || value === "claude-code") return value;
   return undefined;
 }
 
@@ -43,6 +44,7 @@ async function resolveTarget(argv: string[]): Promise<{
       `- lastActiveHost: ${state.lastActiveHost ?? "(unset)"}`,
       `- openclaw session: ${state.lastSessionByHost?.openclaw ?? "(unset)"}`,
       `- codex session: ${state.lastSessionByHost?.codex ?? "(unset)"}`,
+      `- claude-code session: ${state.lastSessionByHost?.["claude-code"] ?? "(unset)"}`,
       `- lastUpdatedAt: ${state.lastUpdatedAt ?? "(unset)"}`,
     ];
     return { commandArgs: [], handledText: lines.join("\n") };
@@ -113,6 +115,24 @@ export async function dispatchCli(argv: string[]): Promise<TokenPilotProductComm
   if (target.host === "codex") {
     const { handleCommand, maybeResolveLatestSessionId } = createCodexCliBridge({
       host: "codex",
+      sessionId: target.sessionId,
+    });
+    const result = await handleCommand({
+      args: commandArgs.join(" "),
+      sessionId: target.sessionId,
+    });
+
+    const resolvedSessionId = target.sessionId ?? await maybeResolveLatestSessionId();
+    await updateCliContextState({
+      host: target.host,
+      sessionId: resolvedSessionId,
+    });
+    return result;
+  }
+
+  if (target.host === "claude-code") {
+    const { handleCommand, maybeResolveLatestSessionId } = createClaudeCodeCliBridge({
+      host: "claude-code",
       sessionId: target.sessionId,
     });
     const result = await handleCommand({

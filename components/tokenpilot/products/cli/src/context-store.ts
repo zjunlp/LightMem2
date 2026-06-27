@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export type CliHostId = "openclaw" | "codex";
+export type CliHostId = "openclaw" | "codex" | "claude-code";
 
 export type CliContextState = {
   lastActiveHost?: CliHostId;

@@ -61,3 +61,30 @@ test("dispatch routes codex host commands through the shared CLI bridge", async 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("dispatch routes claude-code host commands through the shared CLI bridge", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-cli-claude-code-"));
+  const originalHome = process.env.HOME;
+  process.env.HOME = dir;
+  try {
+    const status = await dispatchCli(["claude-code", "status"]);
+    assert.match(status.text, /TokenPilot Claude Code status:/);
+    assert.doesNotMatch(status.text, /lifecycle eviction/i);
+
+    const useHost = await dispatchCli(["use", "claude-code"]);
+    assert.equal(useHost.text, "Default host = claude-code");
+
+    const reduction = await dispatchCli(["claude-code", "reduction", "off"]);
+    assert.equal(reduction.text, "✅ Observation Reduction disabled");
+
+    const unsupported = await dispatchCli(["claude-code", "settings", "details", "on"]);
+    assert.equal(unsupported.text, "Claude Code does not expose shared runtime settings yet.");
+  } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+});
