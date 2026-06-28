@@ -10,6 +10,7 @@ import {
   handleMcpRequest,
   MEMORY_FAULT_RECOVER_TOOL_NAME,
   probeTokenPilotMcpServer,
+  resolveTokenPilotMcpProbeServerSpec,
   resolveMemoryFaultRecover,
   resolveTokenPilotMcpServerSpec,
 } from "../src/index.js";
@@ -94,8 +95,9 @@ test("handleMcpRequest marks archive miss as tool error", async () => {
 });
 
 test("probeTokenPilotMcpServer completes initialize handshake", async () => {
-  const spec = resolveTokenPilotMcpServerSpec({
+  const spec = resolveTokenPilotMcpProbeServerSpec({
     stateDir: join(tmpdir(), "lightmem2-mcp-probe-state"),
+    requireBuild: false,
   });
   const result = await probeTokenPilotMcpServer(spec, {
     timeoutMs: 3_000,
@@ -107,6 +109,37 @@ test("probeTokenPilotMcpServer completes initialize handshake", async () => {
   assert.equal(result.ok, true);
   assert.equal(result.timedOut, false);
   assert.match(result.detail, /initialize succeeded/i);
+});
+
+test("install MCP spec always resolves to built runtime entry", () => {
+  const spec = resolveTokenPilotMcpServerSpec({
+    stateDir: join(tmpdir(), "lightmem2-mcp-install-state"),
+  });
+
+  assert.equal(spec.command, process.execPath);
+  assert.equal(spec.args.length, 1);
+  assert.match(spec.entryPath, /dist[\/\\]server\.js$/);
+  assert.deepEqual(spec.args, [spec.entryPath]);
+});
+
+test("probe MCP spec can fall back to source entry when dist is unavailable", () => {
+  const spec = resolveTokenPilotMcpProbeServerSpec({
+    stateDir: join(tmpdir(), "lightmem2-mcp-probe-fallback-state"),
+    requireBuild: false,
+  });
+
+  assert.equal(spec.command, process.execPath);
+  assert.ok(spec.args.length >= 1);
+  assert.ok(
+    /dist[\/\\]server\.js$/.test(spec.entryPath)
+      || /src[\/\\]server\.ts$/.test(spec.entryPath),
+  );
+  if (/src[\/\\]server\.ts$/.test(spec.entryPath)) {
+    assert.deepEqual(spec.args.slice(0, 2), ["--import", "tsx"]);
+    assert.equal(spec.args[2], spec.entryPath);
+  } else {
+    assert.deepEqual(spec.args, [spec.entryPath]);
+  }
 });
 
 function tryExtractContentLengthBody(stdout: string): string | null {
@@ -122,8 +155,9 @@ function tryExtractContentLengthBody(stdout: string): string | null {
 }
 
 test("MCP server responds to newline-delimited JSON-RPC stdio", async () => {
-  const spec = resolveTokenPilotMcpServerSpec({
+  const spec = resolveTokenPilotMcpProbeServerSpec({
     stateDir: join(tmpdir(), "lightmem2-mcp-newline-state"),
+    requireBuild: false,
   });
   const child = spawn(spec.command, spec.args, {
     stdio: ["pipe", "pipe", "pipe"],
@@ -168,8 +202,9 @@ test("MCP server responds to newline-delimited JSON-RPC stdio", async () => {
 });
 
 test("MCP server remains compatible with content-length framing", async () => {
-  const spec = resolveTokenPilotMcpServerSpec({
+  const spec = resolveTokenPilotMcpProbeServerSpec({
     stateDir: join(tmpdir(), "lightmem2-mcp-content-length-state"),
+    requireBuild: false,
   });
   const child = spawn(spec.command, spec.args, {
     stdio: ["pipe", "pipe", "pipe"],

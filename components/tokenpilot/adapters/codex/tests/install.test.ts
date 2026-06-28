@@ -23,6 +23,8 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
     assert.match(codexToml, /\[mcp_servers\.tokenpilot_memory_fault_recover\]/);
     assert.match(codexToml, /startup_timeout_sec\s*=\s*90/);
     assert.match(codexToml, new RegExp(result.expectedMcpCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.equal(result.expectedMcpArgs.length, 1);
+    assert.match(result.expectedMcpArgs[0] ?? "", /dist[\/\\]server\.js$/);
     for (const arg of result.expectedMcpArgs) {
       assert.match(codexToml, new RegExp(arg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     }

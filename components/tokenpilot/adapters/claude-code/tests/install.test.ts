@@ -46,6 +46,8 @@ test("installClaudeCodeTokenPilot writes settings, MCP config, and backups exist
       result.stateDir,
     );
     assert.equal(mcp.mcpServers?.tokenpilot_memory_fault_recover?.command, result.expectedMcpCommand);
+    assert.equal(result.expectedMcpArgs.length, 1);
+    assert.match(result.expectedMcpArgs[0] ?? "", /dist[\/\\]server\.js$/);
     assert.deepEqual(mcp.mcpServers?.tokenpilot_memory_fault_recover?.args ?? [], result.expectedMcpArgs);
     assert.equal(mcp.mcpServers?.tokenpilot_memory_fault_recover?.startup_timeout_sec, 90);
     assert.equal(typeof mcp.mcpServers?.existing?.command, "string");
