@@ -217,6 +217,7 @@ export function createCodexCliBridge(target: {
   bridge: TokenPilotProductSurfaceHostBridge;
   configAdapter: TokenPilotProductSurfaceConfigAdapter;
   maybeResolveLatestSessionId(): Promise<string | undefined>;
+  resolveSessionId(sessionId?: string): Promise<string | undefined>;
   handleCommand(ctx: { args: string; sessionId?: string }): Promise<{ text: string }>;
 } {
   const bridge: TokenPilotProductSurfaceHostBridge = {
@@ -346,6 +347,12 @@ export function createCodexCliBridge(target: {
     bridge,
     configAdapter: codexProductSurfaceConfigAdapter,
     maybeResolveLatestSessionId,
+    async resolveSessionId(sessionId?: string): Promise<string | undefined> {
+      return resolveCodexCliSessionId({
+        currentConfig: await loadConfig(),
+        explicitSessionId: sessionId,
+      });
+    },
     handleCommand,
   };
 }

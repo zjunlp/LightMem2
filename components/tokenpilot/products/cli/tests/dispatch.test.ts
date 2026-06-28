@@ -3,6 +3,7 @@ import test from "node:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { indexCodexHostSessionAlias } from "../../../adapters/codex/src/session-state.js";
 import { readCliContextState } from "../src/context-store.js";
 import { dispatchCli } from "../src/dispatch.js";
 
@@ -136,6 +137,31 @@ test("dispatch uses the default host and latest resolved codex session for hostl
     const persisted = await readCliContextState(join(dir, ".lightmem2", "state", "cli-context.json"));
     assert.equal(persisted.lastActiveHost, "codex");
     assert.equal(persisted.lastSessionByHost?.codex, "codex-session-1");
+  } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch canonicalizes pinned codex host session ids before persisting CLI context", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-cli-codex-canonical-context-"));
+  const originalHome = process.env.HOME;
+  process.env.HOME = dir;
+  try {
+    const stateDir = join(dir, ".codex", "tokenpilot-state", "tokenpilot");
+    await mkdir(join(stateDir, "session-state"), { recursive: true });
+    await indexCodexHostSessionAlias(stateDir, "codex-host-session-1", "codex-synth-session-1");
+
+    const useContext = await dispatchCli(["use", "codex", "session", "codex-host-session-1"]);
+    assert.equal(useContext.text, "Default context = codex / codex-synth-session-1");
+
+    const persisted = await readCliContextState(join(dir, ".lightmem2", "state", "cli-context.json"));
+    assert.equal(persisted.lastActiveHost, "codex");
+    assert.equal(persisted.lastSessionByHost?.codex, "codex-synth-session-1");
   } finally {
     if (originalHome === undefined) {
       delete process.env.HOME;

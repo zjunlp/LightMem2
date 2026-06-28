@@ -56,9 +56,13 @@ async function resolveTarget(argv: string[]): Promise<{
       return { commandArgs: [], handledText: `Unknown host.\n\n${formatCliUsage()}` };
     }
     if (argv[2] === "session") {
-      const sessionId = String(argv[3] ?? "").trim();
+      let sessionId = String(argv[3] ?? "").trim();
       if (!sessionId) {
         return { commandArgs: [], handledText: "Missing session id." };
+      }
+      if (host === "codex") {
+        const codex = createCodexCliBridge({ host: "codex", sessionId });
+        sessionId = (await codex.resolveSessionId(sessionId)) ?? sessionId;
       }
       await updateCliContextState({ host, sessionId });
       return { commandArgs: [], handledText: `Default context = ${host} / ${sessionId}` };
@@ -113,7 +117,7 @@ export async function dispatchCli(argv: string[]): Promise<TokenPilotProductComm
   }
 
   if (target.host === "codex") {
-    const { handleCommand, maybeResolveLatestSessionId } = createCodexCliBridge({
+    const { handleCommand, maybeResolveLatestSessionId, resolveSessionId } = createCodexCliBridge({
       host: "codex",
       sessionId: target.sessionId,
     });
@@ -122,7 +126,9 @@ export async function dispatchCli(argv: string[]): Promise<TokenPilotProductComm
       sessionId: target.sessionId,
     });
 
-    const resolvedSessionId = target.sessionId ?? await maybeResolveLatestSessionId();
+    const resolvedSessionId = target.sessionId
+      ? await resolveSessionId(target.sessionId)
+      : await maybeResolveLatestSessionId();
     await updateCliContextState({
       host: target.host,
       sessionId: resolvedSessionId,
