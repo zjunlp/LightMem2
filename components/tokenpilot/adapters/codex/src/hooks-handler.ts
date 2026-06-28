@@ -9,7 +9,7 @@ import {
   readDaemonStatus,
   startDaemon,
 } from "./daemon.js";
-import { upsertCodexSessionSnapshot } from "./session-state.js";
+import { resolveCodexSessionAlias, upsertCodexSessionSnapshot } from "./session-state.js";
 import { appendTrace } from "./trace.js";
 import { dirname, join } from "node:path";
 
@@ -87,18 +87,21 @@ function finishSuccess(): void {
   // hooks silent unless we intentionally need to block or inject context.
 }
 
-async function main() {
-  const event = await readStdinJson();
+export async function processCodexHookEvent(event: Record<string, unknown>): Promise<void> {
   const hookEventName = stringValue(event.hook_event_name) ?? stringValue(event.event) ?? "unknown";
   const configPath = process.env.TOKENPILOT_CODEX_CONFIG ?? defaultTokenPilotConfigPath();
   const codexConfigPath = process.env.CODEX_CONFIG_PATH ?? defaultCodexConfigPath();
   const config = await loadTokenPilotCodexConfig(configPath);
-  const sessionId = stringValue(event.session_id);
+  const codexSessionId = stringValue(event.session_id);
+  const sessionId = codexSessionId
+    ? await resolveCodexSessionAlias(config.stateDir, codexSessionId) ?? codexSessionId
+    : undefined;
   const workspaceHint = workspaceHintFromEvent(event);
   const tool = extractToolEvent(event);
   const common = {
     hookEventName,
-    codexSessionId: sessionId ?? null,
+    codexSessionId: codexSessionId ?? null,
+    sessionId: sessionId ?? null,
     transcriptPath: stringValue(event.transcript_path) ?? null,
     cwd: workspaceHint ?? null,
     model: stringValue(event.model) ?? null,
@@ -111,6 +114,8 @@ async function main() {
       lastToolName: tool.toolName ?? undefined,
       lastToolInputChars: tool.toolInputChars,
       lastToolOutputChars: tool.toolOutputChars,
+    }, {
+      markLatest: false,
     });
   }
 
@@ -168,7 +173,18 @@ async function main() {
   finishSuccess();
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+async function main() {
+  const event = await readStdinJson();
+  await processCodexHookEvent(event);
+}
+
+const entryArg = process.argv[1];
+const isDirectExecution = typeof entryArg === "string"
+  && entryArg.endsWith("hooks-handler.js");
+
+if (isDirectExecution) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}

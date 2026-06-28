@@ -6,9 +6,12 @@ import { tmpdir } from "node:os";
 
 import {
   appendCodexRecentTurnBinding,
+  indexCodexHostSessionAlias,
   indexCodexPromptCacheKeySession,
   loadCodexRecentTurnBindings,
   loadCodexSessionSnapshot,
+  mergeCodexSessionSnapshot,
+  resolveCodexSessionAlias,
   resolveCodexSessionIdByPromptCacheKey,
   resolveLatestCodexSessionId,
   upsertCodexSessionSnapshot,
@@ -75,6 +78,49 @@ test("session-state resolves prompt_cache_key session mappings", async () => {
 
     assert.equal(resolved, "codex-synth-a");
     assert.equal(missing, undefined);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("session-state resolves host codex session aliases", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-codex-session-alias-"));
+  try {
+    await indexCodexHostSessionAlias(stateDir, "019f-real-codex-session", "codex-synth-a");
+    const resolved = await resolveCodexSessionAlias(stateDir, "019f-real-codex-session");
+    const missing = await resolveCodexSessionAlias(stateDir, "019f-missing-session");
+
+    assert.equal(resolved, "codex-synth-a");
+    assert.equal(missing, undefined);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("session-state can merge hook snapshot metadata into the synthesized proxy session", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-codex-session-merge-"));
+  try {
+    await upsertCodexSessionSnapshot(stateDir, "019f-hook-session", {
+      workspaceHint: "/tmp/hook-workspace",
+      latestModel: "gpt-5.4-mini",
+      lastHookEvent: "PostToolUse",
+      lastToolName: "read",
+      lastToolInputChars: 64,
+      lastToolOutputChars: 512,
+    }, {
+      markLatest: false,
+    });
+    await upsertCodexSessionSnapshot(stateDir, "codex-synth-1", {
+      latestResponseId: "resp-1",
+      latestModel: "gpt-5.4-mini",
+    });
+
+    const merged = await mergeCodexSessionSnapshot(stateDir, "019f-hook-session", "codex-synth-1");
+
+    assert.equal(merged?.workspaceHint, "/tmp/hook-workspace");
+    assert.equal(merged?.lastHookEvent, "PostToolUse");
+    assert.equal(merged?.lastToolName, "read");
+    assert.equal(merged?.latestResponseId, "resp-1");
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }

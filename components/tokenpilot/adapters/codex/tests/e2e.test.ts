@@ -24,6 +24,7 @@ import {
   writeTokenPilotCodexConfig,
 } from "../src/config.js";
 import { installCodexTokenPilot } from "../src/install.js";
+import { processCodexHookEvent } from "../src/hooks-handler.js";
 import { createConsoleLogger } from "../src/logger.js";
 import { startCodexResponsesProxy } from "../src/proxy-runtime.js";
 
@@ -514,5 +515,118 @@ test("Codex CLI report and visual return clear empty-state messages before any r
 
     const visual = await handleCommand({ args: "visual" });
     assert.equal(visual.text, "No Codex TokenPilot session data found.");
+  });
+});
+
+test("Codex proxy merges hook-observed metadata into the synthesized session when prompt_cache_key carries the real Codex session id", async () => {
+  await withTempHome("lightmem2-codex-hook-session-merge-", async (homeDir) => {
+    const proxyPort = await reserveUnusedPort();
+    const upstreamPort = await reserveUnusedPort();
+    const stateDir = join(homeDir, ".codex", "tokenpilot-state", "tokenpilot");
+    const codexConfigPath = defaultCodexConfigPath();
+    const tokenPilotConfigPath = defaultTokenPilotConfigPath();
+
+    const upstream = createHttpServer(async (req, res) => {
+      if (req.method !== "POST" || req.url !== "/v1/responses") {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+      }
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({
+        id: "resp-merge-1",
+        object: "response",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "done" }],
+          },
+        ],
+      }));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      upstream.once("error", reject);
+      upstream.listen(upstreamPort, "127.0.0.1", () => {
+        upstream.off("error", reject);
+        resolve();
+      });
+    });
+
+    try {
+      await mkdir(join(homeDir, ".codex"), { recursive: true });
+      await writeTokenPilotCodexConfig(
+        normalizeTokenPilotCodexConfig({
+          proxyPort,
+          stateDir,
+          upstreamProvider: "OpenAI",
+          upstream: {
+            name: "OpenAI",
+            baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
+            wireApi: "responses",
+            requiresOpenAIAuth: true,
+          },
+        }),
+        tokenPilotConfigPath,
+      );
+
+      await processCodexHookEvent({
+        hook_event_name: "PostToolUse",
+        session_id: "019f-real-codex-session",
+        cwd: "/repo/from-hook",
+        tool_name: "read",
+        tool_input: "file.ts",
+        tool_response: "content",
+      });
+
+      const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+      const runtime = await startCodexResponsesProxy({
+        config,
+        logger: createConsoleLogger(false),
+        codexConfigPath,
+      });
+
+      try {
+        const response = await fetch(`${runtime.baseUrl}/responses`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "tokenpilot/gpt-5.4-mini",
+            stream: false,
+            prompt_cache_key: "019f-real-codex-session",
+            input: [{ role: "user", content: "turn one" }],
+          }),
+        });
+        assert.equal(response.status, 200);
+
+        const latestRaw = await readFile(join(stateDir, "session-state", "latest.json"), "utf8");
+        const latest = JSON.parse(latestRaw) as { sessionId?: string };
+        const synthSessionId = String(latest.sessionId ?? "");
+        assert.match(synthSessionId, /^codex-synth-/);
+
+        const synthSnapshotRaw = await readFile(
+          join(stateDir, "session-state", "sessions", `${encodeURIComponent(synthSessionId)}.json`),
+          "utf8",
+        );
+        const synthSnapshot = JSON.parse(synthSnapshotRaw) as {
+          workspaceHint?: string;
+          lastHookEvent?: string;
+          lastToolName?: string;
+        };
+        assert.equal(synthSnapshot.workspaceHint, "/repo/from-hook");
+        assert.equal(synthSnapshot.lastHookEvent, "PostToolUse");
+        assert.equal(synthSnapshot.lastToolName, "read");
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
   });
 });

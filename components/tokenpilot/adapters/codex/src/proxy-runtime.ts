@@ -27,8 +27,10 @@ import {
 } from "./upstream.js";
 import {
   appendCodexRecentTurnBinding,
+  indexCodexHostSessionAlias,
   indexCodexPromptCacheKeySession,
   indexCodexResponseSession,
+  mergeCodexSessionSnapshot,
   resolveCodexSessionIdByPromptCacheKey,
   resolveCodexSessionIdByResponseId,
   upsertCodexSessionSnapshot,
@@ -141,6 +143,13 @@ export async function startCodexResponsesProxy(params: {
       }
       const sessionId = envelope.session.sessionId;
       if (inboundPromptCacheKey) {
+        if (
+          inboundPromptCacheKey !== sessionId
+          && !inboundPromptCacheKey.startsWith("lightmem2-codex-")
+        ) {
+          await mergeCodexSessionSnapshot(config.stateDir, inboundPromptCacheKey, sessionId);
+          await indexCodexHostSessionAlias(config.stateDir, inboundPromptCacheKey, sessionId);
+        }
         await indexCodexPromptCacheKeySession(config.stateDir, inboundPromptCacheKey, sessionId);
       }
       let reductionSummary: CodexReductionSummary | undefined;

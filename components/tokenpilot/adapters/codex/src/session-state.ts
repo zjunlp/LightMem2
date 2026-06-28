@@ -38,6 +38,10 @@ export type CodexRecentTurnBinding = {
   updatedAt: string;
 };
 
+export type UpsertCodexSessionSnapshotOptions = {
+  markLatest?: boolean;
+};
+
 type CodexResponseSessionRef = {
   responseId: string;
   sessionId: string;
@@ -50,12 +54,22 @@ type CodexPromptCacheKeySessionRef = {
   updatedAt: string;
 };
 
+type CodexHostSessionAliasRef = {
+  codexSessionId: string;
+  sessionId: string;
+  updatedAt: string;
+};
+
 function responseSessionPath(stateDir: string, responseId: string): string {
   return join(sessionStateRoot(stateDir), "responses", `${encodeURIComponent(responseId)}.json`);
 }
 
 function promptCacheKeySessionPath(stateDir: string, promptCacheKey: string): string {
   return join(sessionStateRoot(stateDir), "prompt-cache-keys", `${encodeURIComponent(promptCacheKey)}.json`);
+}
+
+function hostSessionAliasPath(stateDir: string, codexSessionId: string): string {
+  return join(sessionStateRoot(stateDir), "host-session-aliases", `${encodeURIComponent(codexSessionId)}.json`);
 }
 
 async function markLatestSession(stateDir: string, sessionId: string, updatedAt: string): Promise<void> {
@@ -73,6 +87,7 @@ export async function upsertCodexSessionSnapshot(
   stateDir: string,
   sessionId: string,
   patch: Partial<CodexSessionSnapshot>,
+  options?: UpsertCodexSessionSnapshotOptions,
 ): Promise<CodexSessionSnapshot> {
   const current = await loadCodexSessionSnapshot(stateDir, sessionId);
   const updatedAt = new Date().toISOString();
@@ -89,8 +104,40 @@ export async function upsertCodexSessionSnapshot(
     updatedAt,
   };
   await writeSessionSnapshot(stateDir, sessionId, next);
-  await markLatestSession(stateDir, sessionId, updatedAt);
+  if (options?.markLatest !== false) {
+    await markLatestSession(stateDir, sessionId, updatedAt);
+  }
   return next;
+}
+
+export async function mergeCodexSessionSnapshot(
+  stateDir: string,
+  sourceSessionId: string,
+  targetSessionId: string,
+): Promise<CodexSessionSnapshot | null> {
+  const normalizedSourceSessionId = sourceSessionId.trim();
+  const normalizedTargetSessionId = targetSessionId.trim();
+  if (!normalizedSourceSessionId || !normalizedTargetSessionId) return null;
+  if (normalizedSourceSessionId === normalizedTargetSessionId) {
+    return loadCodexSessionSnapshot(stateDir, normalizedTargetSessionId);
+  }
+
+  const [source, target] = await Promise.all([
+    loadCodexSessionSnapshot(stateDir, normalizedSourceSessionId),
+    loadCodexSessionSnapshot(stateDir, normalizedTargetSessionId),
+  ]);
+  if (!source) return target;
+
+  return upsertCodexSessionSnapshot(stateDir, normalizedTargetSessionId, {
+    latestResponseId: target?.latestResponseId ?? source.latestResponseId,
+    previousResponseId: target?.previousResponseId ?? source.previousResponseId,
+    latestModel: target?.latestModel ?? source.latestModel,
+    workspaceHint: target?.workspaceHint ?? source.workspaceHint,
+    lastHookEvent: target?.lastHookEvent ?? source.lastHookEvent,
+    lastToolName: target?.lastToolName ?? source.lastToolName,
+    lastToolInputChars: target?.lastToolInputChars ?? source.lastToolInputChars,
+    lastToolOutputChars: target?.lastToolOutputChars ?? source.lastToolOutputChars,
+  });
 }
 
 export async function appendCodexRecentTurnBinding(
@@ -149,6 +196,34 @@ export async function resolveCodexSessionIdByPromptCacheKey(
   if (!normalizedPromptCacheKey) return undefined;
   const record = await readJsonFile<CodexPromptCacheKeySessionRef>(
     promptCacheKeySessionPath(stateDir, normalizedPromptCacheKey),
+  );
+  const sessionId = typeof record?.sessionId === "string" ? record.sessionId.trim() : "";
+  return sessionId || undefined;
+}
+
+export async function indexCodexHostSessionAlias(
+  stateDir: string,
+  codexSessionId: string,
+  sessionId: string,
+): Promise<void> {
+  const normalizedCodexSessionId = codexSessionId.trim();
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedCodexSessionId || !normalizedSessionId) return;
+  await writeJsonFileAtomic(hostSessionAliasPath(stateDir, normalizedCodexSessionId), {
+    codexSessionId: normalizedCodexSessionId,
+    sessionId: normalizedSessionId,
+    updatedAt: new Date().toISOString(),
+  } satisfies CodexHostSessionAliasRef);
+}
+
+export async function resolveCodexSessionAlias(
+  stateDir: string,
+  codexSessionId: string,
+): Promise<string | undefined> {
+  const normalizedCodexSessionId = codexSessionId.trim();
+  if (!normalizedCodexSessionId) return undefined;
+  const record = await readJsonFile<CodexHostSessionAliasRef>(
+    hostSessionAliasPath(stateDir, normalizedCodexSessionId),
   );
   const sessionId = typeof record?.sessionId === "string" ? record.sessionId.trim() : "";
   return sessionId || undefined;
