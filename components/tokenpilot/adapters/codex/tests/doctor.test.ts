@@ -124,6 +124,7 @@ test("inspectCodexDoctor detects installed recovery MCP entry", async () => {
       "[mcp_servers.tokenpilot_memory_fault_recover]",
       `command = ${JSON.stringify(process.execPath)}`,
       `args = [${JSON.stringify("/tmp/server.js")}]`,
+      "startup_timeout_sec = 90",
       "",
       "[mcp_servers.tokenpilot_memory_fault_recover.env]",
       `TOKENPILOT_STATE_DIR = ${JSON.stringify(join(dir, "state"))}`,
@@ -147,6 +148,7 @@ test("inspectCodexDoctor detects installed recovery MCP entry", async () => {
     assert.equal(report.mcpStateDirMatches, true);
     assert.equal(report.mcpCommandMatches, true);
     assert.equal(report.mcpArgsMatch, false);
+    assert.equal(report.mcpStartupTimeoutSecMatches, true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -203,4 +205,41 @@ test("formatCodexDoctorReport includes remediation hints for drifted installs", 
   const text = formatCodexDoctorReport(report);
   assert.match(text, /Suggested fixes:/);
   assert.match(text, /rerun the Codex install command/i);
+});
+
+test("formatCodexDoctorReport shows degraded mode when core runtime is healthy but MCP recovery drifted", () => {
+  const text = formatCodexDoctorReport({
+    configPath: "/tmp/config.toml",
+    hooksConfigPath: "/tmp/hooks.json",
+    tokenPilotConfigPath: "/tmp/tokenpilot.json",
+    proxyBaseUrl: "http://127.0.0.1:17667/v1",
+    expectedHookCommand: "node hooks-handler.js",
+    expectedMcpCommand: process.execPath,
+    expectedMcpArgs: ["/tmp/server.js"],
+    expectedMcpStartupTimeoutSec: 90,
+    providerInstalled: true,
+    hooksInstalled: true,
+    hooksComplete: true,
+    hooksMatchExpectedCommand: true,
+    installedHookEvents: ["SessionStart", "PreToolUse", "PostToolUse", "Stop"],
+    missingHookEvents: [],
+    daemonRunning: true,
+    proxyHealthy: true,
+    stateDir: "/tmp/state",
+    upstreamProvider: "OpenAI",
+    mcpInstalled: true,
+    mcpStateDirMatches: true,
+    mcpCommandMatches: true,
+    mcpArgsMatch: true,
+    mcpStartupTimeoutSecMatches: false,
+    coreRuntimeHealthy: true,
+    recoveryMcpHealthy: false,
+    degradedMode: true,
+  });
+
+  assert.match(text, /core runtime healthy: yes/);
+  assert.match(text, /recovery MCP healthy: no/);
+  assert.match(text, /degraded mode: yes/);
+  assert.match(text, /stable-prefix rewriting and reduction remain available/);
+  assert.match(text, /startup_timeout_sec/);
 });

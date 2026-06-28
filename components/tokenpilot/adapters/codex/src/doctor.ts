@@ -28,6 +28,11 @@ export type CodexDoctorReport = {
   mcpStateDirMatches: boolean;
   mcpCommandMatches: boolean;
   mcpArgsMatch: boolean;
+  mcpStartupTimeoutSecMatches: boolean;
+  expectedMcpStartupTimeoutSec: number;
+  coreRuntimeHealthy: boolean;
+  recoveryMcpHealthy: boolean;
+  degradedMode: boolean;
 };
 
 const HOOK_EVENT_NAMES = [
@@ -36,6 +41,7 @@ const HOOK_EVENT_NAMES = [
   "PostToolUse",
   "Stop",
 ] as const;
+const EXPECTED_CODEX_MCP_STARTUP_TIMEOUT_SEC = 90;
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -84,6 +90,10 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- expected hook command: ${report.expectedHookCommand}`,
     `- expected MCP command: ${report.expectedMcpCommand}`,
     `- expected MCP args: ${report.expectedMcpArgs.length > 0 ? report.expectedMcpArgs.join(" ") : "(none)"}`,
+    `- expected MCP startup timeout: ${report.expectedMcpStartupTimeoutSec}s`,
+    `- core runtime healthy: ${report.coreRuntimeHealthy ? "yes" : "no"}`,
+    `- recovery MCP healthy: ${report.recoveryMcpHealthy ? "yes" : "no"}`,
+    `- degraded mode: ${report.degradedMode ? "yes" : "no"}`,
     `- provider installed: ${report.providerInstalled ? "yes" : "no"}`,
     `- recovery MCP installed: ${report.mcpInstalled ? "yes" : "no"}`,
     `- hooks installed: ${report.hooksInstalled ? "yes" : "no"}`,
@@ -94,6 +104,7 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- recovery MCP stateDir matches: ${report.mcpStateDirMatches ? "yes" : "no"}`,
     `- recovery MCP command matches: ${report.mcpCommandMatches ? "yes" : "no"}`,
     `- recovery MCP args match: ${report.mcpArgsMatch ? "yes" : "no"}`,
+    `- recovery MCP startup timeout matches: ${report.mcpStartupTimeoutSecMatches ? "yes" : "no"}`,
     `- daemon running: ${report.daemonRunning ? "yes" : "no"}`,
     `- proxy healthy: ${report.proxyHealthy ? "yes" : "no"}`,
     `- proxy base URL: ${report.proxyBaseUrl}`,
@@ -109,8 +120,19 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
   if (!report.mcpInstalled || !report.mcpStateDirMatches || !report.mcpCommandMatches || !report.mcpArgsMatch) {
     fixes.push("- rerun the Codex install command to refresh the recovery MCP entry in `config.toml`");
   }
+  if (report.mcpInstalled && !report.mcpStartupTimeoutSecMatches) {
+    fixes.push("- rerun the Codex install command or set `startup_timeout_sec` on `tokenpilot_memory_fault_recover` to the expected value");
+  }
   if (!report.daemonRunning || !report.proxyHealthy) {
     fixes.push("- start or restart the TokenPilot Codex daemon before using Codex");
+  }
+  if (report.degradedMode) {
+    lines.push(
+      "",
+      "Degraded mode:",
+      "- stable-prefix rewriting and reduction remain available",
+      "- real `memory_fault_recover` MCP recovery is currently unavailable or drifted",
+    );
   }
   if (fixes.length > 0) {
     lines.push("", "Suggested fixes:");
@@ -152,6 +174,17 @@ export async function inspectCodexDoctor(params: {
   const hooksComplete = missingHookEvents.length === 0;
   const hooksInstalled = installedHookEvents.length > 0;
   const hooksMatchExpectedCommand = HOOK_EVENT_NAMES.every((name) => matchedHookEvents.includes(name));
+  const proxyHealthy = await checkHealth(proxyBaseUrl);
+  const mcpStartupTimeoutSecMatches = mcp?.startupTimeoutSec === EXPECTED_CODEX_MCP_STARTUP_TIMEOUT_SEC;
+  const coreRuntimeHealthy = Boolean(tokenpilotProvider) && daemon.running && proxyHealthy;
+  const recoveryMcpHealthy =
+    Boolean(mcp?.command)
+    && mcp?.env?.TOKENPILOT_STATE_DIR === params.config.stateDir
+    && mcp?.command === expectedMcpSpec.command
+    && Array.isArray(mcp?.args)
+    && mcp.args.length === expectedMcpSpec.args.length
+    && mcp.args.every((value, index) => value === expectedMcpSpec.args[index])
+    && mcpStartupTimeoutSecMatches;
   return {
     configPath: params.configPath,
     hooksConfigPath: params.hooksConfigPath,
@@ -167,7 +200,7 @@ export async function inspectCodexDoctor(params: {
     installedHookEvents,
     missingHookEvents,
     daemonRunning: daemon.running,
-    proxyHealthy: await checkHealth(proxyBaseUrl),
+    proxyHealthy,
     stateDir: params.config.stateDir,
     upstreamProvider: params.config.upstreamProvider,
     mcpInstalled: Boolean(mcp?.command),
@@ -177,5 +210,10 @@ export async function inspectCodexDoctor(params: {
       Array.isArray(mcp?.args)
       && mcp.args.length === expectedMcpSpec.args.length
       && mcp.args.every((value, index) => value === expectedMcpSpec.args[index]),
+    mcpStartupTimeoutSecMatches,
+    expectedMcpStartupTimeoutSec: EXPECTED_CODEX_MCP_STARTUP_TIMEOUT_SEC,
+    coreRuntimeHealthy,
+    recoveryMcpHealthy,
+    degradedMode: coreRuntimeHealthy && !recoveryMcpHealthy,
   };
 }
