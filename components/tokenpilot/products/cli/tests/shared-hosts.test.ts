@@ -87,6 +87,29 @@ test("shared host helpers return shared report fallback messages and report text
     },
   });
 
+  const noAggregate = await buildSessionReportResult({
+    currentConfig: { stateDir: "/tmp/state" },
+    configAdapter: passthroughConfigAdapter,
+    async resolveLatestSessionId() {
+      return "session-latest";
+    },
+    async readLatestUxEffect() {
+      return {
+        at: "2026-06-28T12:20:00.000Z",
+        sessionId: "session-ux",
+        model: "test-model",
+        countMode: "chars",
+        beforeCount: 1000,
+        afterCount: 900,
+        savedCount: 100,
+      };
+    },
+    async readSessionAggregate(_stateDir, sessionId) {
+      assert.equal(sessionId, "session-ux");
+      return null;
+    },
+  });
+
   const report = await buildSessionReportResult({
     currentConfig: {
       stateDir: "/tmp/state",
@@ -127,6 +150,7 @@ test("shared host helpers return shared report fallback messages and report text
 
   assert.equal(noStateDir.text, "TokenPilot stateDir is not configured.");
   assert.equal(noStats.text, "No TokenPilot session stats yet.");
+  assert.equal(noAggregate.text, "No TokenPilot savings recorded yet for session session-ux.");
   assert.match(report.text, /session: session-a/);
   assert.match(report.text, /saved chars: 800/);
 });
