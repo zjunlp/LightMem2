@@ -71,16 +71,31 @@ export function resolveTokenPilotMcpServerSpec(params?: {
   requireBuild?: boolean;
 }): TokenPilotMcpServerSpec {
   const packageRoot = packageRootFromHere();
-  const entryPath = join(packageRoot, "dist", "server.js");
-  if (params?.requireBuild !== false && !existsSync(entryPath)) {
+  const distEntryPath = join(packageRoot, "dist", "server.js");
+  const srcEntryPath = join(packageRoot, "src", "server.ts");
+  const runningViaTsx =
+    process.execArgv.includes("--import")
+    && process.execArgv.some((value) => value.includes("tsx"));
+
+  let entryPath = distEntryPath;
+  let command = process.execPath;
+  let args = [entryPath];
+
+  if (runningViaTsx && existsSync(srcEntryPath)) {
+    entryPath = srcEntryPath;
+    args = ["--import", "tsx", entryPath];
+  } else if (params?.requireBuild !== false && !existsSync(distEntryPath)) {
     throw new Error(
-      `TokenPilot MCP server is not built yet: ${entryPath}. Run \`pnpm --dir <repo> --filter @tokenpilot/mcp build\` first.`,
+      `TokenPilot MCP server is not built yet: ${distEntryPath}. Run \`pnpm --dir <repo> --filter @tokenpilot/mcp build\` first.`,
     );
+  } else {
+    entryPath = distEntryPath;
+    args = [entryPath];
   }
   return {
     serverName: TOKENPILOT_MCP_SERVER_NAME,
-    command: process.execPath,
-    args: [entryPath],
+    command,
+    args,
     env: {
       TOKENPILOT_STATE_DIR: resolveRecoveryStateDir(params?.stateDir),
     },
@@ -88,13 +103,18 @@ export function resolveTokenPilotMcpServerSpec(params?: {
   };
 }
 
-function encodeMcpMessage(message: unknown): Buffer {
+export type TokenPilotMcpWireProtocol = "newline_json" | "content_length";
+
+export function encodeMcpMessage(message: unknown, protocol: TokenPilotMcpWireProtocol = "newline_json"): Buffer {
   const body = Buffer.from(JSON.stringify(message), "utf8");
-  const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8");
-  return Buffer.concat([header, body]);
+  if (protocol === "content_length") {
+    const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8");
+    return Buffer.concat([header, body]);
+  }
+  return Buffer.concat([body, Buffer.from("\n", "utf8")]);
 }
 
-function tryReadMcpInitializeResponse(buffer: Buffer): {
+function tryReadContentLengthMcpInitializeResponse(buffer: Buffer): {
   ok: boolean;
   detail: string;
 } | null {
@@ -136,17 +156,50 @@ function tryReadMcpInitializeResponse(buffer: Buffer): {
   }
 }
 
+function tryReadNewlineMcpInitializeResponse(buffer: Buffer): {
+  ok: boolean;
+  detail: string;
+} | null {
+  const newlineIndex = buffer.indexOf("\n");
+  if (newlineIndex < 0) return null;
+  const line = buffer.slice(0, newlineIndex).toString("utf8").trim();
+  if (!line) return null;
+  try {
+    const parsed = JSON.parse(line) as {
+      error?: { message?: string };
+      result?: { serverInfo?: { name?: string } };
+    };
+    if (parsed?.error?.message) {
+      return {
+        ok: false,
+        detail: `MCP initialize failed: ${parsed.error.message}`,
+      };
+    }
+    return {
+      ok: true,
+      detail: `MCP initialize succeeded (${parsed?.result?.serverInfo?.name ?? "server"})`,
+    };
+  } catch {
+    return {
+      ok: false,
+      detail: "invalid JSON in newline MCP initialize response",
+    };
+  }
+}
+
 export async function probeTokenPilotMcpServer(
   spec: TokenPilotMcpServerSpec,
   params?: {
     timeoutMs?: number;
     clientName?: string;
     clientVersion?: string;
+    protocol?: TokenPilotMcpWireProtocol;
   },
 ): Promise<TokenPilotMcpProbeResult> {
   const timeoutMs = params?.timeoutMs ?? DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS;
   const clientName = params?.clientName?.trim() || "tokenpilot-mcp-probe";
   const clientVersion = params?.clientVersion?.trim() || "0.1.0";
+  const protocol = params?.protocol ?? "newline_json";
 
   return new Promise((resolve) => {
     const child = spawn(spec.command, spec.args, {
@@ -195,7 +248,9 @@ export async function probeTokenPilotMcpServer(
         stdoutBuffer,
         Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
       ]);
-      const parsed = tryReadMcpInitializeResponse(stdoutBuffer);
+      const parsed = protocol === "content_length"
+        ? tryReadContentLengthMcpInitializeResponse(stdoutBuffer)
+        : tryReadNewlineMcpInitializeResponse(stdoutBuffer);
       if (!parsed) return;
       finish({
         ok: parsed.ok,
@@ -230,7 +285,7 @@ export async function probeTokenPilotMcpServer(
           version: clientVersion,
         },
       },
-    }));
+    }, protocol));
   });
 }
 

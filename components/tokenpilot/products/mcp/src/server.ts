@@ -1,13 +1,11 @@
 import { stdin, stdout } from "node:process";
+import { encodeMcpMessage, type TokenPilotMcpWireProtocol } from "./index.js";
 import { handleMcpRequest } from "./index.js";
 
 type HeaderMap = Map<string, string>;
 
-function writeMessage(message: unknown): void {
-  const body = Buffer.from(JSON.stringify(message), "utf8");
-  const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8");
-  stdout.write(header);
-  stdout.write(body);
+function writeMessage(message: unknown, protocol: TokenPilotMcpWireProtocol): void {
+  stdout.write(encodeMcpMessage(message, protocol));
 }
 
 function parseHeaders(raw: string): HeaderMap {
@@ -24,25 +22,39 @@ function parseHeaders(raw: string): HeaderMap {
 
 async function main(): Promise<void> {
   let buffer = Buffer.alloc(0);
+  let preferredProtocol: TokenPilotMcpWireProtocol = "newline_json";
 
   stdin.on("data", async (chunk: Buffer | string) => {
     buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
     for (;;) {
+      let body: string | null = null;
       const boundary = buffer.indexOf("\r\n\r\n");
-      if (boundary < 0) break;
-      const headerText = buffer.slice(0, boundary).toString("utf8");
-      const headers = parseHeaders(headerText);
-      const contentLength = Number(headers.get("content-length") ?? "");
-      if (!Number.isFinite(contentLength) || contentLength < 0) {
-        buffer = Buffer.alloc(0);
+      const newlineIndex = buffer.indexOf("\n");
+
+      if (boundary >= 0 && (newlineIndex < 0 || boundary < newlineIndex)) {
+        const headerText = buffer.slice(0, boundary).toString("utf8");
+        const headers = parseHeaders(headerText);
+        const contentLength = Number(headers.get("content-length") ?? "");
+        if (!Number.isFinite(contentLength) || contentLength < 0) {
+          buffer = Buffer.alloc(0);
+          break;
+        }
+        const messageStart = boundary + 4;
+        const messageEnd = messageStart + contentLength;
+        if (buffer.length < messageEnd) break;
+        body = buffer.slice(messageStart, messageEnd).toString("utf8");
+        buffer = buffer.slice(messageEnd);
+        preferredProtocol = "content_length";
+      } else if (newlineIndex >= 0) {
+        body = buffer.slice(0, newlineIndex).toString("utf8").trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (!body) {
+          continue;
+        }
+        preferredProtocol = "newline_json";
+      } else {
         break;
       }
-      const messageStart = boundary + 4;
-      const messageEnd = messageStart + contentLength;
-      if (buffer.length < messageEnd) break;
-
-      const body = buffer.slice(messageStart, messageEnd).toString("utf8");
-      buffer = buffer.slice(messageEnd);
 
       let parsed: unknown;
       try {
@@ -52,7 +64,7 @@ async function main(): Promise<void> {
           jsonrpc: "2.0",
           id: null,
           error: { code: -32700, message: "Parse error" },
-        });
+        }, preferredProtocol);
         continue;
       }
 
@@ -62,7 +74,7 @@ async function main(): Promise<void> {
         method?: string;
         params?: Record<string, unknown>;
       });
-      if (response) writeMessage(response);
+      if (response) writeMessage(response, preferredProtocol);
     }
   });
 }
@@ -73,6 +85,6 @@ main().catch((error) => {
     jsonrpc: "2.0",
     id: null,
     error: { code: -32000, message },
-  });
+  }, "newline_json");
   process.exit(1);
 });

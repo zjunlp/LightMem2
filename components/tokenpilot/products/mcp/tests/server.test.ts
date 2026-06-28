@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { archiveContent } from "@tokenpilot/runtime-core";
 import {
+  encodeMcpMessage,
   handleMcpRequest,
   MEMORY_FAULT_RECOVER_TOOL_NAME,
   probeTokenPilotMcpServer,
@@ -99,9 +101,115 @@ test("probeTokenPilotMcpServer completes initialize handshake", async () => {
     timeoutMs: 3_000,
     clientName: "mcp-test",
     clientVersion: "0.1.0",
+    protocol: "newline_json",
   });
 
   assert.equal(result.ok, true);
   assert.equal(result.timedOut, false);
   assert.match(result.detail, /initialize succeeded/i);
+});
+
+function tryExtractContentLengthBody(stdout: string): string | null {
+  const boundary = stdout.indexOf("\r\n\r\n");
+  if (boundary < 0) return null;
+  const header = stdout.slice(0, boundary);
+  const match = /^Content-Length:\s*(\d+)$/im.exec(header);
+  if (!match) return null;
+  const contentLength = Number(match[1]);
+  const body = stdout.slice(boundary + 4);
+  if (Buffer.byteLength(body, "utf8") < contentLength) return null;
+  return body.slice(0, contentLength);
+}
+
+test("MCP server responds to newline-delimited JSON-RPC stdio", async () => {
+  const spec = resolveTokenPilotMcpServerSpec({
+    stateDir: join(tmpdir(), "lightmem2-mcp-newline-state"),
+  });
+  const child = spawn(spec.command, spec.args, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...spec.env,
+    },
+  });
+
+  try {
+    const response = await new Promise<string>((resolve, reject) => {
+      let stdout = "";
+      const timer = setTimeout(() => {
+        reject(new Error("newline MCP response timeout"));
+      }, 3_000);
+      child.stdout.on("data", (chunk: Buffer | string) => {
+        stdout += chunk.toString();
+        if (stdout.includes("\n")) {
+          clearTimeout(timer);
+          resolve(stdout);
+        }
+      });
+      child.once("error", reject);
+      child.stdin.write(encodeMcpMessage({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "newline-test", version: "0.1.0" },
+        },
+      }, "newline_json"));
+    });
+
+    const firstLine = response.trim().split("\n")[0] ?? "";
+    const parsed = JSON.parse(firstLine) as { result?: { serverInfo?: { name?: string } } };
+    assert.equal(parsed.result?.serverInfo?.name, "tokenpilot-memory-fault-recover");
+  } finally {
+    child.kill();
+  }
+});
+
+test("MCP server remains compatible with content-length framing", async () => {
+  const spec = resolveTokenPilotMcpServerSpec({
+    stateDir: join(tmpdir(), "lightmem2-mcp-content-length-state"),
+  });
+  const child = spawn(spec.command, spec.args, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...spec.env,
+    },
+  });
+
+  try {
+    const response = await new Promise<string>((resolve, reject) => {
+      let stdout = "";
+      const timer = setTimeout(() => {
+        reject(new Error("content-length MCP response timeout"));
+      }, 3_000);
+      child.stdout.on("data", (chunk: Buffer | string) => {
+        stdout += chunk.toString();
+        if (tryExtractContentLengthBody(stdout)) {
+          clearTimeout(timer);
+          resolve(stdout);
+        }
+      });
+      child.once("error", reject);
+      child.stdin.write(encodeMcpMessage({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "content-length-test", version: "0.1.0" },
+        },
+      }, "content_length"));
+    });
+
+    assert.match(response, /Content-Length:/);
+    const body = tryExtractContentLengthBody(response);
+    assert.ok(body);
+    assert.match(body, /tokenpilot-memory-fault-recover/);
+  } finally {
+    child.kill();
+  }
 });
