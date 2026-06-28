@@ -45,6 +45,28 @@ test("codec normalizes developer role on decode and restores it on encode", () =
   assert.equal(encoded.input[0].metadata, undefined);
 });
 
+test("codec preserves responses input items that do not carry message roles", () => {
+  const codec = createCodexResponsesPayloadCodec();
+  const rawPayload: any = {
+    model: "tokenpilot/gpt-5.4-mini",
+    stream: false,
+    input: [
+      { role: "developer", content: "stay stable" },
+      { type: "function_call_output", call_id: "call-1", output: "{\"ok\":true}" },
+      { type: "reasoning", summary: [] },
+    ],
+  };
+
+  const envelope = codec.decodeRequest(rawPayload);
+  const encoded = codec.encodeRequest(envelope) as any;
+
+  assert.equal(encoded.input[0].role, "developer");
+  assert.equal(encoded.input[1].type, "function_call_output");
+  assert.equal(encoded.input[1].role, undefined);
+  assert.equal(encoded.input[2].type, "reasoning");
+  assert.equal(encoded.input[2].role, undefined);
+});
+
 test("codex session resolver uses mapped previous response session instead of raw previous_response_id", () => {
   const codec = createCodexResponsesPayloadCodec(
     createCodexSessionResolver({

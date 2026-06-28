@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 
 import {
   appendCodexRecentTurnBinding,
+  indexCodexPromptCacheKeySession,
   loadCodexRecentTurnBindings,
   loadCodexSessionSnapshot,
+  resolveCodexSessionIdByPromptCacheKey,
   resolveLatestCodexSessionId,
   upsertCodexSessionSnapshot,
 } from "../src/session-state.js";
@@ -59,6 +61,20 @@ test("session-state persists snapshots and recent turn bindings per session", as
     assert.equal(bindings[0]?.responseId, "resp-3");
     assert.equal(bindings[1]?.responseId, "resp-2");
     assert.equal(latestSessionId, "session-a");
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("session-state resolves prompt_cache_key session mappings", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-codex-prompt-cache-session-"));
+  try {
+    await indexCodexPromptCacheKeySession(stateDir, "pk-session-a", "codex-synth-a");
+    const resolved = await resolveCodexSessionIdByPromptCacheKey(stateDir, "pk-session-a");
+    const missing = await resolveCodexSessionIdByPromptCacheKey(stateDir, "pk-session-b");
+
+    assert.equal(resolved, "codex-synth-a");
+    assert.equal(missing, undefined);
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }

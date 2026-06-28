@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -207,5 +208,286 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
 
     await runtime?.close();
     await upstream.close();
+  });
+});
+
+test("Codex streaming requests persist response-session mapping before the next turn resolves", async () => {
+  await withTempHome("lightmem2-codex-stream-session-", async (homeDir) => {
+    const proxyPort = await reserveUnusedPort();
+    const upstreamPort = await reserveUnusedPort();
+    const stateDir = join(homeDir, ".codex", "tokenpilot-state", "tokenpilot");
+    const codexConfigPath = defaultCodexConfigPath();
+    const tokenPilotConfigPath = defaultTokenPilotConfigPath();
+    const requests: Array<Record<string, unknown>> = [];
+
+    const upstream = createHttpServer(async (req, res) => {
+      if (req.method !== "POST" || req.url !== "/v1/responses") {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+      }
+      requests.push(JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>);
+
+      const stream = requests.length === 1;
+      if (stream) {
+        res.statusCode = 200;
+        res.setHeader("content-type", "text/event-stream; charset=utf-8");
+        res.write("event: response.created\n");
+        res.write("data: {\"response\":{\"id\":\"resp-stream-1\"}}\n\n");
+        res.write("event: response.output_text.delta\n");
+        res.write("data: {\"delta\":{\"output_text\":\"hello\"}}\n\n");
+        res.write("event: response.completed\n");
+        res.write("data: {\"usage\":{\"input_tokens\":10,\"output_tokens\":3}}\n\n");
+        res.end("data: [DONE]\n\n");
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({
+        id: "resp-turn-2",
+        object: "response",
+        previous_response_id: "resp-stream-1",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "continued" }],
+          },
+        ],
+      }));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      upstream.once("error", reject);
+      upstream.listen(upstreamPort, "127.0.0.1", () => {
+        upstream.off("error", reject);
+        resolve();
+      });
+    });
+
+    try {
+      await writeTokenPilotCodexConfig(
+        normalizeTokenPilotCodexConfig({
+          proxyPort,
+          stateDir,
+          upstreamProvider: "OpenAI",
+          upstream: {
+            name: "OpenAI",
+            baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
+            wireApi: "responses",
+            requiresOpenAIAuth: true,
+          },
+          reduction: {
+            triggerMinChars: 999999,
+            maxToolChars: 999999,
+            passes: {
+              readStateCompaction: false,
+              toolPayloadTrim: false,
+              htmlSlimming: false,
+              execOutputTruncation: false,
+              agentsStartupOptimization: false,
+            },
+          },
+        }),
+        tokenPilotConfigPath,
+      );
+
+      const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+      const runtime = await startCodexResponsesProxy({
+        config,
+        logger: createConsoleLogger(false),
+        codexConfigPath,
+      });
+
+      try {
+        const streamResp = await fetch(`${runtime.baseUrl}/responses`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "tokenpilot/gpt-5.4-mini",
+            stream: true,
+            input: [{ role: "user", content: "turn one" }],
+          }),
+        });
+        assert.equal(streamResp.status, 200);
+        await streamResp.text();
+
+        const secondResp = await fetch(`${runtime.baseUrl}/responses`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "tokenpilot/gpt-5.4-mini",
+            stream: false,
+            previous_response_id: "resp-stream-1",
+            input: [{ role: "user", content: "turn two" }],
+          }),
+        });
+        assert.equal(secondResp.status, 200);
+
+        const latestRaw = await readFile(join(stateDir, "session-state", "latest.json"), "utf8");
+        const latest = JSON.parse(latestRaw) as { sessionId?: string };
+        const latestSessionId = String(latest.sessionId ?? "");
+        assert.match(latestSessionId, /^codex-synth-/);
+
+        const bindingsRaw = await readFile(
+          join(stateDir, "session-state", "bindings", `${encodeURIComponent(latestSessionId)}.jsonl`),
+          "utf8",
+        );
+        const bindings = bindingsRaw.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as {
+          sessionId: string;
+          responseId?: string;
+          previousResponseId?: string;
+        });
+
+        assert.equal(bindings.length, 2);
+        assert.equal(bindings[0]?.sessionId, latestSessionId);
+        assert.equal(bindings[1]?.sessionId, latestSessionId);
+        assert.equal(bindings[0]?.responseId, "resp-stream-1");
+        assert.equal(bindings[1]?.responseId, "resp-turn-2");
+        assert.equal(requests[1]?.previous_response_id, "resp-stream-1");
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  });
+});
+
+test("Codex requests reuse synth sessions through prompt_cache_key when previous_response_id is unavailable", async () => {
+  await withTempHome("lightmem2-codex-prompt-cache-session-", async (homeDir) => {
+    const proxyPort = await reserveUnusedPort();
+    const upstreamPort = await reserveUnusedPort();
+    const stateDir = join(homeDir, ".codex", "tokenpilot-state", "tokenpilot");
+    const codexConfigPath = defaultCodexConfigPath();
+    const tokenPilotConfigPath = defaultTokenPilotConfigPath();
+    const requests: Array<Record<string, unknown>> = [];
+
+    const upstream = createHttpServer(async (req, res) => {
+      if (req.method !== "POST" || req.url !== "/v1/responses") {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+      }
+      requests.push(JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>);
+
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({
+        id: `resp-pk-${requests.length}`,
+        object: "response",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: `turn-${requests.length}` }],
+          },
+        ],
+      }));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      upstream.once("error", reject);
+      upstream.listen(upstreamPort, "127.0.0.1", () => {
+        upstream.off("error", reject);
+        resolve();
+      });
+    });
+
+    try {
+      await writeTokenPilotCodexConfig(
+        normalizeTokenPilotCodexConfig({
+          proxyPort,
+          stateDir,
+          upstreamProvider: "OpenAI",
+          upstream: {
+            name: "OpenAI",
+            baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
+            wireApi: "responses",
+            requiresOpenAIAuth: true,
+          },
+          reduction: {
+            triggerMinChars: 999999,
+            maxToolChars: 999999,
+            passes: {
+              readStateCompaction: false,
+              toolPayloadTrim: false,
+              htmlSlimming: false,
+              execOutputTruncation: false,
+              agentsStartupOptimization: false,
+            },
+          },
+        }),
+        tokenPilotConfigPath,
+      );
+
+      const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+      const runtime = await startCodexResponsesProxy({
+        config,
+        logger: createConsoleLogger(false),
+        codexConfigPath,
+      });
+
+      try {
+        const firstResp = await fetch(`${runtime.baseUrl}/responses`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "tokenpilot/gpt-5.4-mini",
+            stream: false,
+            prompt_cache_key: "pk-codex-session-1",
+            input: [{ role: "user", content: "turn one" }],
+          }),
+        });
+        assert.equal(firstResp.status, 200);
+
+        const secondResp = await fetch(`${runtime.baseUrl}/responses`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "tokenpilot/gpt-5.4-mini",
+            stream: false,
+            prompt_cache_key: "pk-codex-session-1",
+            input: [{ role: "user", content: "turn two" }],
+          }),
+        });
+        assert.equal(secondResp.status, 200);
+
+        const latestRaw = await readFile(join(stateDir, "session-state", "latest.json"), "utf8");
+        const latest = JSON.parse(latestRaw) as { sessionId?: string };
+        const latestSessionId = String(latest.sessionId ?? "");
+        assert.match(latestSessionId, /^codex-synth-/);
+
+        const bindingsRaw = await readFile(
+          join(stateDir, "session-state", "bindings", `${encodeURIComponent(latestSessionId)}.jsonl`),
+          "utf8",
+        );
+        const bindings = bindingsRaw.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as {
+          sessionId: string;
+          responseId?: string;
+        });
+
+        assert.equal(bindings.length, 2);
+        assert.equal(bindings[0]?.sessionId, latestSessionId);
+        assert.equal(bindings[1]?.sessionId, latestSessionId);
+        assert.equal(bindings[0]?.responseId, "resp-pk-1");
+        assert.equal(bindings[1]?.responseId, "resp-pk-2");
+        assert.equal(requests[0]?.prompt_cache_key, "pk-codex-session-1");
+        assert.equal(requests[1]?.prompt_cache_key, "pk-codex-session-1");
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
   });
 });
