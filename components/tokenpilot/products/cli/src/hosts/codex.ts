@@ -1,8 +1,10 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import type {
+import {
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
+  readLatestUxEffect,
+  readUxSessionAggregate,
 } from "@tokenpilot/host-adapter";
 import {
   getNestedValue,
@@ -27,7 +29,6 @@ import {
   resolveLatestCodexSessionId,
 } from "../../../../adapters/codex/src/session-state.js";
 import { renderCodexSessionVisual } from "../../../../adapters/codex/src/session-visual.js";
-import { readCodexUxSessionAggregate, readLatestCodexUxEffect } from "../../../../adapters/codex/src/ux-effects.js";
 import {
   applyStandardRuntimeModeConfig,
   buildSessionReportResult,
@@ -61,7 +62,7 @@ async function maybeResolveLatestSessionId(): Promise<string | undefined> {
     loadConfig,
     resolveStateDir: resolveCodexStateDir,
     resolveLatestSessionId: resolveLatestCodexSessionId,
-    readLatestUxEffect: readLatestCodexUxEffect,
+    readLatestUxEffect,
   });
 }
 
@@ -78,7 +79,7 @@ async function resolveCodexCliSessionId(params: {
   return resolvePreferredSessionId({
     stateDir,
     resolveLatestSessionId: resolveLatestCodexSessionId,
-    readLatestUxEffect: readLatestCodexUxEffect,
+    readLatestUxEffect,
   });
 }
 
@@ -149,8 +150,8 @@ export function createCodexCliBridge(target: {
         explicitSessionId: sessionId,
         configAdapter: codexProductSurfaceConfigAdapter,
         resolveLatestSessionId: resolveLatestCodexSessionId,
-        readLatestUxEffect: readLatestCodexUxEffect,
-        readSessionAggregate: readCodexUxSessionAggregate,
+        readLatestUxEffect,
+        readSessionAggregate: readUxSessionAggregate,
       });
     },
   };

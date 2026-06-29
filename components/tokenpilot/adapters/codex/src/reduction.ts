@@ -17,6 +17,7 @@ type SegmentBinding = {
   field: "content" | "arguments" | "output";
   blockIndex?: number;
   blockKey?: "text" | "content";
+  toolName?: string;
 };
 
 type ReductionInstruction = {
@@ -58,6 +59,19 @@ type CodexReductionReportEntry = {
   touchedSegmentIds?: string[];
 };
 
+export type CodexReductionVisualSegment = {
+  segmentId: string;
+  itemIndex: number;
+  field: "content" | "arguments" | "output" | "result";
+  blockIndex?: number;
+  blockKey?: "text" | "content";
+  toolName?: string;
+  savedChars: number;
+  beforeText: string;
+  afterText: string;
+  report: CodexReductionReportEntry[];
+};
+
 export type CodexReductionSummary = {
   changedItems: number;
   changedBlocks: number;
@@ -67,6 +81,7 @@ export type CodexReductionSummary = {
   report: CodexReductionReportEntry[];
   passEffects: CodexReductionPassEffect[];
   diagnostics: CodexReductionDiagnostics;
+  visualSegments?: CodexReductionVisualSegment[];
   skippedReason?: string;
 };
 
@@ -243,17 +258,32 @@ function buildTurnContext(payload: any, sessionId: string): {
       if (typeof item.output === "string") {
         const id = `input-${itemIndex}-output`;
         segments.push(segmentForText({ id, text: item.output, source: "responses.input.output", item, field: "output", latestUserQuery }));
-        bindings.push({ segmentId: id, itemIndex, field: "output" });
+        bindings.push({
+          segmentId: id,
+          itemIndex,
+          field: "output",
+          toolName: typeof item?.name === "string" ? item.name : undefined,
+        });
       }
       if (typeof item.arguments === "string") {
         const id = `input-${itemIndex}-arguments`;
         segments.push(segmentForText({ id, text: item.arguments, source: "responses.input.arguments", item, field: "arguments", latestUserQuery }));
-        bindings.push({ segmentId: id, itemIndex, field: "arguments" });
+        bindings.push({
+          segmentId: id,
+          itemIndex,
+          field: "arguments",
+          toolName: typeof item?.name === "string" ? item.name : undefined,
+        });
       }
       if (typeof item.content === "string") {
         const id = `input-${itemIndex}-content`;
         segments.push(segmentForText({ id, text: item.content, source: "responses.input.content", item, field: "content", latestUserQuery }));
-        bindings.push({ segmentId: id, itemIndex, field: "content" });
+        bindings.push({
+          segmentId: id,
+          itemIndex,
+          field: "content",
+          toolName: typeof item?.name === "string" ? item.name : undefined,
+        });
       }
       if (Array.isArray(item.content)) {
         item.content.forEach((block: any, blockIndex: number) => {
@@ -269,7 +299,14 @@ function buildTurnContext(payload: any, sessionId: string): {
             field: "content",
             latestUserQuery,
           }));
-          bindings.push({ segmentId: id, itemIndex, field: "content", blockIndex, blockKey });
+          bindings.push({
+            segmentId: id,
+            itemIndex,
+            field: "content",
+            blockIndex,
+            blockKey,
+            toolName: typeof item?.name === "string" ? item.name : undefined,
+          });
         });
       }
     });
@@ -567,6 +604,7 @@ export async function applyBeforeCallReductionToPayload(params: {
   let changedBlocks = 0;
   let savedChars = 0;
   const changedItems = new Set<number>();
+  const visualSegments: CodexReductionVisualSegment[] = [];
   for (const binding of bindings) {
     if (!changedSegmentIds.has(binding.segmentId)) continue;
     const segment = segmentMap.get(binding.segmentId);
@@ -591,7 +629,20 @@ export async function applyBeforeCallReductionToPayload(params: {
     }
     changedBlocks += 1;
     changedItems.add(binding.itemIndex);
-    savedChars += Math.max(0, before.length - segment.text.length);
+    const segmentSavedChars = Math.max(0, before.length - segment.text.length);
+    savedChars += segmentSavedChars;
+    visualSegments.push({
+      segmentId: binding.segmentId,
+      itemIndex: binding.itemIndex,
+      field: binding.field,
+      blockIndex: binding.blockIndex,
+      blockKey: binding.blockKey,
+      toolName: binding.toolName,
+      savedChars: segmentSavedChars,
+      beforeText: before,
+      afterText: segment.text,
+      report: report.filter((entry) => entry.changed && entry.touchedSegmentIds?.includes(binding.segmentId)),
+    });
   }
   return {
     changedItems: changedItems.size,
@@ -602,6 +653,7 @@ export async function applyBeforeCallReductionToPayload(params: {
     report,
     passEffects,
     diagnostics: built.diagnostics,
+    visualSegments,
   };
 }
 

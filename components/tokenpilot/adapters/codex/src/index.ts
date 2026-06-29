@@ -12,4 +12,3 @@ export * from "./stable-prefix.js";
 export * from "./stream-observer.js";
 export * from "./trace.js";
 export * from "./upstream.js";
-export * from "./ux-effects.js";

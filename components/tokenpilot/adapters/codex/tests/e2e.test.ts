@@ -13,6 +13,7 @@ import {
   startMockJsonUpstream,
   withTempHome,
 } from "@tokenpilot/host-adapter";
+import { readVisualSessionData, readVisualSessionList } from "@tokenpilot/product-surface";
 import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../products/mcp/src/index.js";
 import { createCodexCliBridge } from "../../../products/cli/src/hosts/codex.js";
 import {
@@ -128,6 +129,10 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
         instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
         input: [
           {
+            role: "developer",
+            content: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+          },
+          {
             role: "user",
             content: [
               { type: "input_text", text: "summarize this tool output" },
@@ -151,10 +156,10 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
 
     const forwardedInput = upstream.requests[0]?.input as Array<Record<string, unknown>>;
     assert.ok(Array.isArray(forwardedInput));
-    const firstUser = forwardedInput[0];
+    const firstUser = forwardedInput.find((item) => item?.role === "user");
     const firstBlocks = firstUser?.content as Array<Record<string, unknown>>;
 
-    const reducedToolItem = forwardedInput[1];
+    const reducedToolItem = forwardedInput.find((item) => String(item?.type ?? "").toLowerCase() === "function_call_output");
     const reducedOutput = String(reducedToolItem?.output ?? "");
     assertReductionMarkerText(reducedOutput);
     await assertRecoveryRoundTrip({
@@ -206,6 +211,19 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
         ],
       },
     });
+
+    const sessions = await readVisualSessionList(stateDir);
+    assert.equal(sessions.length, 1);
+    assert.match(sessions[0]?.sessionId ?? "", /^codex-synth-/);
+    assert.equal(sessions[0]?.stabilityCount, 1);
+    assert.ok((sessions[0]?.reductionCount ?? 0) > 0);
+
+    const visual = await readVisualSessionData(stateDir, String(sessions[0]?.sessionId ?? ""));
+    assert.equal(visual.stability.length, 1);
+    assert.ok(visual.reduction.length > 0);
+    assert.match(visual.stability[0]?.developerCanonical ?? "", /<WORKDIR>/);
+    assert.match(visual.stability[0]?.dynamicContextText ?? "", /WORKDIR: \/repo\/demo/);
+    assert.ok((visual.reduction[0]?.savedChars ?? 0) > 0);
 
     await runtime?.close();
     await upstream.close();
