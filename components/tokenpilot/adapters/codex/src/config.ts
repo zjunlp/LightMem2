@@ -237,6 +237,22 @@ export async function readCodexProviderFromToml(
   };
 }
 
+export async function readCodexRootModelProvider(
+  configPath = defaultCodexConfigPath(),
+): Promise<string | undefined> {
+  if (!existsSync(configPath)) return undefined;
+  const text = await readFile(configPath, "utf8");
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (/^\[.+\]$/.test(trimmed)) break;
+    const assignment = /^model_provider\s*=\s*(.+)$/.exec(trimmed);
+    if (!assignment) continue;
+    return parseTomlStringValue(assignment[1]);
+  }
+  return undefined;
+}
+
 export async function readCodexMcpServerFromToml(
   serverName: string,
   configPath = defaultCodexConfigPath(),

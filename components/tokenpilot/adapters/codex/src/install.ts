@@ -14,8 +14,11 @@ import {
   defaultHooksConfigPath,
   defaultTokenPilotConfigPath,
   loadTokenPilotCodexConfig,
+  readCodexProviderFromToml,
+  readCodexRootModelProvider,
   writeTokenPilotCodexConfig,
 } from "./config.js";
+import { migrateCodexThreadProviders } from "./thread-providers.js";
 
 function quoteToml(value: string): string {
   return JSON.stringify(value);
@@ -219,6 +222,7 @@ export async function installCodexTokenPilot(params?: {
   tokenPilotConfigPath: string;
   hooksConfigPath: string;
   providerName: string;
+  activeProviderName: string;
   baseUrl: string;
   hooksInstalled: boolean;
   mcpServerName: string;
@@ -238,7 +242,19 @@ export async function installCodexTokenPilot(params?: {
   const hooksConfigPath = params?.hooksConfigPath ?? defaultHooksConfigPath();
   const providerName = params?.providerName ?? "tokenpilot";
   const tokenPilotConfig = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+  const existingRootProvider = await readCodexRootModelProvider(codexConfigPath);
+  const preferredActiveProvider = existingRootProvider && existingRootProvider !== providerName
+    ? existingRootProvider
+    : tokenPilotConfig.upstreamProvider;
+  const activeProviderName = preferredActiveProvider && preferredActiveProvider !== providerName
+    ? preferredActiveProvider
+    : "OpenAI";
+  const upstreamProvider = await readCodexProviderFromToml(activeProviderName, codexConfigPath);
   tokenPilotConfig.providerName = providerName;
+  tokenPilotConfig.upstreamProvider = activeProviderName;
+  if (upstreamProvider) {
+    tokenPilotConfig.upstream = upstreamProvider;
+  }
   await writeTokenPilotCodexConfig(tokenPilotConfig, tokenPilotConfigPath);
   const baseUrl = `http://127.0.0.1:${tokenPilotConfig.proxyPort}/v1`;
   const mcpServer = resolveCodexMcpServerSpecForInstall(tokenPilotConfig.stateDir);
@@ -249,8 +265,9 @@ export async function installCodexTokenPilot(params?: {
   if (existsSync(codexConfigPath)) {
     await copyFile(codexConfigPath, `${codexConfigPath}.tokenpilot.bak`);
   }
-  let next = replaceOrInsertRootAssignment(existing, "model_provider", quoteToml(providerName));
+  let next = existing;
   next = upsertProviderSection(next, { providerName, baseUrl });
+  next = upsertProviderSection(next, { providerName: activeProviderName, baseUrl });
   next = upsertMcpServerSection(next, {
     serverName: mcpServer.serverName,
     command: mcpServer.command,
@@ -266,6 +283,10 @@ export async function installCodexTokenPilot(params?: {
       adapterRoot: adapterRootFromHere(),
     });
   }
+  migrateCodexThreadProviders({
+    codexHome: dirname(codexConfigPath),
+    activeProviderName,
+  });
   const expectedHookCommand = resolveCodexHookCommandForInstall();
   const mcpProbeResult = params?.probeMcp === false
     ? {
@@ -284,6 +305,7 @@ export async function installCodexTokenPilot(params?: {
     tokenPilotConfigPath,
     hooksConfigPath,
     providerName,
+    activeProviderName,
     baseUrl,
     hooksInstalled,
     mcpServerName: mcpServer.serverName,

@@ -10,5 +10,6 @@ export * from "./session-state.js";
 export * from "./session-visual.js";
 export * from "./stable-prefix.js";
 export * from "./stream-observer.js";
+export * from "./thread-providers.js";
 export * from "./trace.js";
 export * from "./upstream.js";
