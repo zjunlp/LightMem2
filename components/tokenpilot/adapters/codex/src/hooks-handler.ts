@@ -81,13 +81,22 @@ function workspaceHintFromEvent(input: Record<string, unknown>): string | undefi
   ]);
 }
 
-function finishSuccess(): void {
-  // Codex validates hook stdout against event-specific schemas. Empty stdout
-  // with exit 0 is accepted as success for every hook event, so keep control
-  // hooks silent unless we intentionally need to block or inject context.
+function successOutputForHook(hookEventName: string): string | undefined {
+  if (hookEventName === "Stop") {
+    // Stop hooks require JSON on stdout for successful exit-0 completion.
+    return "{}\n";
+  }
+  return undefined;
 }
 
-export async function processCodexHookEvent(event: Record<string, unknown>): Promise<void> {
+function writeSuccessOutput(hookEventName: string): void {
+  const output = successOutputForHook(hookEventName);
+  if (typeof output === "string" && output.length > 0) {
+    process.stdout.write(output);
+  }
+}
+
+export async function processCodexHookEvent(event: Record<string, unknown>): Promise<string | undefined> {
   const hookEventName = stringValue(event.hook_event_name) ?? stringValue(event.event) ?? "unknown";
   const configPath = process.env.TOKENPILOT_CODEX_CONFIG ?? defaultTokenPilotConfigPath();
   const codexConfigPath = process.env.CODEX_CONFIG_PATH ?? defaultCodexConfigPath();
@@ -131,8 +140,7 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
       ...common,
       daemon,
     });
-    finishSuccess();
-    return;
+    return successOutputForHook(hookEventName);
   }
 
   if (hookEventName === "PostToolUse") {
@@ -141,8 +149,7 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
       ...common,
       ...tool,
     });
-    finishSuccess();
-    return;
+    return successOutputForHook(hookEventName);
   }
 
   if (hookEventName === "PreToolUse") {
@@ -151,8 +158,7 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
       ...common,
       ...tool,
     });
-    finishSuccess();
-    return;
+    return successOutputForHook(hookEventName);
   }
 
   if (hookEventName === "Stop") {
@@ -162,20 +168,22 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
       ...common,
       daemon,
     });
-    finishSuccess();
-    return;
+    return successOutputForHook(hookEventName);
   }
 
   await appendTrace(config.stateDir, {
     stage: "codex_hook_observed",
     ...common,
   });
-  finishSuccess();
+  return successOutputForHook(hookEventName);
 }
 
 async function main() {
   const event = await readStdinJson();
-  await processCodexHookEvent(event);
+  const output = await processCodexHookEvent(event);
+  if (typeof output === "string" && output.length > 0) {
+    process.stdout.write(output);
+  }
 }
 
 const entryArg = process.argv[1];

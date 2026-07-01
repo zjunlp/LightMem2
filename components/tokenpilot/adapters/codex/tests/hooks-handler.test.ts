@@ -113,3 +113,36 @@ test("processCodexHookEvent writes directly into the synthesized session after a
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("processCodexHookEvent returns minimal JSON output for Stop hooks", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-hooks-handler-stop-"));
+  const originalCodexConfig = process.env.TOKENPILOT_CODEX_CONFIG;
+  try {
+    const stateDir = join(dir, "state");
+    const configPath = join(dir, "tokenpilot.json");
+    process.env.TOKENPILOT_CODEX_CONFIG = configPath;
+
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({
+        stateDir,
+        proxyPort: 17667,
+      }),
+      configPath,
+    );
+
+    const output = await processCodexHookEvent({
+      hook_event_name: "Stop",
+      session_id: "019f-real-codex-session",
+      cwd: "/repo/from-hook",
+    });
+
+    assert.equal(output, "{}\n");
+  } finally {
+    if (originalCodexConfig === undefined) {
+      delete process.env.TOKENPILOT_CODEX_CONFIG;
+    } else {
+      process.env.TOKENPILOT_CODEX_CONFIG = originalCodexConfig;
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+});
