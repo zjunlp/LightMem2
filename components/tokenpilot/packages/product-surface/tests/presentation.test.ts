@@ -60,11 +60,13 @@ test("formatSessionReport falls back to token aggregates when latest mode is uns
 test("renderVisualPageHtml includes core visual navigation structure", () => {
   const html = renderVisualPageHtml();
 
-  assert.match(html, /<title>TokenPilot Visual<\/title>/);
+  assert.match(html, /<title>LightMem2 Visual<\/title>/);
   assert.match(html, /Loading sessions…/);
   assert.match(html, /Stability/);
   assert.match(html, /Reduction/);
   assert.match(html, /Eviction/);
   assert.match(html, /session-list/);
+  assert.match(html, /overviewRoot/);
   assert.match(html, /compare/);
+  assert.match(html, /hostSelect/);
 });

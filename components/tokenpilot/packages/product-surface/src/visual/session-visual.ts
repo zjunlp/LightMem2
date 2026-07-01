@@ -113,13 +113,24 @@ async function loadVisualHostsSummary(hosts: VisualHostSource[]): Promise<Array<
   hostId: string;
   displayName: string;
   sessionCount: number;
+  stabilityCount: number;
+  reductionCount: number;
+  evictionCount: number;
+  latestAt: string;
 }>> {
   const normalized = normalizeVisualHostSources(hosts);
-  return Promise.all(normalized.map(async (host) => ({
-    hostId: host.hostId,
-    displayName: host.displayName,
-    sessionCount: (await readVisualSessionList(host.stateDir)).length,
-  })));
+  return Promise.all(normalized.map(async (host) => {
+    const sessions = await readVisualSessionList(host.stateDir);
+    return {
+      hostId: host.hostId,
+      displayName: host.displayName,
+      sessionCount: sessions.length,
+      stabilityCount: sessions.reduce((sum, session) => sum + Number(session.stabilityCount ?? 0), 0),
+      reductionCount: sessions.reduce((sum, session) => sum + Number(session.reductionCount ?? 0), 0),
+      evictionCount: sessions.reduce((sum, session) => sum + Number(session.evictionCount ?? 0), 0),
+      latestAt: sessions.reduce((latest, session) => String(session.lastAt ?? "") > latest ? String(session.lastAt ?? "") : latest, ""),
+    };
+  }));
 }
 
 export async function startMultiHostVisualServer(

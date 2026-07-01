@@ -4,7 +4,7 @@ export function renderVisualPageHtml(): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TokenPilot Visual</title>
+  <title>LightMem2 Visual</title>
   <style>
     :root {
       --bg: #f4f1ea;
@@ -190,6 +190,51 @@ export function renderVisualPageHtml(): string {
       box-shadow: var(--shadow);
       padding: 20px;
     }
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .overview-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.74);
+      padding: 14px 16px;
+      transition: border-color 140ms ease, transform 140ms ease, background 140ms ease;
+      text-align: left;
+      color: inherit;
+      width: 100%;
+      cursor: pointer;
+    }
+    .overview-card.active {
+      border-color: rgba(15, 118, 110, 0.26);
+      background: rgba(15, 118, 110, 0.08);
+      transform: translateY(-1px);
+    }
+    .overview-card:hover {
+      border-color: rgba(15, 118, 110, 0.2);
+      transform: translateY(-1px);
+    }
+    .overview-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .overview-value {
+      font-size: 24px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .overview-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .panel-header {
       display: flex;
       align-items: flex-start;
@@ -352,9 +397,9 @@ export function renderVisualPageHtml(): string {
     <aside class="sidebar">
       <div class="sidebar-header">
         <button id="collapseBtn" class="collapse-btn" type="button" aria-label="Toggle sidebar">‹</button>
-        <div class="brand">TokenPilot Visual</div>
+        <div class="brand">LightMem2 Visual</div>
       </div>
-      <div class="sidebar-copy">Pick a session, then inspect one reduction or eviction event at a time.</div>
+      <div class="sidebar-copy">Switch hosts, pick a session, then inspect stability, reduction, or eviction snapshots one event at a time.</div>
       <select id="hostSelect" class="host-select" aria-label="Select host"></select>
       <div id="sessionList" class="session-list"></div>
     </aside>
@@ -370,6 +415,7 @@ export function renderVisualPageHtml(): string {
           <button id="tabEviction" class="tab-btn" type="button">Eviction</button>
         </div>
       </div>
+      <section id="overviewRoot" class="overview"></section>
       <section class="panel">
         <div class="panel-header">
           <div>
@@ -399,9 +445,10 @@ export function renderVisualPageScript(): string {
   sessions: [],
   activeHost: new URL(window.location.href).searchParams.get("host") || "",
   activeSessionId: new URL(window.location.href).searchParams.get("session") || "",
-  activeTab: "stability",
+  activeTab: new URL(window.location.href).searchParams.get("tab") || "stability",
   indexes: { stability: 0, reduction: 0, eviction: 0 },
   sessionData: new Map(),
+  lastSessionByHost: {},
   collapsed: false,
 };
 
@@ -411,6 +458,7 @@ const el = {
   hostSelect: document.getElementById("hostSelect"),
   sessionList: document.getElementById("sessionList"),
   subtitle: document.getElementById("subtitle"),
+  overviewRoot: document.getElementById("overviewRoot"),
   tabStability: document.getElementById("tabStability"),
   tabReduction: document.getElementById("tabReduction"),
   tabEviction: document.getElementById("tabEviction"),
@@ -527,6 +575,7 @@ async function loadHosts() {
     state.activeHost = state.hosts[0].hostId;
   }
   renderHostSelect();
+  renderHostOverview();
 }
 
 async function loadSessions() {
@@ -539,8 +588,16 @@ async function loadSessions() {
   }
   const payload = await fetchJson("/api/sessions?host=" + encodeURIComponent(state.activeHost));
   state.sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-  if (!state.activeSessionId && state.sessions.length > 0) {
+  const preferredSessionId = state.lastSessionByHost[state.activeHost] || state.activeSessionId;
+  const matchedSession = preferredSessionId
+    ? state.sessions.find((session) => session.sessionId === preferredSessionId)
+    : undefined;
+  if (matchedSession) {
+    state.activeSessionId = matchedSession.sessionId;
+  } else if (state.sessions.length > 0) {
     state.activeSessionId = state.sessions[0].sessionId;
+  } else {
+    state.activeSessionId = "";
   }
   renderSessionList();
   if (state.activeSessionId) {
@@ -560,12 +617,46 @@ function renderHostSelect() {
   }).join("");
 }
 
+function renderHostOverview() {
+  if (!el.overviewRoot) return;
+  if (!Array.isArray(state.hosts) || state.hosts.length === 0) {
+    el.overviewRoot.innerHTML = "";
+    return;
+  }
+  el.overviewRoot.innerHTML = state.hosts.map((host) => {
+    const active = host.hostId === state.activeHost ? " active" : "";
+    return '<button class="overview-card' + active + '" data-host-id="' + escapeHtml(host.hostId) + '" type="button">'
+      + '<div class="overview-label">' + escapeHtml(host.displayName) + '</div>'
+      + '<div class="overview-value">' + escapeHtml(fmtInt(host.sessionCount)) + '</div>'
+      + '<div class="overview-meta">'
+      + '<span>S ' + escapeHtml(fmtInt(host.stabilityCount)) + '</span>'
+      + '<span>R ' + escapeHtml(fmtInt(host.reductionCount)) + '</span>'
+      + '<span>E ' + escapeHtml(fmtInt(host.evictionCount)) + '</span>'
+      + '</div>'
+      + '<div class="overview-meta">'
+      + '<span>latest ' + escapeHtml(fmtDate(host.latestAt) || "-") + '</span>'
+      + '</div>'
+      + '</button>';
+  }).join("");
+  el.overviewRoot.querySelectorAll(".overview-card").forEach((node) => {
+    node.addEventListener("click", () => {
+      const hostId = node.getAttribute("data-host-id") || "";
+      if (!hostId || hostId === state.activeHost) return;
+      void setActiveHost(hostId);
+    });
+  });
+}
+
 async function loadSession(sessionId) {
   if (!sessionId) return;
   state.activeSessionId = sessionId;
+  if (state.activeHost) {
+    state.lastSessionByHost[state.activeHost] = sessionId;
+  }
   const query = new URL(window.location.href);
   query.searchParams.set("host", state.activeHost || "");
   query.searchParams.set("session", sessionId);
+  query.searchParams.set("tab", state.activeTab);
   history.replaceState(null, "", query.toString());
   const sessionKey = (state.activeHost || "") + "::" + sessionId;
   if (!state.sessionData.has(sessionKey)) {
@@ -579,15 +670,19 @@ async function loadSession(sessionId) {
 function renderSessionList() {
   if (state.sessions.length === 0) {
     el.sessionList.innerHTML = '<div class="empty">No sessions</div>';
+    renderHostOverview();
     el.subtitle.textContent = state.activeHost
       ? "No visual snapshots available yet for " + state.activeHost + "."
       : "No visual snapshots available yet.";
     return;
   }
   const activeHost = state.hosts.find((host) => host.hostId === state.activeHost);
+  renderHostOverview();
   el.subtitle.textContent = state.activeSessionId
     ? (activeHost ? activeHost.displayName + " · " : "") + "Session " + state.activeSessionId
-    : "Pick a session from the left.";
+    : activeHost
+      ? activeHost.displayName + " · Pick a session from the left."
+      : "Pick a session from the left.";
   el.sessionList.innerHTML = state.sessions.map((session, index) => {
     const active = session.sessionId === state.activeSessionId ? "active" : "";
     return '<button class="session-item ' + active + '" data-session-id="' + escapeHtml(session.sessionId) + '" data-index="' + (index + 1) + '" type="button">'
@@ -622,8 +717,11 @@ function renderEmpty(message) {
   el.passRoot.innerHTML = "";
 }
 
-el.hostSelect.addEventListener("change", async () => {
-  state.activeHost = el.hostSelect.value || "";
+async function setActiveHost(hostId) {
+  if (state.activeHost && state.activeSessionId) {
+    state.lastSessionByHost[state.activeHost] = state.activeSessionId;
+  }
+  state.activeHost = hostId || "";
   state.activeSessionId = "";
   state.sessions = [];
   const query = new URL(window.location.href);
@@ -633,8 +731,13 @@ el.hostSelect.addEventListener("change", async () => {
     query.searchParams.delete("host");
   }
   query.searchParams.delete("session");
+  query.searchParams.set("tab", state.activeTab);
   history.replaceState(null, "", query.toString());
   await loadSessions();
+}
+
+el.hostSelect.addEventListener("change", async () => {
+  await setActiveHost(el.hostSelect.value || "");
 });
 
 function renderStability(item) {
@@ -717,6 +820,15 @@ function renderEviction(item) {
 }
 
 function renderActiveView() {
+  const query = new URL(window.location.href);
+  query.searchParams.set("tab", state.activeTab);
+  if (state.activeHost) {
+    query.searchParams.set("host", state.activeHost);
+  }
+  if (state.activeSessionId) {
+    query.searchParams.set("session", state.activeSessionId);
+  }
+  history.replaceState(null, "", query.toString());
   const items = activeItems();
   const index = state.indexes[state.activeTab] || 0;
   el.tabStability.classList.toggle("active", state.activeTab === "stability");
@@ -774,6 +886,16 @@ el.collapseBtn.addEventListener("click", () => {
 window.addEventListener("error", (event) => {
   const message = event?.error?.message || event?.message || "Unknown visual page error";
   renderEmpty("Visual page error: " + message);
+});
+
+window.addEventListener("popstate", () => {
+  const query = new URL(window.location.href);
+  state.activeHost = query.searchParams.get("host") || "";
+  state.activeSessionId = query.searchParams.get("session") || "";
+  state.activeTab = query.searchParams.get("tab") || "stability";
+  void loadSessions().catch((error) => {
+    renderEmpty("Failed to load visual data: " + (error && error.message ? error.message : String(error)));
+  });
 });
 
 void loadSessions().catch((error) => {

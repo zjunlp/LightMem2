@@ -162,12 +162,31 @@ test("multi-host visual server exposes hosts and host-scoped sessions", async ()
     try {
       const hostsResp = await fetch(`${handle.url}/api/hosts`);
       const hostsPayload = await hostsResp.json() as {
-        hosts: Array<{ hostId: string; displayName: string; sessionCount: number }>;
+        hosts: Array<{
+          hostId: string;
+          displayName: string;
+          sessionCount: number;
+          stabilityCount: number;
+          reductionCount: number;
+          evictionCount: number;
+          latestAt: string;
+        }>;
       };
       assert.deepEqual(
-        hostsPayload.hosts.map((host) => [host.hostId, host.sessionCount]),
-        [["codex", 1], ["openclaw", 1]],
+        hostsPayload.hosts.map((host) => [
+          host.hostId,
+          host.sessionCount,
+          host.stabilityCount,
+          host.reductionCount,
+          host.evictionCount,
+        ]),
+        [
+          ["codex", 1, 0, 1, 0],
+          ["openclaw", 1, 0, 1, 0],
+        ],
       );
+      assert.equal(hostsPayload.hosts[0]?.latestAt, "2026-06-29T11:00:00.000Z");
+      assert.equal(hostsPayload.hosts[1]?.latestAt, "2026-06-29T10:00:00.000Z");
 
       const openclawSessionsResp = await fetch(`${handle.url}/api/sessions?host=openclaw`);
       const openclawSessionsPayload = await openclawSessionsResp.json() as {
