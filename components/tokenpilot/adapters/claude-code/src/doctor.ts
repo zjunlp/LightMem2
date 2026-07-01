@@ -8,7 +8,7 @@ import {
   type TokenPilotObservedMcpConfig,
   inspectClaudeMcpServerConfig,
   listClaudeMcpConfigCandidates,
-} from "@tokenpilot/mcp";
+} from "../../../products/mcp/src/index.js";
 import {
   CLAUDE_TOOL_SEARCH_DEFAULT,
   CLAUDE_TOOL_SEARCH_ENV,

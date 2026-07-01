@@ -4,7 +4,7 @@ import {
   DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
   inspectTokenPilotMcpHealth,
   TOKENPILOT_MCP_SERVER_NAME,
-} from "@tokenpilot/mcp";
+} from "../../../products/mcp/src/index.js";
 import type { TokenPilotCodexConfig } from "./config.js";
 import { readCodexMcpServerFromToml, readCodexProviderFromToml } from "./config.js";
 import { readDaemonStatus } from "./daemon.js";

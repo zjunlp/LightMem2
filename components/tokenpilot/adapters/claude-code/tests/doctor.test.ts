@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import {
   CLAUDE_TOOL_SEARCH_DEFAULT,
   CLAUDE_TOOL_SEARCH_ENV,
-  defaultClaudeCodeMcpConfigPath,
   normalizeTokenPilotClaudeCodeConfig,
   proxyBaseUrlForPort,
 } from "../src/config.js";
@@ -16,13 +15,14 @@ test("inspectClaudeCodeDoctor reports missing settings honestly", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-doctor-"));
   try {
     const settingsPath = join(dir, "settings.json");
+    const mcpConfigPath = join(dir, ".claude.json");
     const tokenPilotConfigPath = join(dir, "tokenpilot.json");
     const report = await inspectClaudeCodeDoctor({
       config: normalizeTokenPilotClaudeCodeConfig({
         stateDir: join(dir, "state"),
         proxyPort: 18777,
       }),
-      mcpConfigPath: defaultClaudeCodeMcpConfigPath(),
+      mcpConfigPath,
       settingsPath,
       tokenPilotConfigPath,
     });
