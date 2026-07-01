@@ -316,7 +316,6 @@ export async function installCodexTokenPilot(params?: {
   }
   let next = existing;
   next = upsertProviderSection(next, { providerName, baseUrl });
-  next = upsertProviderSection(next, { providerName: activeProviderName, baseUrl });
   next = upsertMcpServerSection(next, {
     serverName: mcpServer.serverName,
     command: mcpServer.command,

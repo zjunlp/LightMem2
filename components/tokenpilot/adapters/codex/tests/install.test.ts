@@ -34,7 +34,8 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
     assert.match(codexToml, /model_provider = "OPENAI"/);
     assert.match(codexToml, /\[model_providers\.tokenpilot\]/);
     assert.match(codexToml, /\[model_providers\.OPENAI\]/);
-    assert.match(codexToml, /base_url = "http:\/\/127\.0\.0\.1:\d+\/v1"/);
+    assert.match(codexToml, /\[model_providers\.tokenpilot\][\s\S]*base_url = "http:\/\/127\.0\.0\.1:\d+\/v1"/);
+    assert.match(codexToml, /\[model_providers\.OPENAI\][\s\S]*base_url = "https:\/\/api\.openai\.com\/v1"/);
     assert.match(codexToml, /\[mcp_servers\.tokenpilot_memory_fault_recover\]/);
     assert.match(codexToml, /startup_timeout_sec\s*=\s*90/);
     assert.match(codexToml, new RegExp(result.expectedMcpCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
