@@ -5,6 +5,10 @@ import {
   inspectTokenPilotMcpHealth,
   TOKENPILOT_MCP_SERVER_NAME,
 } from "../../../products/mcp/src/index.js";
+import {
+  asObjectRecord,
+  scanInstalledHookEvents,
+} from "../../shared/doctor-shared.js";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   readCodexMcpServerFromToml,
@@ -60,35 +64,6 @@ function normalizeLocalProxyBaseUrl(value: string | undefined): string | undefin
   const match = /^http:\/\/127\.0\.0\.1:(\d+)\/v1$/i.exec(trimmed);
   if (!match) return undefined;
   return `http://127.0.0.1:${match[1]}/v1`;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
-
-function hookGroupHasTokenPilot(group: unknown): boolean {
-  if (!group || typeof group !== "object") return false;
-  const hooks = (group as Record<string, unknown>).hooks;
-  if (!Array.isArray(hooks)) return false;
-  return hooks.some((entry) => {
-    if (!entry || typeof entry !== "object") return false;
-    const command = (entry as Record<string, unknown>).command;
-    return typeof command === "string"
-      && (command.includes("hooks-handler.js") || command.includes("tokenpilot-codex-hook.cmd"));
-  });
-}
-
-function hookGroupHasExpectedCommand(group: unknown, expectedCommand: string): boolean {
-  if (!group || typeof group !== "object") return false;
-  const hooks = (group as Record<string, unknown>).hooks;
-  if (!Array.isArray(hooks)) return false;
-  return hooks.some((entry) => {
-    if (!entry || typeof entry !== "object") return false;
-    const command = (entry as Record<string, unknown>).command;
-    return typeof command === "string" && command.trim() === expectedCommand;
-  });
 }
 
 async function checkHealth(baseUrl: string): Promise<boolean> {
@@ -195,22 +170,20 @@ export async function inspectCodexDoctor(params: {
   if (existsSync(params.hooksConfigPath)) {
     hooksRoot = JSON.parse(await readFile(params.hooksConfigPath, "utf8").catch(() => "{}")) as Record<string, unknown>;
   }
-  const hooks = asRecord(hooksRoot.hooks);
-  const installedHookEvents: string[] = [];
-  const matchedHookEvents: string[] = [];
-  for (const name of HOOK_EVENT_NAMES) {
-    const groups = hooks[name];
-    if (Array.isArray(groups) && groups.some(hookGroupHasTokenPilot)) {
-      installedHookEvents.push(name);
-    }
-    if (Array.isArray(groups) && groups.some((group) => hookGroupHasExpectedCommand(group, expectedHookCommand))) {
-      matchedHookEvents.push(name);
-    }
-  }
-  const missingHookEvents = HOOK_EVENT_NAMES.filter((name) => !installedHookEvents.includes(name));
-  const hooksComplete = missingHookEvents.length === 0;
-  const hooksInstalled = installedHookEvents.length > 0;
-  const hooksMatchExpectedCommand = HOOK_EVENT_NAMES.every((name) => matchedHookEvents.includes(name));
+  const {
+    installedHookEvents,
+    missingHookEvents,
+    hooksComplete,
+    hooksInstalled,
+    hooksMatchExpectedCommand,
+  } = scanInstalledHookEvents({
+    hooksRoot: asObjectRecord(hooksRoot),
+    hookEventNames: HOOK_EVENT_NAMES,
+    isTokenPilotCommand(command) {
+      return command.includes("hooks-handler.js") || command.includes("tokenpilot-codex-hook.cmd");
+    },
+    expectedCommand: expectedHookCommand,
+  });
   const proxyHealthy = await checkHealth(proxyBaseUrl);
   const providerIntercepted = tokenpilotProvider?.baseUrl === proxyBaseUrl;
   const upstreamBaseUrl = params.config.upstream?.baseUrl
