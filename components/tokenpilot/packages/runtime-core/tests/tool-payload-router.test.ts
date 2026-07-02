@@ -249,12 +249,44 @@ const buildIndex = (
   const result = reduceToolPayloadText(payload, "stdout", defaultCfg);
   assert.equal(result.route, "code_like");
   assert.equal(result.changed, true);
-  assert.match(result.text, /\[code reduced lines=/);
+  assert.match(result.text, /\[code outlined lines=/);
   assert.match(result.text, /imports:/);
-  assert.match(result.text, /symbols:/);
-  assert.match(result.text, /selected blocks:/);
+  assert.match(result.text, /\[outlined definitions;/);
+  assert.match(result.text, /body elided by LightMem2/);
   assert.match(result.text, /export class SearchService/);
   assert.match(result.text, /export async function runSearch/);
+});
+
+test("reduceToolPayloadText outlines exported declarations in file order", () => {
+  const payload = `
+import fs from "node:fs";
+
+export function loadSessionIndex(sessionId: string) {
+  return fs.readFileSync(sessionId, "utf8");
+}
+
+export function renderTerminalFrame(text: string) {
+  return text.toUpperCase();
+}
+
+export class SessionCache {
+  hydrate(id: string) {
+    return loadSessionIndex(id);
+  }
+}
+`.repeat(8);
+
+  const result = reduceToolPayloadText(payload, "stdout", defaultCfg, {
+    toolName: "read",
+    path: "/repo/src/session.ts",
+    payloadKind: "stdout",
+  });
+
+  assert.equal(result.route, "code_like");
+  assert.equal(result.changed, true);
+  assert.match(result.text, /export function loadSessionIndex/);
+  assert.match(result.text, /export function renderTerminalFrame/);
+  assert.match(result.text, /export class SessionCache/);
 });
 
 test("reduceToolPayloadText keeps controlled small-window code reads intact", () => {
@@ -279,6 +311,48 @@ test("reduceToolPayloadText keeps controlled small-window code reads intact", ()
   });
   assert.equal(result.route, "code_like");
   assert.equal(result.changed, false);
+});
+
+test("reduceToolPayloadText does not outline explicit code line windows", () => {
+  const payload = [
+    "120 | export function loadConfig(file: string) {",
+    "121 |   const full = path.resolve(file);",
+    "122 |   return fs.readFileSync(full, \"utf8\");",
+    "123 | }",
+  ].join("\n").repeat(4);
+
+  const result = reduceToolPayloadText(payload, "stdout", defaultCfg, {
+    toolName: "read",
+    path: "/repo/src/config.ts?start_line=120&end_line=123",
+    payloadKind: "stdout",
+  });
+
+  assert.equal(result.route, "code_like");
+  assert.equal(result.changed, false);
+});
+
+test("reduceToolPayloadText passes through repeated reads of the same code path", () => {
+  const payload = `
+export function loadConfig(file: string) {
+  return file.trim();
+}
+
+export function saveConfig(file: string, text: string) {
+  return text + file;
+}
+`.repeat(20);
+
+  const result = reduceToolPayloadText(payload, "stdout", defaultCfg, {
+    toolName: "read",
+    path: "/repo/src/config.ts",
+    payloadKind: "stdout",
+  }, {
+    previouslyReadPaths: new Set(["/repo/src/config.ts"]),
+  });
+
+  assert.equal(result.route, "code_like");
+  assert.equal(result.changed, false);
+  assert.match(result.reason, /progressive_disclosure_repeat_read/);
 });
 
 test("reduceToolPayloadText compresses stale read payloads more aggressively", () => {
@@ -334,4 +408,41 @@ test("reduceToolPayloadText compresses superseded read payloads more than fresh 
   assert.equal(fresh.changed, true);
   assert.equal(superseded.changed, true);
   assert.ok(superseded.text.length < fresh.text.length);
+});
+
+test("reduceToolPayloadText keeps stale code reads less compressed than stale logs", () => {
+  const codePayload = [
+    "import fs from \"node:fs\";",
+    "export function load(path: string) {",
+    "  const text = fs.readFileSync(path, \"utf8\");",
+    "  if (!text) return \"\";",
+    "  return text.trim();",
+    "}",
+  ].join("\n").repeat(40);
+  const logPayload = [
+    "WARN deprecated package detected",
+    "Error: build failed",
+    "    at compile (/app/build.js:10:1)",
+    "    at main (/app/main.js:2:1)",
+    "done",
+  ].join("\n").repeat(18);
+
+  const staleCode = reduceToolPayloadText(codePayload, "stdout", defaultCfg, {
+    toolName: "bash",
+    path: "/repo/src/config.ts",
+    payloadKind: "stdout",
+    readState: "stale",
+  });
+  const staleLog = reduceToolPayloadText(logPayload, "stderr", defaultCfg, {
+    toolName: "read",
+    path: "/repo/build.log",
+    payloadKind: "stderr",
+    readState: "stale",
+  });
+
+  assert.equal(staleCode.route, "code_like");
+  assert.equal(staleLog.route, "log_output");
+  assert.equal(staleCode.changed, true);
+  assert.equal(staleLog.changed, true);
+  assert.ok(staleCode.text.length > staleLog.text.length);
 });

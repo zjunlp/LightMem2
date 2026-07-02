@@ -435,3 +435,68 @@ test("runReductionBeforeCall continues after disabled pass and still executes la
   assert.equal(result.report[1]?.id, "read_state_compaction");
   assert.equal(result.report[1]?.changed, true);
 });
+
+test("runReductionBeforeCall outlines the first large code read and leaves the second read intact", async () => {
+  const largeCode = `
+export function loadConfig(file: string) {
+  return file.trim();
+}
+
+export function saveConfig(file: string, text: string) {
+  return text + file;
+}
+`.repeat(30);
+
+  const turnCtx: RuntimeTurnContext = {
+    sessionId: "test-session",
+    sessionMode: "single",
+    provider: "test",
+    model: "test",
+    prompt: "",
+    budget: {
+      maxInputTokens: 100000,
+      reserveOutputTokens: 1000,
+    },
+    segments: [
+      buildSegment("read-1-output", "read", "/repo/config.ts", largeCode, "output"),
+      buildSegment("read-2-output", "read", "/repo/config.ts", largeCode, "output"),
+    ],
+    metadata: {
+      workspaceDir: "/tmp",
+      policy: {
+        decisions: {
+          reduction: {
+            instructions: [
+              {
+                strategy: "tool_payload_trim",
+                segmentIds: ["read-1-output", "read-2-output"],
+                parameters: { payloadKind: "stdout" },
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+
+  const result = await runReductionBeforeCall({
+    turnCtx,
+    passes: [
+      {
+        id: "tool_payload_trim",
+        phase: "before_call",
+        target: "context_segment",
+        options: {},
+      },
+    ],
+  });
+
+  const first = result.turnCtx.segments.find((segment) => segment.id === "read-1-output");
+  const second = result.turnCtx.segments.find((segment) => segment.id === "read-2-output");
+  assert.ok(first);
+  assert.ok(second);
+  assert.match(first?.text ?? "", /\[code outlined lines=/);
+  assert.match(first?.text ?? "", /body elided by LightMem2/);
+  assert.match(second?.text ?? "", /export function loadConfig/);
+  assert.doesNotMatch(second?.text ?? "", /\[code outlined lines=/);
+});

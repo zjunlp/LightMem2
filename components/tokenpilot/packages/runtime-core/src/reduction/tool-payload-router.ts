@@ -37,6 +37,7 @@ export type ToolPayloadReductionResult = {
 
 type ToolPayloadRoutingContext = {
   queryText?: string;
+  previouslyReadPaths?: Set<string>;
 };
 
 function scaleBlockConfig(
@@ -78,6 +79,12 @@ type CodeLineEntry = {
   text: string;
 };
 
+type CodeOutlineEntry = {
+  lineNumber: number;
+  signature: string;
+  docLine?: string;
+};
+
 const SEARCH_LINE_RE = /^(.+?):(\d+)(?::|-)(.*)$/;
 const LOG_IMPORTANCE_RE = /\b(error|warn(?:ing)?|failed|exception|traceback|panic|fatal|denied|timeout)\b/i;
 const STACK_TRACE_RE = /^\s*(at\s+\S+\s+\(|Traceback \(most recent call last\):|Caused by:|File ".*", line \d+)/;
@@ -89,6 +96,8 @@ const CODE_SYMBOL_RE =
   /^\s*(export\s+)?(async\s+)?(function|class|def|interface|type|const\s+\w+\s*=\s*\(|let\s+\w+\s*=\s*\(|var\s+\w+\s*=\s*\()|^\s*[A-Za-z_][A-Za-z0-9_]*\s*\([^)]*\)\s*\{/;
 const CODE_ALERT_RE = /\b(throw\s+new|throw\s+|catch\s*\(|Error\b|Exception\b|TODO\b|FIXME\b|panic!\b|console\.(error|warn)\b)\b/;
 const NUMBERED_CODE_LINE_RE = /^\s*\d+\s*(?:[|:]\s*|\t|\s{2,})(.+)$/;
+const CODE_DOC_RE = /^\s*(?:\/\*\*|\/\/|#|"""|''')/;
+const CODE_RANGE_HINT_RE = /\b(offset|limit|start[_-]?line|end[_-]?line|line[_-]?range|ranges)\b/i;
 
 function clipText(value: string, maxChars: number): string {
   return value.length <= maxChars ? value : `${value.slice(0, maxChars)}...`;
@@ -395,21 +404,54 @@ function summarizeLogOutput(text: string, cfg: PayloadBlockConfig): string {
   return merged.join("\n").trim();
 }
 
-function summarizeCodeLike(text: string, cfg: PayloadBlockConfig): string {
+function looksLikeExplicitRangeIntent(text: string, hint: ToolPayloadHint | undefined): boolean {
+  const path = hint?.path?.trim().toLowerCase() ?? "";
+  if (CODE_RANGE_HINT_RE.test(path)) return true;
+  const sample = text.slice(0, 400).toLowerCase();
+  if (/^\s*\d+\s*[:|-]/m.test(sample) && /read specific line range|specific line range|line range requested/i.test(sample)) {
+    return true;
+  }
+  return false;
+}
+
+function extractCodeOutlineEntries(lines: string[], cfg: PayloadBlockConfig): CodeOutlineEntry[] {
+  const entries: CodeOutlineEntry[] = [];
+  const seenLines = new Set<number>();
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index]?.trim() ?? "";
+    if (!trimmed || !CODE_SYMBOL_RE.test(trimmed)) continue;
+    if (seenLines.has(index)) continue;
+    seenLines.add(index);
+
+    let docLine: string | undefined;
+    let probe = index + 1;
+    while (probe < lines.length && !(lines[probe]?.trim() ?? "")) probe += 1;
+    if (probe < lines.length && CODE_DOC_RE.test(lines[probe]?.trim() ?? "")) {
+      docLine = clipText(lines[probe].trim(), cfg.maxPreviewChars * 2);
+    }
+
+    entries.push({
+      lineNumber: index + 1,
+      signature: clipText(trimmed, cfg.maxPreviewChars * 2),
+      docLine,
+    });
+    if (entries.length >= Math.max(6, cfg.maxItems * 2)) break;
+  }
+
+  return entries;
+}
+
+function summarizeCodeLike(
+  text: string,
+  cfg: PayloadBlockConfig,
+  hint?: ToolPayloadHint,
+  context?: ToolPayloadRoutingContext,
+): string {
   if (text.length <= cfg.maxChars) return text;
   const lines = text.split("\n");
   const imports: CodeLineEntry[] = [];
-  const symbols: CodeLineEntry[] = [];
   const alerts: CodeLineEntry[] = [];
-  const windows: Array<{ start: number; end: number; label: string }> = [];
-
-  const addWindow = (start: number, end: number, label: string): void => {
-    const boundedStart = Math.max(0, start);
-    const boundedEnd = Math.min(lines.length - 1, end);
-    if (boundedStart > boundedEnd) return;
-    windows.push({ start: boundedStart, end: boundedEnd, label });
-  };
-
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
@@ -418,66 +460,40 @@ function summarizeCodeLike(text: string, cfg: PayloadBlockConfig): string {
       imports.push({ lineNumber: index + 1, text: trimmed });
       continue;
     }
-    if (CODE_SYMBOL_RE.test(trimmed) && symbols.length < Math.max(4, cfg.maxItems * 2)) {
-      symbols.push({ lineNumber: index + 1, text: trimmed });
-      addWindow(index, index + 4, "symbol");
-      continue;
-    }
     if (CODE_ALERT_RE.test(trimmed) && alerts.length < Math.max(3, cfg.maxItems)) {
       alerts.push({ lineNumber: index + 1, text: trimmed });
-      addWindow(index - 1, index + 2, "alert");
     }
   }
 
-  if (symbols.length === 0 && imports.length === 0 && alerts.length === 0) {
+  const outlineEntries = extractCodeOutlineEntries(lines, cfg);
+  if (outlineEntries.length === 0 && imports.length === 0 && alerts.length === 0) {
     return summarizeLineBlock(text, "code", cfg);
   }
 
-  addWindow(0, Math.min(lines.length - 1, Math.max(5, cfg.keepHeadLines) - 1), "head");
-  addWindow(
-    Math.max(0, lines.length - Math.max(5, cfg.keepTailLines)),
-    lines.length - 1,
-    "tail",
+  const repeatedRead = Boolean(
+    hint?.path
+    && context?.previouslyReadPaths?.has(hint.path.trim().toLowerCase()),
   );
-
-  windows.sort((a, b) => a.start - b.start || a.end - b.end);
-  const mergedWindows: Array<{ start: number; end: number }> = [];
-  for (const window of windows) {
-    const last = mergedWindows[mergedWindows.length - 1];
-    if (!last || window.start > last.end + 1) {
-      mergedWindows.push({ start: window.start, end: window.end });
-      continue;
-    }
-    last.end = Math.max(last.end, window.end);
-  }
-
-  const selectedLines: string[] = [];
-  let previousEnd = -1;
-  for (const window of mergedWindows.slice(0, Math.max(3, cfg.maxItems + 1))) {
-    if (window.start > previousEnd + 1) {
-      selectedLines.push(`...[code block omitted lines=${window.start - previousEnd - 1}]`);
-    }
-    for (let index = window.start; index <= window.end; index += 1) {
-      selectedLines.push(`${index + 1}: ${clipText(lines[index], cfg.maxPreviewChars * 2)}`);
-    }
-    previousEnd = window.end;
-  }
-  if (previousEnd < lines.length - 1) {
-    selectedLines.push(`...[code tail omitted lines=${lines.length - previousEnd - 1}]`);
-  }
+  const headerNote = looksLikeExplicitRangeIntent(text, hint)
+    ? "explicit_range_hint_detected"
+    : repeatedRead
+      ? "repeat_read_detected"
+      : "bodies_elided";
 
   const summary = [
-    `[code reduced lines=${lines.length} imports=${imports.length} symbols=${symbols.length} alerts=${alerts.length}]`,
+    `[code outlined lines=${lines.length} imports=${imports.length} definitions=${outlineEntries.length} alerts=${alerts.length} mode=${headerNote}]`,
     ...(imports.length > 0
       ? [
           "imports:",
           ...imports.slice(0, Math.max(4, cfg.maxItems)).map((entry) => `  ${entry.lineNumber}: ${clipText(entry.text, cfg.maxPreviewChars)}`),
         ]
       : []),
-    ...(symbols.length > 0
+    ...(outlineEntries.length > 0
       ? [
-          "symbols:",
-          ...symbols.slice(0, Math.max(4, cfg.maxItems)).map((entry) => `  ${entry.lineNumber}: ${clipText(entry.text, cfg.maxPreviewChars)}`),
+          "[outlined definitions; re-read with a line range to inspect a specific body]",
+          ...outlineEntries.map((entry) => entry.signature),
+          ...outlineEntries.flatMap((entry) => entry.docLine ? [entry.docLine] : []),
+          ...outlineEntries.map(() => "    # ... (body elided by LightMem2; request a specific line range to inspect it)"),
         ]
       : []),
     ...(alerts.length > 0
@@ -486,8 +502,6 @@ function summarizeCodeLike(text: string, cfg: PayloadBlockConfig): string {
           ...alerts.slice(0, Math.max(3, cfg.maxItems)).map((entry) => `  ${entry.lineNumber}: ${clipText(entry.text, cfg.maxPreviewChars)}`),
         ]
       : []),
-    "selected blocks:",
-    ...selectedLines,
   ];
   return summary.join("\n").trim();
 }
@@ -598,14 +612,24 @@ function getBlockConfig(cfg: ToolPayloadRouteConfig, kind: ToolPayloadKind): Pay
 function getLifecycleAdjustedBlockConfig(
   cfg: ToolPayloadRouteConfig,
   kind: ToolPayloadKind,
+  contentType: ToolPayloadContentType,
   hint?: ToolPayloadHint,
 ): PayloadBlockConfig {
   const base = getBlockConfig(cfg, kind);
   const readState = hint?.readState;
   if (!readState) return base;
   if (readState === "fresh") return base;
-  if (readState === "superseded") return scaleBlockConfig(base, 0.75);
-  return scaleBlockConfig(base, 0.55);
+
+  const baseFactor = readState === "superseded" ? 0.75 : 0.55;
+  let factor = baseFactor;
+  if (contentType === "log_output" || contentType === "search_results") {
+    factor *= 0.78;
+  } else if (contentType === "code_like" || contentType === "diff_output") {
+    factor = Math.max(factor, readState === "superseded" ? 0.88 : 0.72);
+  } else if (contentType === "json_array" || contentType === "json_object") {
+    factor *= 0.9;
+  }
+  return scaleBlockConfig(base, factor);
 }
 
 function reduceByClassification(
@@ -616,7 +640,7 @@ function reduceByClassification(
   hint?: ToolPayloadHint,
   context?: ToolPayloadRoutingContext,
 ): ToolPayloadReductionResult {
-  const blockCfg = getLifecycleAdjustedBlockConfig(cfg, kind, hint);
+  const blockCfg = getLifecycleAdjustedBlockConfig(cfg, kind, classification.contentType, hint);
   if (!blockCfg.enabled) {
     return {
       text,
@@ -656,6 +680,17 @@ function reduceByClassification(
       nextText = summarizeBlobText(text, blockCfg);
       break;
     case "code_like":
+      if (
+        hint?.path
+        && context?.previouslyReadPaths?.has(hint.path.trim().toLowerCase())
+      ) {
+        return {
+          text,
+          changed: false,
+          route: classification.contentType,
+          reason: `${classification.reason}:progressive_disclosure_repeat_read`,
+        };
+      }
       if (looksLikeControlledCodeRead(text, hint)) {
         const relaxedChars = Math.max(blockCfg.maxChars * 6, 9_000);
         if (text.length <= relaxedChars) {

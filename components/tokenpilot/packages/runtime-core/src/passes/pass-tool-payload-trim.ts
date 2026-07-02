@@ -11,7 +11,7 @@ import {
   type ToolPayloadKind,
   type ToolPayloadRouteConfig,
 } from "../reduction/tool-payload-router.js";
-import { classifyReadStates } from "../reduction/read-state-compaction.js";
+import { classifyReadStates, isReadOutputSegment } from "../reduction/read-state-compaction.js";
 
 const DEFAULT_MAX_CHARS = 1200;
 const DEFAULT_HEAD_LINES = 8;
@@ -115,6 +115,7 @@ const reduceSegment = (
   payloadKind: ToolPayloadKind,
   turnCtx: RuntimeTurnContext,
   readStateBySegmentId: Map<string, "fresh" | "superseded" | "stale">,
+  previouslyReadPaths: Set<string>,
 ) => {
   const meta = asObject(segment.metadata);
   const toolPayload = asObject(meta?.toolPayload);
@@ -149,6 +150,7 @@ const reduceSegment = (
           : typeof turnCtx.metadata?.currentQuery === "string"
             ? turnCtx.metadata.currentQuery
             : undefined,
+      previouslyReadPaths,
     },
   );
 };
@@ -240,6 +242,7 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
     const reducedKinds = new Set<ToolPayloadKind>();
     const reducedRoutes = new Set<string>();
     const readStateBySegmentId = classifyReadStates(turnCtx.segments);
+    const previouslyReadPaths = new Set<string>();
 
     const workspaceDir =
       typeof turnCtx.metadata?.workspaceDir === "string"
@@ -247,9 +250,13 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
         : undefined;
     const archivePaths: string[] = [];
     let skippedNoNetSavings = 0;
-    const nextSegments = await Promise.all(turnCtx.segments.map(async (segment) => {
+    const nextSegments: ContextSegment[] = [];
+    for (const segment of turnCtx.segments) {
       const entry = segmentMap.get(segment.id);
-      if (!entry) return segment;
+      if (!entry) {
+        nextSegments.push(segment);
+        continue;
+      }
 
       const reduced = reduceSegment(
         segment,
@@ -257,8 +264,17 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
         entry.payloadKind,
         turnCtx,
         readStateBySegmentId,
+        previouslyReadPaths,
       );
-      if (!reduced.changed) return segment;
+      const segmentMeta = asObject(segment.metadata);
+      const segmentPath = extractDataKey(segment);
+      if (isReadOutputSegment(segment) && segmentMeta && segmentPath) {
+        previouslyReadPaths.add(segmentPath.trim().toLowerCase());
+      }
+      if (!reduced.changed) {
+        nextSegments.push(segment);
+        continue;
+      }
 
       const dataKey = extractDataKey(segment);
       const toolName = extractToolName(segment);
@@ -277,7 +293,8 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
 
       if (replacementText.length >= segment.text.length) {
         skippedNoNetSavings += 1;
-        return segment;
+        nextSegments.push(segment);
+        continue;
       }
 
       await archiveContent({
@@ -302,7 +319,7 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
       reducedRoutes.add(reduced.route);
       archivePaths.push(archivePath);
 
-      return {
+      nextSegments.push({
         ...segment,
         text: replacementText,
         metadata: {
@@ -322,8 +339,8 @@ export const toolPayloadTrimPass: ReductionPassHandler = {
             },
           },
         },
-      };
-    }));
+      });
+    }
 
     if (touchedSegmentIds.length === 0) {
       return {
