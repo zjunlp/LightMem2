@@ -9,6 +9,7 @@ import {
   formatOnOff,
   formatSessionReport,
   getNestedValue,
+  readRecentReductionMetrics,
   type ProductSurfaceLatestUxEffect,
   type ProductSurfaceSessionAggregate,
 } from "@tokenpilot/product-surface";
@@ -125,12 +126,16 @@ export async function buildSessionReportResult(params: {
   }
   const pluginCfg = params.configAdapter.pluginConfigRecord(params.currentConfig);
   const detailsEnabled = getNestedValue(pluginCfg, ["ux", "details"]) === true;
+  const recentMetrics = detailsEnabled
+    ? await readRecentReductionMetrics(stateDir, sessionId)
+    : null;
   return {
     text: formatSessionReport({
       sessionId,
       aggregate,
       latest,
       detailsEnabled,
+      recentMetrics,
     }),
   };
 }

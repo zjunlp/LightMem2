@@ -28,6 +28,13 @@ export type ProductSurfaceSessionAggregate = {
   avgSavedCharsPerOptimizedTurn: number;
 };
 
+export type ProductSurfaceRecentReductionMetrics = {
+  sampledTurns: number;
+  routeSavedChars: Record<string, number>;
+  routeHitCount: Record<string, number>;
+  passSavedChars: Record<string, number>;
+};
+
 export function formatTokenPilotHelp(section?: string): string {
   if (section === "stabilizer") {
     return [
@@ -228,8 +235,9 @@ export function formatSessionReport(params: {
   aggregate: ProductSurfaceSessionAggregate;
   latest?: ProductSurfaceLatestUxEffect | null;
   detailsEnabled: boolean;
+  recentMetrics?: ProductSurfaceRecentReductionMetrics | null;
 }): string {
-  const { sessionId, aggregate, latest, detailsEnabled } = params;
+  const { sessionId, aggregate, latest, detailsEnabled, recentMetrics } = params;
   const latestCountMode = latest?.countMode ?? aggregate.latestCountMode ?? "litellm_tokens";
   const unitLabel = countModeLabel(latestCountMode);
   const savedCount = latestCountMode === "chars" ? aggregate.charSavedCount : aggregate.tokenSavedCount;
@@ -252,6 +260,21 @@ export function formatSessionReport(params: {
     }
     if (latest?.details?.responseSavedCount !== undefined) {
       lines.push(`- latest response savings: ${formatInt(latest.details.responseSavedCount)} ${unitLabel}`);
+    }
+    if (recentMetrics) {
+      const topRoutes = Object.entries(recentMetrics.routeSavedChars)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([route, saved]) => `${route}=${formatInt(saved)} ${unitLabel}/${formatInt(recentMetrics.routeHitCount[route] ?? 0)} hits`)
+        .join(", ");
+      const topPasses = Object.entries(recentMetrics.passSavedChars)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([pass, saved]) => `${pass}=${formatInt(saved)} ${unitLabel}`)
+        .join(", ");
+      lines.push(`- recent sampled turns: ${formatInt(recentMetrics.sampledTurns)}`);
+      if (topRoutes) lines.push(`- recent top routes: ${topRoutes}`);
+      if (topPasses) lines.push(`- recent top passes: ${topPasses}`);
     }
   }
 
