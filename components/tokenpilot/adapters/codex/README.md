@@ -60,8 +60,9 @@ npm --prefix components/tokenpilot/adapters/codex run install:codex
 
 The installer will:
 
-- add a TokenPilot provider entry to Codex config
-- switch the default `model_provider` to that TokenPilot provider
+- keep the current active `model_provider`
+- repoint that active provider's `base_url` to the local TokenPilot proxy
+- persist the original upstream provider config into `~/.codex/tokenpilot.json`
 - register a `tokenpilot_memory_fault_recover` MCP server in Codex config
 - write a conservative `startup_timeout_sec` for the recovery MCP server
 - write TokenPilot runtime config
@@ -78,6 +79,10 @@ The installed Codex skill bridge currently creates these explicit skills:
 
 These are host entry points, not a separate runtime implementation. They call
 the existing `lightmem2 codex ...` CLI surface underneath.
+
+This install mode is intentionally session-preserving: Codex keeps using the
+same provider name it was already using, so existing thread history does not
+disappear behind a separate `tokenpilot` provider bucket.
 
 ## Verify
 
@@ -192,11 +197,17 @@ Useful checks:
 ```bash
 cat ~/.codex/tokenpilot.json
 cat ~/.codex/hooks.json
-rg "model_provider|model_providers.tokenpilot" ~/.codex/config.toml
+rg "model_provider|base_url" ~/.codex/config.toml
 rg "mcp_servers.tokenpilot_memory_fault_recover" ~/.codex/config.toml
 npm --prefix components/tokenpilot/adapters/codex run doctor:codex
 tokenpilot-codex status
 ```
+
+Expected install shape:
+
+- root `model_provider` stays on your original Codex provider, such as `OPENAI`
+- that provider's `base_url` is rewritten to `http://127.0.0.1:<port>/v1`
+- the real upstream base URL is stored in `~/.codex/tokenpilot.json`
 
 If Codex reports that hooks need review, trust the TokenPilot hooks in Codex and rerun the doctor.
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { createServer } from "node:net";
 import {
   DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS,
   DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
@@ -22,7 +23,6 @@ import {
   defaultCodexSkillBridgeDir,
   installCommandSkillBridge,
 } from "../../shared/command-skill-bridge.js";
-import { migrateCodexThreadProviders } from "./thread-providers.js";
 
 function quoteToml(value: string): string {
   return JSON.stringify(value);
@@ -44,23 +44,66 @@ function replaceOrInsertRootAssignment(text: string, key: string, value: string)
   return lines.join("\n");
 }
 
-function upsertProviderSection(text: string, params: {
+function rewriteProviderSectionForProxy(text: string, params: {
   providerName: string;
   baseUrl: string;
+  displayName?: string;
+  wireApi?: "responses" | "chat";
+  requiresOpenAIAuth?: boolean;
 }): string {
   const sectionHeader = `[model_providers.${params.providerName}]`;
-  const section = [
-    sectionHeader,
-    `name = ${quoteToml("TokenPilot")}`,
-    `base_url = ${quoteToml(params.baseUrl)}`,
-    `wire_api = ${quoteToml("responses")}`,
-    "requires_openai_auth = true",
-  ].join("\n");
-  const sectionRe = new RegExp(`\\n?\\[model_providers\\.${params.providerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\][\\s\\S]*?(?=\\n\\[[^\\]]+\\]|$)`);
-  if (sectionRe.test(text)) {
-    return text.replace(sectionRe, `\n${section}\n`);
+  const lines = text.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => line.trim() === sectionHeader);
+  const desired = {
+    name: params.displayName,
+    base_url: params.baseUrl,
+    wire_api: params.wireApi ?? "responses",
+    requires_openai_auth: params.requiresOpenAIAuth === false ? "false" : "true",
+  };
+
+  if (startIndex === -1) {
+    const section = [
+      sectionHeader,
+      `name = ${quoteToml(desired.name ?? params.providerName)}`,
+      `base_url = ${quoteToml(desired.base_url)}`,
+      `wire_api = ${quoteToml(desired.wire_api)}`,
+      `requires_openai_auth = ${desired.requires_openai_auth}`,
+    ].join("\n");
+    return `${text.replace(/\s*$/, "")}\n\n${section}\n`;
   }
-  return `${text.replace(/\s*$/, "")}\n\n${section}\n`;
+
+  let endIndex = lines.length;
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    if (/^\s*\[.+\]\s*$/.test(lines[i])) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  const sectionLines = [...lines.slice(startIndex, endIndex)];
+  const rewriteAssignment = (key: string, value: string, quote = true): void => {
+    const assignment = `${key} = ${quote ? quoteToml(value) : value}`;
+    const relativeIndex = sectionLines.findIndex((line, index) =>
+      index > 0 && new RegExp(`^\\s*${key}\\s*=`).test(line.trim()));
+    if (relativeIndex >= 0) {
+      sectionLines[relativeIndex] = assignment;
+      return;
+    }
+    sectionLines.push(assignment);
+  };
+
+  if (desired.name) {
+    rewriteAssignment("name", desired.name);
+  }
+  rewriteAssignment("base_url", desired.base_url);
+  rewriteAssignment("wire_api", desired.wire_api);
+  rewriteAssignment("requires_openai_auth", desired.requires_openai_auth, false);
+
+  return [
+    ...lines.slice(0, startIndex),
+    ...sectionLines,
+    ...lines.slice(endIndex),
+  ].join("\n");
 }
 
 function upsertMcpServerSection(text: string, params: {
@@ -146,6 +189,24 @@ function adapterRootFromHere(moduleDir = __dirname): string {
 
 function shellQuote(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+}
+
+async function canListenOnPort(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+async function resolveAvailableCodexProxyPort(preferredPort: number): Promise<number> {
+  if (await canListenOnPort(preferredPort)) return preferredPort;
+  for (let port = preferredPort + 1; port <= preferredPort + 20; port += 1) {
+    if (await canListenOnPort(port)) return port;
+  }
+  return preferredPort;
 }
 
 function hookWrapperPath(adapterRoot: string): string {
@@ -288,20 +349,30 @@ export async function installCodexTokenPilot(params?: {
   const codexConfigPath = params?.codexConfigPath ?? defaultCodexConfigPath();
   const tokenPilotConfigPath = params?.tokenPilotConfigPath ?? defaultTokenPilotConfigPath();
   const hooksConfigPath = params?.hooksConfigPath ?? defaultHooksConfigPath();
-  const providerName = params?.providerName ?? "tokenpilot";
   const tokenPilotConfig = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+  const previousProxyPort = tokenPilotConfig.proxyPort;
   const commandSkillsDir = defaultCodexSkillBridgeDir(dirname(codexConfigPath));
+  tokenPilotConfig.proxyPort = await resolveAvailableCodexProxyPort(tokenPilotConfig.proxyPort);
   const existingRootProvider = await readCodexRootModelProvider(codexConfigPath);
-  const preferredActiveProvider = existingRootProvider && existingRootProvider !== providerName
-    ? existingRootProvider
-    : tokenPilotConfig.upstreamProvider;
-  const activeProviderName = preferredActiveProvider && preferredActiveProvider !== providerName
-    ? preferredActiveProvider
-    : "OpenAI";
-  const upstreamProvider = await readCodexProviderFromToml(activeProviderName, codexConfigPath);
+  const persistedProviderName = tokenPilotConfig.providerName !== "tokenpilot"
+    ? tokenPilotConfig.providerName
+    : undefined;
+  const providerName = (existingRootProvider
+    || params?.providerName?.trim()
+    || tokenPilotConfig.upstreamProvider
+    || persistedProviderName
+    || "OpenAI");
+  const interceptedProvider = await readCodexProviderFromToml(providerName, codexConfigPath);
+  const previousProxyBaseUrl = `http://127.0.0.1:${previousProxyPort}/v1`;
+  const providerAlreadyRouted = tokenPilotConfig.providerName === providerName
+    && interceptedProvider?.baseUrl === previousProxyBaseUrl
+    && Boolean(tokenPilotConfig.upstream?.baseUrl);
+  const upstreamProvider = providerAlreadyRouted
+    ? tokenPilotConfig.upstream
+    : interceptedProvider;
   tokenPilotConfig.providerName = providerName;
-  tokenPilotConfig.upstreamProvider = activeProviderName;
-  if (upstreamProvider) {
+  tokenPilotConfig.upstreamProvider = providerName;
+  if (upstreamProvider?.baseUrl) {
     tokenPilotConfig.upstream = upstreamProvider;
   }
   await writeTokenPilotCodexConfig(tokenPilotConfig, tokenPilotConfigPath);
@@ -315,7 +386,14 @@ export async function installCodexTokenPilot(params?: {
     await copyFile(codexConfigPath, `${codexConfigPath}.tokenpilot.bak`);
   }
   let next = existing;
-  next = upsertProviderSection(next, { providerName, baseUrl });
+  next = replaceOrInsertRootAssignment(next, "model_provider", quoteToml(providerName));
+  next = rewriteProviderSectionForProxy(next, {
+    providerName,
+    baseUrl,
+    displayName: interceptedProvider?.name ?? providerName,
+    wireApi: interceptedProvider?.wireApi ?? "responses",
+    requiresOpenAIAuth: interceptedProvider?.requiresOpenAIAuth ?? true,
+  });
   next = upsertMcpServerSection(next, {
     serverName: mcpServer.serverName,
     command: mcpServer.command,
@@ -332,10 +410,6 @@ export async function installCodexTokenPilot(params?: {
       platform: params?.platform,
     });
   }
-  migrateCodexThreadProviders({
-    codexHome: dirname(codexConfigPath),
-    activeProviderName,
-  });
   const commandSkillBridge = await installCommandSkillBridge({
     adapterRoot: adapterRootFromHere(),
     skillsDir: commandSkillsDir,
@@ -360,7 +434,7 @@ export async function installCodexTokenPilot(params?: {
     tokenPilotConfigPath,
     hooksConfigPath,
     providerName,
-    activeProviderName,
+    activeProviderName: providerName,
     baseUrl,
     hooksInstalled,
     mcpServerName: mcpServer.serverName,

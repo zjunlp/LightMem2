@@ -98,6 +98,7 @@ Supported host adapters:
 
 - `OpenClaw`: production adapter with the broadest public feature set
 - `Codex CLI`: adapter with stable-prefix, reduction, MCP recovery, report, doctor, and text visual
+  - installs by rerouting the active Codex provider through a local TokenPilot proxy, while preserving existing session history under the same provider name
 - `Claude Code`: adapter with gateway routing, stable-prefix, reduction, MCP recovery, report, doctor, and text visual
 
 Shared product surfaces:

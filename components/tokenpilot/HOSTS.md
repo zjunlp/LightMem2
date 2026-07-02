@@ -48,6 +48,7 @@ Legend:
 ### Codex CLI
 
 - uses Codex config mutation, hook registration, and a local OpenAI-compatible Responses proxy
+- preserves the current active Codex provider name and reroutes that provider's `base_url` through the local proxy
 - uses the standalone `lightmem2 codex ...` CLI surface instead of in-host slash commands
 - supports stable-prefix, reduction, report, doctor, text visual, and real MCP recovery
 - intentionally does not expose `settings`, `eviction`, or `mode aggressive`

@@ -3,8 +3,12 @@ import test from "node:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { DatabaseSync } from "node:sqlite";
-import { loadTokenPilotCodexConfig } from "../src/config.js";
+import { createServer } from "node:net";
+import {
+  loadTokenPilotCodexConfig,
+  normalizeTokenPilotCodexConfig,
+  writeTokenPilotCodexConfig,
+} from "../src/config.js";
 import { installCodexTokenPilot, resolveCodexHookCommandForInstall } from "../src/install.js";
 
 test("installCodexTokenPilot writes provider, MCP, and hooks with expected commands", async () => {
@@ -32,10 +36,9 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
 
     const codexToml = await readFile(codexConfigPath, "utf8");
     assert.match(codexToml, /model_provider = "OPENAI"/);
-    assert.match(codexToml, /\[model_providers\.tokenpilot\]/);
     assert.match(codexToml, /\[model_providers\.OPENAI\]/);
-    assert.match(codexToml, /\[model_providers\.tokenpilot\][\s\S]*base_url = "http:\/\/127\.0\.0\.1:\d+\/v1"/);
-    assert.match(codexToml, /\[model_providers\.OPENAI\][\s\S]*base_url = "https:\/\/api\.openai\.com\/v1"/);
+    assert.match(codexToml, /\[model_providers\.OPENAI\][\s\S]*base_url = "http:\/\/127\.0\.0\.1:\d+\/v1"/);
+    assert.doesNotMatch(codexToml, /\[model_providers\.tokenpilot\]/);
     assert.match(codexToml, /\[mcp_servers\.tokenpilot_memory_fault_recover\]/);
     assert.match(codexToml, /startup_timeout_sec\s*=\s*90/);
     assert.match(codexToml, new RegExp(result.expectedMcpCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -48,6 +51,7 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
     assert.equal(result.mcpProbe.ok, true);
     assert.equal(result.mcpProbe.degraded, false);
     assert.equal(result.activeProviderName, "OPENAI");
+    assert.equal(result.providerName, "OPENAI");
     assert.deepEqual(result.commandSkillNames, [
       "lightmem2-status",
       "lightmem2-report",
@@ -77,59 +81,6 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
   }
 });
 
-test("installCodexTokenPilot retags old tokenpilot threads back to the active provider", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-retag-"));
-  try {
-    const codexConfigPath = join(dir, "config.toml");
-    const hooksConfigPath = join(dir, "hooks.json");
-    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
-    const dbPath = join(dir, "state_5.sqlite");
-
-    await writeFile(codexConfigPath, [
-      "model_provider = \"OPENAI\"",
-      "",
-      "[model_providers.OPENAI]",
-      "name = \"OpenAI\"",
-      "base_url = \"https://api.openai.com/v1\"",
-      "wire_api = \"responses\"",
-      "requires_openai_auth = true",
-      "",
-    ].join("\n"), "utf8");
-    await mkdir(dir, { recursive: true });
-
-    const db = new DatabaseSync(dbPath);
-    try {
-      db.exec("CREATE TABLE threads (id TEXT PRIMARY KEY, model_provider TEXT NOT NULL)");
-      db.prepare("INSERT INTO threads (id, model_provider) VALUES (?, ?)").run("a", "tokenpilot");
-      db.prepare("INSERT INTO threads (id, model_provider) VALUES (?, ?)").run("b", "OPENAI");
-    } finally {
-      db.close();
-    }
-
-    await installCodexTokenPilot({
-      codexConfigPath,
-      hooksConfigPath,
-      tokenPilotConfigPath,
-    });
-
-    const verifyDb = new DatabaseSync(dbPath);
-    try {
-      const tokenpilotCount = Number(
-        verifyDb.prepare("SELECT COUNT(*) AS count FROM threads WHERE model_provider = ?").get("tokenpilot")?.count ?? 0,
-      );
-      const openaiCount = Number(
-        verifyDb.prepare("SELECT COUNT(*) AS count FROM threads WHERE model_provider = ?").get("OPENAI")?.count ?? 0,
-      );
-      assert.equal(tokenpilotCount, 0);
-      assert.equal(openaiCount, 2);
-    } finally {
-      verifyDb.close();
-    }
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 test("installCodexTokenPilot reports degraded MCP mode when probe is skipped", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-skip-probe-"));
   try {
@@ -143,6 +94,45 @@ test("installCodexTokenPilot reports degraded MCP mode when probe is skipped", a
     assert.equal(result.mcpProbe.ok, false);
     assert.equal(result.mcpProbe.degraded, true);
     assert.match(result.mcpProbe.detail, /skipped/i);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("installCodexTokenPilot preserves an existing custom root provider and reroutes that provider to the proxy", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-custom-root-"));
+  try {
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+    await writeFile(codexConfigPath, [
+      "model_provider = \"OPENROUTER\"",
+      "",
+      "[model_providers.OPENROUTER]",
+      "name = \"OpenRouter\"",
+      "base_url = \"https://openrouter.ai/api/v1\"",
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n"), "utf8");
+
+    const result = await installCodexTokenPilot({
+      codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+      probeMcp: false,
+    });
+
+    const codexToml = await readFile(codexConfigPath, "utf8");
+    assert.match(codexToml, /model_provider = "OPENROUTER"/);
+    assert.match(codexToml, /\[model_providers\.OPENROUTER\][\s\S]*base_url = "http:\/\/127\.0\.0\.1:\d+\/v1"/);
+    assert.equal(result.providerName, "OPENROUTER");
+    assert.equal(result.activeProviderName, "OPENROUTER");
+
+    const tokenPilotConfig = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+    assert.equal(tokenPilotConfig.providerName, "OPENROUTER");
+    assert.equal(tokenPilotConfig.upstreamProvider, "OPENROUTER");
+    assert.equal(tokenPilotConfig.upstream?.baseUrl, "https://openrouter.ai/api/v1");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -219,6 +209,57 @@ test("installCodexTokenPilot rewrites the MCP server block idempotently", async 
     const envHeaders = codexToml.match(/\[mcp_servers\.tokenpilot_memory_fault_recover\.env\]/g) ?? [];
     assert.equal(envHeaders.length, 1);
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("installCodexTokenPilot shifts the proxy port when the preferred port is already occupied", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-port-shift-"));
+  const blocker = await new Promise<{ server: import("node:net").Server; port: number }>((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        reject(new Error("failed to reserve blocker port"));
+        return;
+      }
+      resolve({ server, port: address.port });
+    });
+  });
+  try {
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({
+        proxyPort: blocker.port,
+      }),
+      tokenPilotConfigPath,
+    );
+    await writeFile(codexConfigPath, [
+      "model_provider = \"OPENAI\"",
+      "",
+      "[model_providers.OPENAI]",
+      "name = \"OpenAI\"",
+      "base_url = \"https://api.openai.com/v1\"",
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n"), "utf8");
+
+    const result = await installCodexTokenPilot({
+      codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+      probeMcp: false,
+    });
+
+    const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+    assert.notEqual(config.proxyPort, blocker.port);
+    assert.equal(result.baseUrl, `http://127.0.0.1:${config.proxyPort}/v1`);
+  } finally {
+    await new Promise<void>((resolve) => blocker.server.close(() => resolve()));
     await rm(dir, { recursive: true, force: true });
   }
 });

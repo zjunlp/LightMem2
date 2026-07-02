@@ -5,7 +5,7 @@ installCodexTokenPilot({
   tokenPilotConfigPath: process.env.TOKENPILOT_CODEX_CONFIG,
   hooksConfigPath: process.env.CODEX_HOOKS_CONFIG_PATH,
 }).then((result) => {
-  console.log(`Installed TokenPilot Codex provider '${result.providerName}'`);
+  console.log(`Installed TokenPilot Codex routing on provider '${result.providerName}'`);
   console.log(`Codex config: ${result.codexConfigPath}`);
   console.log(`TokenPilot config: ${result.tokenPilotConfigPath}`);
   console.log(`Codex hooks config: ${result.hooksConfigPath} (${result.hooksInstalled ? "installed" : "skipped"})`);
@@ -17,7 +17,7 @@ installCodexTokenPilot({
   console.log(`Recovery MCP probe detail: ${result.mcpProbe.detail}`);
   console.log(`Proxy base URL: ${result.baseUrl}`);
   console.log("TokenPilot will auto-start from Codex SessionStart hooks after hooks are trusted.");
-  console.log(`Active Codex provider remains '${result.activeProviderName}' and is now routed through the local TokenPilot proxy.`);
+  console.log(`Codex default provider remains '${result.providerName}', and TokenPilot forwards upstream to '${result.activeProviderName}'.`);
   console.log("For manual troubleshooting, run: tokenpilot-codex start");
   console.log("If Codex reports hooks need review, run /hooks and trust the TokenPilot hooks.");
   if (result.mcpProbe.degraded) {

@@ -6,7 +6,11 @@ import {
   TOKENPILOT_MCP_SERVER_NAME,
 } from "../../../products/mcp/src/index.js";
 import type { TokenPilotCodexConfig } from "./config.js";
-import { readCodexMcpServerFromToml, readCodexProviderFromToml } from "./config.js";
+import {
+  readCodexMcpServerFromToml,
+  readCodexProviderFromToml,
+  readCodexRootModelProvider,
+} from "./config.js";
 import { readDaemonStatus } from "./daemon.js";
 import { resolveCodexHookCommandForInstall, resolveCodexMcpServerSpecForInstall } from "./install.js";
 
@@ -19,6 +23,8 @@ export type CodexDoctorReport = {
   expectedMcpCommand: string;
   expectedMcpArgs: string[];
   providerInstalled: boolean;
+  providerActive: boolean;
+  providerIntercepted: boolean;
   hooksInstalled: boolean;
   hooksComplete: boolean;
   hooksMatchExpectedCommand: boolean;
@@ -78,7 +84,9 @@ function hookGroupHasExpectedCommand(group: unknown, expectedCommand: string): b
 async function checkHealth(baseUrl: string): Promise<boolean> {
   try {
     const resp = await fetch(`${baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "")}/health`);
-    return resp.ok;
+    if (!resp.ok) return false;
+    const payload = await resp.json().catch(() => undefined) as { adapter?: string } | undefined;
+    return payload?.adapter === "tokenpilot-codex";
   } catch {
     return false;
   }
@@ -99,6 +107,8 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- recovery MCP healthy: ${report.recoveryMcpHealthy ? "yes" : "no"}`,
     `- degraded mode: ${report.degradedMode ? "yes" : "no"}`,
     `- provider installed: ${report.providerInstalled ? "yes" : "no"}`,
+    `- active provider selected: ${report.providerActive ? "yes" : "no"}`,
+    `- active provider routed through proxy: ${report.providerIntercepted ? "yes" : "no"}`,
     `- recovery MCP installed: ${report.mcpInstalled ? "yes" : "no"}`,
     `- hooks installed: ${report.hooksInstalled ? "yes" : "no"}`,
     `- hooks complete: ${report.hooksComplete ? "yes" : "no"}`,
@@ -116,7 +126,13 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
   ];
   const fixes: string[] = [];
   if (!report.providerInstalled) {
-    fixes.push("- rerun the Codex install command to refresh the TokenPilot provider entry in `config.toml`");
+    fixes.push("- rerun the Codex install command to refresh the intercepted provider entry in `config.toml`");
+  }
+  if (report.providerInstalled && !report.providerActive) {
+    fixes.push("- set the root `model_provider` in `config.toml` back to the provider TokenPilot installed against");
+  }
+  if (report.providerInstalled && report.providerActive && !report.providerIntercepted) {
+    fixes.push("- rerun the Codex install command or repoint the active provider `base_url` to the local TokenPilot proxy");
   }
   if (!report.hooksInstalled || !report.hooksComplete || !report.hooksMatchExpectedCommand) {
     fixes.push("- rerun the Codex install command to repair TokenPilot hook groups in `hooks.json`");
@@ -157,6 +173,7 @@ export async function inspectCodexDoctor(params: {
   const expectedHookCommand = await resolveCodexHookCommandForInstall();
   const expectedMcpSpec = resolveCodexMcpServerSpecForInstall(params.config.stateDir);
   const tokenpilotProvider = await readCodexProviderFromToml(providerName, params.configPath);
+  const rootProvider = await readCodexRootModelProvider(params.configPath);
   const mcp = await readCodexMcpServerFromToml(TOKENPILOT_MCP_SERVER_NAME, params.configPath);
   let hooksRoot: Record<string, unknown> = {};
   if (existsSync(params.hooksConfigPath)) {
@@ -179,13 +196,14 @@ export async function inspectCodexDoctor(params: {
   const hooksInstalled = installedHookEvents.length > 0;
   const hooksMatchExpectedCommand = HOOK_EVENT_NAMES.every((name) => matchedHookEvents.includes(name));
   const proxyHealthy = await checkHealth(proxyBaseUrl);
+  const providerIntercepted = tokenpilotProvider?.baseUrl === proxyBaseUrl;
   const mcpHealth = inspectTokenPilotMcpHealth({
     observed: mcp,
     expected: expectedMcpSpec,
     expectedStateDir: params.config.stateDir,
     expectedStartupTimeoutSec: DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
   });
-  const coreRuntimeHealthy = Boolean(tokenpilotProvider) && daemon.running && proxyHealthy;
+  const coreRuntimeHealthy = Boolean(tokenpilotProvider) && providerIntercepted && daemon.running && proxyHealthy;
   const recoveryMcpHealthy = mcpHealth.healthy;
   return {
     configPath: params.configPath,
@@ -196,6 +214,8 @@ export async function inspectCodexDoctor(params: {
     expectedMcpCommand: expectedMcpSpec.command,
     expectedMcpArgs: expectedMcpSpec.args,
     providerInstalled: Boolean(tokenpilotProvider),
+    providerActive: rootProvider === providerName,
+    providerIntercepted,
     hooksInstalled,
     hooksComplete,
     hooksMatchExpectedCommand,

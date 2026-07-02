@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 
 import { normalizeTokenPilotCodexConfig } from "../src/config.js";
 import { formatCodexDoctorReport, inspectCodexDoctor } from "../src/doctor.js";
@@ -98,6 +99,7 @@ test("inspectCodexDoctor checks the configured provider name", async () => {
     });
 
     assert.equal(report.providerInstalled, true);
+    assert.equal(report.providerActive, true);
     assert.equal(report.hooksInstalled, false);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -150,6 +152,64 @@ test("inspectCodexDoctor detects installed recovery MCP entry", async () => {
     assert.equal(report.mcpArgsMatch, false);
     assert.equal(report.mcpStartupTimeoutSecMatches, true);
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("inspectCodexDoctor treats a non-tokenpilot active provider as healthy when it is routed through the local proxy", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-doctor-intercepted-root-"));
+  const proxyPort = await reserveUnusedPort();
+  const server = createHttpServer((req, res) => {
+    if (req.url === "/health") {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ ok: true, adapter: "tokenpilot-codex" }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end("not found");
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(proxyPort, "127.0.0.1", () => resolve());
+    });
+
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+    await writeFile(codexConfigPath, [
+      "model_provider = \"OPENAI\"",
+      "",
+      "[model_providers.OPENAI]",
+      `name = ${JSON.stringify("OPENAI")}`,
+      `base_url = ${JSON.stringify(`http://127.0.0.1:${proxyPort}/v1`)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n"), "utf8");
+    await writeFile(hooksConfigPath, JSON.stringify({ hooks: {} }, null, 2), "utf8");
+    await mkdir(join(dir, "state"), { recursive: true });
+
+    const report = await inspectCodexDoctor({
+      config: normalizeTokenPilotCodexConfig({
+        stateDir: join(dir, "state"),
+        proxyPort,
+        providerName: "OPENAI",
+        upstreamProvider: "OPENAI",
+      }),
+      configPath: codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+    });
+
+    assert.equal(report.providerInstalled, true);
+    assert.equal(report.providerActive, true);
+    assert.equal(report.providerIntercepted, true);
+    assert.equal(report.proxyHealthy, true);
+    assert.equal(report.coreRuntimeHealthy, true);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(dir, { recursive: true, force: true });
   }
 });
@@ -227,6 +287,59 @@ test("inspectCodexDoctor accepts Windows hook wrapper commands", async () => {
   }
 });
 
+test("inspectCodexDoctor rejects a healthy response from a different adapter on the same port", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-doctor-wrong-adapter-"));
+  const proxyPort = await reserveUnusedPort();
+  const server = createHttpServer((req, res) => {
+    if (req.url === "/health") {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ ok: true, adapter: "tokenpilot-openclaw" }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end("not found");
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(proxyPort, "127.0.0.1", () => resolve());
+    });
+
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+
+    await writeFile(codexConfigPath, [
+      "model_provider = \"tokenpilot\"",
+      "",
+      "[model_providers.tokenpilot]",
+      `base_url = ${JSON.stringify(`http://127.0.0.1:${proxyPort}/v1`)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n"), "utf8");
+    await writeFile(hooksConfigPath, JSON.stringify({ hooks: {} }, null, 2), "utf8");
+    await mkdir(join(dir, "state"), { recursive: true });
+
+    const report = await inspectCodexDoctor({
+      config: normalizeTokenPilotCodexConfig({
+        stateDir: join(dir, "state"),
+        proxyPort,
+      }),
+      configPath: codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+    });
+
+    assert.equal(report.proxyHealthy, false);
+    assert.equal(report.coreRuntimeHealthy, false);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("formatCodexDoctorReport includes remediation hints for drifted installs", async () => {
   const proxyPort = await reserveUnusedPort();
   const report = await inspectCodexDoctor({
@@ -254,6 +367,7 @@ test("formatCodexDoctorReport shows degraded mode when core runtime is healthy b
     expectedMcpArgs: ["/tmp/server.js"],
     expectedMcpStartupTimeoutSec: 90,
     providerInstalled: true,
+    providerActive: true,
     hooksInstalled: true,
     hooksComplete: true,
     hooksMatchExpectedCommand: true,
