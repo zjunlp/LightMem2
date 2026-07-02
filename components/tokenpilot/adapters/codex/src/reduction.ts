@@ -10,6 +10,7 @@ import {
   runReductionBeforeCall,
 } from "@tokenpilot/runtime-core";
 import type { TokenPilotCodexConfig } from "./config.js";
+import { loadCodexSessionSnapshot } from "./session-state.js";
 
 type SegmentBinding = {
   segmentId: string;
@@ -82,8 +83,20 @@ export type CodexReductionSummary = {
   passEffects: CodexReductionPassEffect[];
   diagnostics: CodexReductionDiagnostics;
   visualSegments?: CodexReductionVisualSegment[];
+  disclosedReadPaths?: string[];
   skippedReason?: string;
 };
+
+function normalizeDisclosedReadPaths(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const next = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const normalized = entry.trim().toLowerCase();
+    if (normalized) next.add(normalized);
+  }
+  return next.size > 0 ? [...next] : undefined;
+}
 
 function stringifyStructuredValue(value: unknown): string {
   if (typeof value === "string") return value;
@@ -93,6 +106,43 @@ function stringifyStructuredValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function parseStructuredObject(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== "string") return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractPathHint(value: unknown): string | undefined {
+  const record = asRecord(value);
+  const candidates = [
+    record.path,
+    record.file_path,
+    record.filePath,
+    record.filename,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
 }
 
 export function normalizeResponsesInputForUpstream(input: any): void {
@@ -182,11 +232,16 @@ function segmentForText(params: {
   item: any;
   field: string;
   latestUserQuery: string;
+  path?: string;
+  toolName?: string;
 }): ContextSegment {
   const isToolLike =
     String(params.item?.role ?? "").toLowerCase() === "tool"
     || String(params.item?.type ?? "").toLowerCase() === "function_call_output"
     || params.field === "output";
+  const toolName = typeof params.toolName === "string" && params.toolName.trim()
+    ? params.toolName.trim()
+    : typeof params.item?.name === "string" ? params.item.name : "tool";
   return {
     id: params.id,
     kind: isToolLike ? "volatile" : "semi_stable",
@@ -198,6 +253,7 @@ function segmentForText(params: {
       type: params.item?.type,
       fieldName: params.field,
       latestUserQuery: params.latestUserQuery,
+      ...(params.path ? { path: params.path } : {}),
       ...(isToolLike
         ? {
             role: "tool",
@@ -206,8 +262,9 @@ function segmentForText(params: {
             toolPayload: {
               enabled: true,
               kind: payloadKindForItem(params.item),
-              toolName: typeof params.item?.name === "string" ? params.item.name : "tool",
+              toolName,
               fieldName: params.field,
+              ...(params.path ? { path: params.path } : {}),
             },
             reduction: {
               target: "tool_payload",
@@ -239,7 +296,11 @@ function extractLatestUserQuery(input: any): string {
   return "";
 }
 
-function buildTurnContext(payload: any, sessionId: string): {
+function buildTurnContext(
+  payload: any,
+  sessionId: string,
+  options?: { disclosedReadPaths?: string[] },
+): {
   turnCtx: RuntimeTurnContext;
   bindings: SegmentBinding[];
   diagnostics: CodexReductionDiagnostics;
@@ -247,42 +308,82 @@ function buildTurnContext(payload: any, sessionId: string): {
   const segments: ContextSegment[] = [];
   const bindings: SegmentBinding[] = [];
   const latestUserQuery = extractLatestUserQuery(payload?.input);
+  const toolCallHints = new Map<string, { toolName?: string; path?: string }>();
   let inputItems = 0;
   let toolLikeItems = 0;
   if (Array.isArray(payload?.input)) {
     payload.input.forEach((item: any, itemIndex: number) => {
       if (!item || typeof item !== "object") return;
       inputItems += 1;
+      if (String(item.type ?? "").toLowerCase() === "function_call") {
+        const callId = typeof item.call_id === "string"
+          ? item.call_id
+          : typeof item.id === "string" ? item.id : "";
+        if (callId) {
+          toolCallHints.set(callId, {
+            toolName: typeof item.name === "string" ? item.name : undefined,
+            path: extractPathHint(parseStructuredObject(item.arguments)),
+          });
+        }
+      }
       if (!isToolLikeInputItem(item)) return;
       toolLikeItems += 1;
+      const callHint = typeof item.call_id === "string" ? toolCallHints.get(item.call_id) : undefined;
       if (typeof item.output === "string") {
         const id = `input-${itemIndex}-output`;
-        segments.push(segmentForText({ id, text: item.output, source: "responses.input.output", item, field: "output", latestUserQuery }));
+        segments.push(segmentForText({
+          id,
+          text: item.output,
+          source: "responses.input.output",
+          item,
+          field: "output",
+          latestUserQuery,
+          path: callHint?.path,
+          toolName: callHint?.toolName,
+        }));
         bindings.push({
           segmentId: id,
           itemIndex,
           field: "output",
-          toolName: typeof item?.name === "string" ? item.name : undefined,
+          toolName: callHint?.toolName ?? (typeof item?.name === "string" ? item.name : undefined),
         });
       }
       if (typeof item.arguments === "string") {
         const id = `input-${itemIndex}-arguments`;
-        segments.push(segmentForText({ id, text: item.arguments, source: "responses.input.arguments", item, field: "arguments", latestUserQuery }));
+        segments.push(segmentForText({
+          id,
+          text: item.arguments,
+          source: "responses.input.arguments",
+          item,
+          field: "arguments",
+          latestUserQuery,
+          path: callHint?.path,
+          toolName: callHint?.toolName,
+        }));
         bindings.push({
           segmentId: id,
           itemIndex,
           field: "arguments",
-          toolName: typeof item?.name === "string" ? item.name : undefined,
+          toolName: callHint?.toolName ?? (typeof item?.name === "string" ? item.name : undefined),
         });
       }
       if (typeof item.content === "string") {
         const id = `input-${itemIndex}-content`;
-        segments.push(segmentForText({ id, text: item.content, source: "responses.input.content", item, field: "content", latestUserQuery }));
+        segments.push(segmentForText({
+          id,
+          text: item.content,
+          source: "responses.input.content",
+          item,
+          field: "content",
+          latestUserQuery,
+          path: callHint?.path,
+          toolName: callHint?.toolName,
+        }));
         bindings.push({
           segmentId: id,
           itemIndex,
           field: "content",
-          toolName: typeof item?.name === "string" ? item.name : undefined,
+          toolName: callHint?.toolName ?? (typeof item?.name === "string" ? item.name : undefined),
         });
       }
       if (Array.isArray(item.content)) {
@@ -298,6 +399,8 @@ function buildTurnContext(payload: any, sessionId: string): {
             item,
             field: "content",
             latestUserQuery,
+            path: callHint?.path,
+            toolName: callHint?.toolName,
           }));
           bindings.push({
             segmentId: id,
@@ -305,7 +408,7 @@ function buildTurnContext(payload: any, sessionId: string): {
             field: "content",
             blockIndex,
             blockKey,
-            toolName: typeof item?.name === "string" ? item.name : undefined,
+            toolName: callHint?.toolName ?? (typeof item?.name === "string" ? item.name : undefined),
           });
         });
       }
@@ -326,6 +429,7 @@ function buildTurnContext(payload: any, sessionId: string): {
       segments,
       metadata: {
         latestUserQuery,
+        ...(options?.disclosedReadPaths ? { disclosedReadPaths: options.disclosedReadPaths } : {}),
       },
     },
     bindings,
@@ -554,7 +658,10 @@ export async function applyBeforeCallReductionToPayload(params: {
       skippedReason: !Array.isArray(payload?.input) ? "no_input_array" : "disabled",
     };
   }
-  const built = buildTurnContext(payload, sessionId);
+  const snapshot = await loadCodexSessionSnapshot(config.stateDir, sessionId);
+  const built = buildTurnContext(payload, sessionId, {
+    disclosedReadPaths: normalizeDisclosedReadPaths(snapshot?.disclosedReadPaths),
+  });
   const analyzerInstructions = buildAnalyzerReductionInstructions(built.turnCtx.segments, config);
   const fallbackInstructions = buildCodexFallbackReductionInstructions(built.turnCtx.segments, config);
   const localInstructions = dedupeReductionInstructions([...analyzerInstructions, ...fallbackInstructions]);
@@ -597,6 +704,7 @@ export async function applyBeforeCallReductionToPayload(params: {
       report,
       passEffects,
       diagnostics: built.diagnostics,
+      disclosedReadPaths: normalizeDisclosedReadPaths(reducedCtx.metadata?.disclosedReadPaths),
       skippedReason: "pipeline_no_effect",
     };
   }
@@ -654,6 +762,7 @@ export async function applyBeforeCallReductionToPayload(params: {
     passEffects,
     diagnostics: built.diagnostics,
     visualSegments,
+    disclosedReadPaths: normalizeDisclosedReadPaths(reducedCtx.metadata?.disclosedReadPaths),
   };
 }
 

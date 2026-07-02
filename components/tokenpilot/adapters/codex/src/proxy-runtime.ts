@@ -236,6 +236,7 @@ export async function startCodexResponsesProxy(params: {
               latestResponseId: snapshot.responseId,
               previousResponseId: snapshot.previousResponseId,
               latestModel: model,
+              disclosedReadPaths: reductionSummary?.disclosedReadPaths,
             });
             if (typeof snapshot.responseId === "string" && snapshot.responseId) {
               await indexCodexResponseSession(config.stateDir, snapshot.responseId, sessionId);
@@ -307,6 +308,7 @@ export async function startCodexResponsesProxy(params: {
         latestResponseId: responseId,
         previousResponseId,
         latestModel: model,
+        disclosedReadPaths: reductionSummary?.disclosedReadPaths,
       });
       if (typeof responseId === "string" && responseId) {
         await indexCodexResponseSession(config.stateDir, responseId, sessionId);

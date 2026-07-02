@@ -18,6 +18,7 @@ export type CodexSessionSnapshot = {
   previousResponseId?: string;
   latestModel?: string;
   workspaceHint?: string;
+  disclosedReadPaths?: string[];
   lastHookEvent?: string;
   lastToolName?: string;
   lastToolInputChars?: number;
@@ -97,6 +98,7 @@ export async function upsertCodexSessionSnapshot(
     previousResponseId: patch.previousResponseId ?? current?.previousResponseId,
     latestModel: patch.latestModel ?? current?.latestModel,
     workspaceHint: patch.workspaceHint ?? current?.workspaceHint,
+    disclosedReadPaths: patch.disclosedReadPaths ?? current?.disclosedReadPaths,
     lastHookEvent: patch.lastHookEvent ?? current?.lastHookEvent,
     lastToolName: patch.lastToolName ?? current?.lastToolName,
     lastToolInputChars: patch.lastToolInputChars ?? current?.lastToolInputChars,
@@ -133,6 +135,7 @@ export async function mergeCodexSessionSnapshot(
     previousResponseId: target?.previousResponseId ?? source.previousResponseId,
     latestModel: target?.latestModel ?? source.latestModel,
     workspaceHint: target?.workspaceHint ?? source.workspaceHint,
+    disclosedReadPaths: target?.disclosedReadPaths ?? source.disclosedReadPaths,
     lastHookEvent: target?.lastHookEvent ?? source.lastHookEvent,
     lastToolName: target?.lastToolName ?? source.lastToolName,
     lastToolInputChars: target?.lastToolInputChars ?? source.lastToolInputChars,

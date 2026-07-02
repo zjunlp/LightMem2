@@ -10,6 +10,7 @@ import {
   runReductionBeforeCall,
 } from "@tokenpilot/runtime-core";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
+import { loadClaudeCodeSessionSnapshot } from "./session-state.js";
 
 type ClaudeSegmentBinding = {
   segmentId: string;
@@ -80,13 +81,41 @@ export type ClaudeReductionSummary = {
   passEffects: ClaudeReductionPassEffect[];
   diagnostics: ClaudeReductionDiagnostics;
   visualSegments?: ClaudeReductionVisualSegment[];
+  disclosedReadPaths?: string[];
   skippedReason?: string;
 };
+
+function normalizeDisclosedReadPaths(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const next = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const normalized = entry.trim().toLowerCase();
+    if (normalized) next.add(normalized);
+  }
+  return next.size > 0 ? [...next] : undefined;
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function extractPathHint(value: unknown): string | undefined {
+  const record = asRecord(value);
+  const candidates = [
+    record.path,
+    record.file_path,
+    record.filePath,
+    record.filename,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
 }
 
 function stringifyStructuredValue(value: unknown): string {
@@ -149,6 +178,7 @@ function segmentForText(params: {
   toolName?: string;
   latestUserQuery: string;
   mimeType?: string;
+  path?: string;
 }): ContextSegment {
   const payloadKind = payloadKindForText(params.text);
   return {
@@ -162,11 +192,13 @@ function segmentForText(params: {
       isToolPayload: true,
       payloadKind,
       latestUserQuery: params.latestUserQuery,
+      ...(params.path ? { path: params.path } : {}),
       ...(params.mimeType ? { mimeType: params.mimeType } : {}),
       toolPayload: {
         enabled: true,
         kind: payloadKind,
         toolName: params.toolName ?? "tool",
+        ...(params.path ? { path: params.path } : {}),
       },
       reduction: {
         target: "tool_payload",
@@ -199,7 +231,11 @@ function extractLatestUserQuery(messages: unknown): string {
   return "";
 }
 
-function buildTurnContext(payload: any, sessionId: string): {
+function buildTurnContext(
+  payload: any,
+  sessionId: string,
+  options?: { disclosedReadPaths?: string[] },
+): {
   turnCtx: RuntimeTurnContext;
   bindings: ClaudeSegmentBinding[];
   diagnostics: ClaudeReductionDiagnostics;
@@ -207,6 +243,7 @@ function buildTurnContext(payload: any, sessionId: string): {
   const segments: ContextSegment[] = [];
   const bindings: ClaudeSegmentBinding[] = [];
   const latestUserQuery = extractLatestUserQuery(payload?.messages);
+  const toolUseHints = new Map<string, { toolName?: string; path?: string }>();
   let messageCount = 0;
   let toolLikeMessages = 0;
 
@@ -214,6 +251,19 @@ function buildTurnContext(payload: any, sessionId: string): {
     payload.messages.forEach((message: any, messageIndex: number) => {
       const item = asRecord(message);
       const content = item.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          const entry = asRecord(block);
+          const type = String(entry.type ?? "").toLowerCase();
+          if (type !== "tool_use") continue;
+          const toolUseId = typeof entry.id === "string" ? entry.id : "";
+          if (!toolUseId) continue;
+          toolUseHints.set(toolUseId, {
+            toolName: typeof entry.name === "string" ? entry.name : undefined,
+            path: extractPathHint(entry.input),
+          });
+        }
+      }
       if (!Array.isArray(content)) {
         if (item.role === "tool" && typeof content === "string") {
           messageCount += 1;
@@ -246,21 +296,24 @@ function buildTurnContext(payload: any, sessionId: string): {
             ? entry.content
             : stringifyStructuredValue(entry.content);
         if (!text) return;
+        const toolUseId = typeof entry.tool_use_id === "string" ? entry.tool_use_id : "";
+        const hint = toolUseId ? toolUseHints.get(toolUseId) : undefined;
         const id = `message-${messageIndex}-block-${blockIndex}`;
         segments.push(segmentForText({
           id,
           text,
           source: "anthropic.messages.tool_result",
-          toolName: typeof entry.name === "string" ? entry.name : undefined,
+          toolName: typeof entry.name === "string" ? entry.name : hint?.toolName,
           latestUserQuery,
           mimeType: typeof entry.mime_type === "string" ? entry.mime_type : undefined,
+          path: hint?.path,
         }));
         bindings.push({
           segmentId: id,
           messageIndex,
           blockIndex,
           field: typeof entry.text === "string" ? "text" : "content",
-          toolName: typeof entry.name === "string" ? entry.name : undefined,
+          toolName: typeof entry.name === "string" ? entry.name : hint?.toolName,
         });
       });
     });
@@ -281,6 +334,7 @@ function buildTurnContext(payload: any, sessionId: string): {
       segments,
       metadata: {
         latestUserQuery,
+        ...(options?.disclosedReadPaths ? { disclosedReadPaths: options.disclosedReadPaths } : {}),
       },
     },
     bindings,
@@ -499,7 +553,10 @@ export async function applyBeforeCallReductionToClaudePayload(params: {
     };
   }
 
-  const built = buildTurnContext(payload, sessionId);
+  const snapshot = await loadClaudeCodeSessionSnapshot(config.stateDir, sessionId);
+  const built = buildTurnContext(payload, sessionId, {
+    disclosedReadPaths: normalizeDisclosedReadPaths(snapshot?.disclosedReadPaths),
+  });
   const analyzerInstructions = buildAnalyzerReductionInstructions(built.turnCtx.segments, config);
   const fallbackInstructions = buildFallbackReductionInstructions(built.turnCtx.segments, config);
   const localInstructions = dedupeReductionInstructions([...analyzerInstructions, ...fallbackInstructions]);
@@ -545,6 +602,7 @@ export async function applyBeforeCallReductionToClaudePayload(params: {
       report,
       passEffects,
       diagnostics: built.diagnostics,
+      disclosedReadPaths: normalizeDisclosedReadPaths(reducedCtx.metadata?.disclosedReadPaths),
       skippedReason: "pipeline_no_effect",
     };
   }
@@ -602,6 +660,7 @@ export async function applyBeforeCallReductionToClaudePayload(params: {
     passEffects,
     diagnostics: built.diagnostics,
     visualSegments,
+    disclosedReadPaths: normalizeDisclosedReadPaths(reducedCtx.metadata?.disclosedReadPaths),
   };
 }
 
