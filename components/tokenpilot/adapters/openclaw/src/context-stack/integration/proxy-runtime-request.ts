@@ -9,6 +9,7 @@ import {
   createOpenClawSessionResolver,
   syncOpenClawPayloadFromEnvelope,
 } from "./openclaw-host-adapter.js";
+import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
 import { injectMemoryFaultProtocolInstructionsText } from "../page-in/recovery-protocol.js";
 import type { UpstreamConfig } from "./upstream.js";
 import { normalizeResponsesInputForUpstream } from "./proxy-runtime-shared.js";
@@ -388,6 +389,16 @@ export async function prepareProxyRequest(args: {
     reductionMaxToolChars,
   );
   if (cfg.stateDir) {
+    const workspaceHint =
+      typeof rootPromptRewrite?.workdir === "string" && rootPromptRewrite.workdir.trim().length > 0
+        ? rootPromptRewrite.workdir.trim()
+        : undefined;
+    await upsertOpenClawSessionSummary(cfg.stateDir, resolvedSessionId, {
+      latestModel: model || upstreamModel || "unknown",
+      workspaceHint,
+      reductionSavedChars: reductionApplied.savedChars,
+      updatedAt: new Date().toISOString(),
+    });
     await helpers.appendTaskStateTrace(cfg.stateDir, {
       stage: "proxy_before_call_rewrite",
       sessionId: resolvedSessionId,

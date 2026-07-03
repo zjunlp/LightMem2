@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { handleReport } from "./session-report.js";
+import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
 
 test("openclaw handleReport includes recent metrics and recovery aggregates when details are enabled", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tokenpilot-openclaw-report-"));
@@ -69,6 +70,17 @@ test("openclaw handleReport includes recent metrics and recovery aggregates when
       ].join("\n"),
       "utf8",
     );
+    await upsertOpenClawSessionSummary(dir, sessionId, {
+      sessionKey: "agent:test-session",
+      workspaceHint: "/tmp/workspace",
+      latestModel: "gpt-5.4",
+      turnCount: 4,
+      requestChars: 1200,
+      responseChars: 400,
+      assistantChars: 240,
+      reductionSavedChars: 360,
+      updatedAt: new Date().toISOString(),
+    });
 
     const result = await handleReport(
       { sessionId },
@@ -86,6 +98,15 @@ test("openclaw handleReport includes recent metrics and recovery aggregates when
       },
     );
 
+    assert.match(result.text, /^Session: 123e4567-e89b-12d3-a456-426614174000/m);
+    assert.match(result.text, /^Turns: 4/m);
+    assert.match(result.text, /^Model: gpt-5\.4/m);
+    assert.match(result.text, /^Workspace: \/tmp\/workspace/m);
+    assert.match(result.text, /^Session key: agent:test-session/m);
+    assert.match(result.text, /^Latest request chars: 1,200|^Latest request chars: 1200/m);
+    assert.match(result.text, /^Latest response chars: 400/m);
+    assert.match(result.text, /^Latest assistant chars: 240/m);
+    assert.match(result.text, /^Latest reduction savings: 360/m);
     assert.match(result.text, /saved chars: 900/i);
     assert.match(result.text, /latest request savings: 240 chars/i);
     assert.match(result.text, /latest response savings: 60 chars/i);

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
+
 function buildReductionHooks(helpers: any) {
   return {
     buildLayeredReductionContext: (payload: any, triggerMinChars: number, sessionId: string, passToggles?: any, passOptions?: any) =>
@@ -188,5 +190,13 @@ export async function recordNonStreamingUxEffect(params: {
       requestSavedCount,
       responseSavedCount,
     },
+  });
+  await upsertOpenClawSessionSummary(cfg.stateDir, resolvedSessionId, {
+    latestModel: model || upstreamModel || "unknown",
+    requestChars: afterReductionInputText.length,
+    responseChars: finalResponseText.length,
+    assistantChars: finalResponseText.length,
+    reductionSavedChars: Number(reductionApplied?.savedChars ?? 0) + Number(afterCallReduction?.savedChars ?? 0),
+    updatedAt: new Date().toISOString(),
   });
 }

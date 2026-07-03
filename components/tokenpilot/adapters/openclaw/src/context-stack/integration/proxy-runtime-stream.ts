@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createOpenClawHostBridge } from "./openclaw-host-bridge.js";
+import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
 
 export async function recordStreamingUxEffect(params: {
   cfg: any;
@@ -63,6 +64,14 @@ export async function recordStreamingUxEffect(params: {
         requestSavedCount,
         responseSavedCount: 0,
       },
+    });
+    await upsertOpenClawSessionSummary(cfg.stateDir, resolvedSessionId, {
+      latestModel: model || upstreamModel || "unknown",
+      requestChars: afterReductionInputText.length,
+      responseChars: responseText.length,
+      assistantChars: responseText.length,
+      reductionSavedChars: Number(reductionApplied?.savedChars ?? 0),
+      updatedAt: new Date().toISOString(),
     });
     await helpers.appendTaskStateTrace(cfg.stateDir, {
       stage: "proxy_stream_ux_recorded",

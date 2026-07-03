@@ -10,6 +10,7 @@ import {
   resolveStateDir,
 } from "./host-config-adapter.js";
 import { resolveOpenClawSessionsRegistryPath } from "../../context-stack/integration/openclaw-paths.js";
+import { buildOpenClawSessionOverview, readOpenClawSessionSummary } from "../../session/session-summary.js";
 
 function normalizeSessionRef(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -154,11 +155,13 @@ export async function handleReport(ctx: any, currentConfig: Record<string, unkno
 
   const pluginCfg = pluginConfigRecord(currentConfig);
   const detailsEnabled = getNestedValue(pluginCfg, ["ux", "details"]) === true;
+  const summary = await readOpenClawSessionSummary(stateDir, sessionId);
   return {
     text: await renderSessionReport({
       stateDir,
       sessionId,
       detailsEnabled,
+      overview: buildOpenClawSessionOverview(sessionId, summary),
       readers: {
         readLatest: readLatestUxEffect,
         readAggregate: readSessionUxAggregate,

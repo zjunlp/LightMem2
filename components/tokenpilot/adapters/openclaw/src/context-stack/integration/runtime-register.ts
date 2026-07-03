@@ -7,6 +7,7 @@ import { startEmbeddedResponsesProxy } from "./proxy-runtime.js";
 import { maybeRegisterProxyProvider } from "./proxy-provider.js";
 import { applyPolicyMonitors } from "./runtime-policy-monitors.js";
 import { createRuntimeSessionRouter } from "./runtime-session-router.js";
+import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
 
 export async function registerRuntime(api: any, cfg: any, logger: any, deps: any): Promise<void> {
   registerMemoryFaultRecoverTool(api, cfg, logger);
@@ -100,6 +101,11 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
         contextSafeRecovery: deps.contextSafeRecovery,
         memoryFaultRecoverToolName: deps.memoryFaultRecoverToolName,
       });
+      await upsertOpenClawSessionSummary(cfg.stateDir, upstreamSessionId, {
+        sessionKey,
+        turnCount: transcriptSync.turnCount,
+        updatedAt: new Date().toISOString(),
+      });
       await deps.appendTaskStateTrace(cfg.stateDir, {
         stage: "llm_input_received",
         sessionId: upstreamSessionId,
@@ -122,6 +128,10 @@ export async function registerRuntime(api: any, cfg: any, logger: any, deps: any
       contentToText: deps.contentToText,
       contextSafeRecovery: deps.contextSafeRecovery,
       memoryFaultRecoverToolName: deps.memoryFaultRecoverToolName,
+    });
+    await upsertOpenClawSessionSummary(cfg.stateDir, upstreamSessionId, {
+      turnCount: transcriptSync.turnCount,
+      updatedAt: new Date().toISOString(),
     });
     await deps.appendTaskStateTrace(cfg.stateDir, {
       stage: "llm_output_received",
