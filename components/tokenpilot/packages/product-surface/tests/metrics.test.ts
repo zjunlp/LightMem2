@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { readRecentReductionMetrics } from "../src/metrics.js";
+import { readRecentReductionMetrics, summarizeRecentReductionMetrics } from "../src/metrics.js";
 import { formatSessionReport } from "../src/presentation.js";
 
 test("readRecentReductionMetrics aggregates recent route and pass metrics from history", async () => {
@@ -88,6 +88,40 @@ test("readRecentReductionMetrics falls back to namespaced history paths", async 
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("summarizeRecentReductionMetrics derives dominant route and pass breakdown", () => {
+  const summary = summarizeRecentReductionMetrics({
+    sampledTurns: 3,
+    routeSavedChars: {
+      code_like: 900,
+      task_doc: 300,
+    },
+    routeHitCount: {
+      code_like: 4,
+      task_doc: 1,
+    },
+    passSavedChars: {
+      tool_payload_trim: 1000,
+      read_state_compaction: 200,
+    },
+    recoveryObservedSegments: 3,
+    recoverySkippedSegments: 3,
+    skippedReasons: {
+      below_trigger_min_chars: 2,
+      pipeline_no_effect: 1,
+    },
+  });
+
+  assert.equal(summary.totalSavedChars, 1200);
+  assert.equal(summary.dominantRoute?.key, "code_like");
+  assert.equal(summary.dominantRoute?.value, 900);
+  assert.equal(summary.dominantRoute?.hits, 4);
+  assert.equal(summary.dominantRoute?.sharePercent, 75);
+  assert.equal(summary.mostTrimmedRoute?.key, "code_like");
+  assert.equal(summary.mostTrimmedRoute?.value, 4);
+  assert.equal(summary.dominantPass?.key, "tool_payload_trim");
+  assert.equal(summary.topSkippedReasons[0]?.key, "below_trigger_min_chars");
 });
 
 test("formatSessionReport includes recent route and pass metrics when provided", () => {

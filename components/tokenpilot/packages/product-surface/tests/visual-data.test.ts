@@ -41,6 +41,17 @@ test("readVisualSessionData returns reduction snapshot route and ux aggregate", 
 
     const aggregatePath = join(stateDir, "tokenpilot", "ux-effects", "sessions", `${sessionId}.json`);
     await mkdir(join(stateDir, "tokenpilot", "ux-effects", "sessions"), { recursive: true });
+    await writeFile(
+      join(stateDir, "tokenpilot", "ux-effects", "history.jsonl"),
+      `${JSON.stringify({
+        sessionId,
+        details: {
+          routeSavedChars: { readme_doc: 320 },
+          routeHitCount: { readme_doc: 1 },
+          passSavedChars: { tool_payload_trim: 300, read_state_compaction: 20 },
+        },
+      })}\n`,
+    );
     await writeFile(aggregatePath, JSON.stringify({
       sessionId,
       turns: 3,
@@ -59,6 +70,9 @@ test("readVisualSessionData returns reduction snapshot route and ux aggregate", 
     assert.equal(data.reduction[0]?.passSavedChars?.tool_payload_trim, 300);
     assert.equal(data.uxAggregate?.charSavedCount, 640);
     assert.equal(data.uxAggregate?.routeSavedChars?.readme_doc, 640);
+    assert.equal(data.recentReduction?.totalSavedChars, 320);
+    assert.equal(data.recentReduction?.dominantRoute?.key, "readme_doc");
+    assert.equal(data.recentReduction?.dominantPass?.key, "tool_payload_trim");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,5 +1,6 @@
 import { readdir, readFile, mkdir, appendFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { readRecentReductionMetrics, summarizeRecentReductionMetrics, type RecentReductionMetricsSummary } from "../metrics.js";
 
 async function appendJsonl(path: string, payload: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -104,6 +105,7 @@ export type VisualSessionData = {
   reduction: ReductionVisualSnapshot[];
   eviction: EvictionVisualSnapshot[];
   uxAggregate?: VisualUxAggregate | null;
+  recentReduction?: RecentReductionMetricsSummary | null;
 };
 
 function encodeSessionId(sessionId: string): string {
@@ -220,13 +222,17 @@ export async function readVisualSessionData(stateDir: string, sessionId: string)
   const stability = sortByAtDesc(await readSnapshotFile<StabilityVisualSnapshot>(snapshotCandidates(stateDir, "stability", sessionId)));
   const reduction = sortByAtDesc(await readSnapshotFile<ReductionVisualSnapshot>(snapshotCandidates(stateDir, "reduction", sessionId)));
   const eviction = sortByAtDesc(await readSnapshotFile<EvictionVisualSnapshot>(snapshotCandidates(stateDir, "eviction", sessionId)));
-  const uxAggregate = await readJsonFile<VisualUxAggregate>(uxAggregateCandidates(stateDir, sessionId));
+  const [uxAggregate, recentMetrics] = await Promise.all([
+    readJsonFile<VisualUxAggregate>(uxAggregateCandidates(stateDir, sessionId)),
+    readRecentReductionMetrics(stateDir, sessionId),
+  ]);
   return {
     sessionId,
     stability,
     reduction,
     eviction,
     uxAggregate,
+    recentReduction: recentMetrics ? summarizeRecentReductionMetrics(recentMetrics) : null,
   };
 }
 

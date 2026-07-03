@@ -12,6 +12,23 @@ export type RecentReductionMetrics = {
   skippedReasons: Record<string, number>;
 };
 
+export type RecentReductionSummaryEntry = {
+  key: string;
+  value: number;
+  hits?: number;
+  sharePercent?: number;
+};
+
+export type RecentReductionMetricsSummary = {
+  totalSavedChars: number;
+  dominantRoute: RecentReductionSummaryEntry | null;
+  mostTrimmedRoute: RecentReductionSummaryEntry | null;
+  dominantPass: RecentReductionSummaryEntry | null;
+  topRoutes: RecentReductionSummaryEntry[];
+  topPasses: RecentReductionSummaryEntry[];
+  topSkippedReasons: RecentReductionSummaryEntry[];
+};
+
 type HistoryEntry = {
   sessionId?: string;
   details?: {
@@ -30,6 +47,57 @@ function historyPaths(stateDir: string): string[] {
     join(stateDir, "ux-effects", "history.jsonl"),
     ...pluginStateSubdirCandidates(stateDir, "ux-effects", "history.jsonl"),
   ];
+}
+
+function sumMetricValues(values: Record<string, number>): number {
+  return Object.values(values).reduce((total, value) => total + Number(value || 0), 0);
+}
+
+function topMetricEntries(
+  values: Record<string, number>,
+  limit = 1,
+): Array<{ key: string; value: number }> {
+  return Object.entries(values)
+    .map(([key, value]) => ({ key, value: Number(value || 0) }))
+    .filter((entry) => entry.value > 0)
+    .sort((left, right) => right.value - left.value)
+    .slice(0, limit);
+}
+
+export function summarizeRecentReductionMetrics(
+  metrics: RecentReductionMetrics,
+): RecentReductionMetricsSummary {
+  const totalSavedChars = sumMetricValues(metrics.routeSavedChars);
+  const topRoutes = topMetricEntries(metrics.routeSavedChars, 3).map((entry) => ({
+    key: entry.key,
+    value: entry.value,
+    hits: Number(metrics.routeHitCount[entry.key] ?? 0),
+    sharePercent: totalSavedChars > 0 ? (entry.value / totalSavedChars) * 100 : 0,
+  }));
+  const topPasses = topMetricEntries(metrics.passSavedChars, 3).map((entry) => ({
+    key: entry.key,
+    value: entry.value,
+  }));
+  const topSkippedReasons = topMetricEntries(metrics.skippedReasons, 3).map((entry) => ({
+    key: entry.key,
+    value: entry.value,
+  }));
+  const mostTrimmedRouteEntry = topMetricEntries(metrics.routeHitCount, 1)[0];
+
+  return {
+    totalSavedChars,
+    dominantRoute: topRoutes[0] ?? null,
+    mostTrimmedRoute: mostTrimmedRouteEntry
+      ? {
+        key: mostTrimmedRouteEntry.key,
+        value: mostTrimmedRouteEntry.value,
+      }
+      : null,
+    dominantPass: topPasses[0] ?? null,
+    topRoutes,
+    topPasses,
+    topSkippedReasons,
+  };
 }
 
 export async function readRecentReductionMetrics(

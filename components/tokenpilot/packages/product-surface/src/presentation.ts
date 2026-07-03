@@ -1,5 +1,5 @@
 import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-adapter";
-import { readRecentReductionMetrics } from "./metrics.js";
+import { readRecentReductionMetrics, summarizeRecentReductionMetrics } from "./metrics.js";
 import {
   RUNTIME_MODE_PRESETS,
   REDUCTION_PASS_PATHS,
@@ -69,26 +69,6 @@ export type ProductSurfaceSessionReportReaders = {
     sessionId: string,
   ): Promise<ProductSurfaceRecentReductionMetrics | null>;
 };
-
-type ReductionLeaderboardEntry = {
-  key: string;
-  value: number;
-};
-
-function sumMetricValues(values: Record<string, number>): number {
-  return Object.values(values).reduce((total, value) => total + Number(value || 0), 0);
-}
-
-function topMetricEntries(
-  values: Record<string, number>,
-  limit = 1,
-): ReductionLeaderboardEntry[] {
-  return Object.entries(values)
-    .map(([key, value]) => ({ key, value: Number(value || 0) }))
-    .filter((entry) => entry.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, limit);
-}
 
 function formatPercent(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0%";
@@ -328,40 +308,30 @@ export function formatSessionReport(params: {
       lines.push(`- latest response savings: ${formatInt(latest.details.responseSavedCount)} ${unitLabel}`);
     }
     if (recentMetrics) {
-      const recentTotalSaved = sumMetricValues(recentMetrics.routeSavedChars);
-      const dominantRoute = topMetricEntries(recentMetrics.routeSavedChars, 1)[0];
-      const hottestRoute = topMetricEntries(recentMetrics.routeHitCount, 1)[0];
-      const dominantPass = topMetricEntries(recentMetrics.passSavedChars, 1)[0];
-      const topRoutes = Object.entries(recentMetrics.routeSavedChars)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([route, saved]) => `${route}=${formatInt(saved)} ${unitLabel}/${formatInt(recentMetrics.routeHitCount[route] ?? 0)} hits`)
+      const summary = summarizeRecentReductionMetrics(recentMetrics);
+      const topRoutes = summary.topRoutes
+        .map((entry) => `${entry.key}=${formatInt(entry.value)} ${unitLabel}/${formatInt(entry.hits ?? 0)} hits`)
         .join(", ");
-      const topPasses = Object.entries(recentMetrics.passSavedChars)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([pass, saved]) => `${pass}=${formatInt(saved)} ${unitLabel}`)
+      const topPasses = summary.topPasses
+        .map((entry) => `${entry.key}=${formatInt(entry.value)} ${unitLabel}`)
         .join(", ");
-      const skippedReasons = Object.entries(recentMetrics.skippedReasons)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([reason, count]) => `${reason}=${formatInt(count)}`)
+      const skippedReasons = summary.topSkippedReasons
+        .map((entry) => `${entry.key}=${formatInt(entry.value)}`)
         .join(", ");
       lines.push(`- recent sampled turns: ${formatInt(recentMetrics.sampledTurns)}`);
-      if (recentTotalSaved > 0) {
-        lines.push(`- recent total savings: ${formatInt(recentTotalSaved)} ${unitLabel}`);
+      if (summary.totalSavedChars > 0) {
+        lines.push(`- recent total savings: ${formatInt(summary.totalSavedChars)} ${unitLabel}`);
       }
-      if (dominantRoute) {
-        const routeShare = recentTotalSaved > 0 ? (dominantRoute.value / recentTotalSaved) * 100 : 0;
+      if (summary.dominantRoute) {
         lines.push(
-          `- recent dominant route: ${dominantRoute.key}=${formatInt(dominantRoute.value)} ${unitLabel} (${formatPercent(routeShare)}, ${formatInt(recentMetrics.routeHitCount[dominantRoute.key] ?? 0)} hits)`,
+          `- recent dominant route: ${summary.dominantRoute.key}=${formatInt(summary.dominantRoute.value)} ${unitLabel} (${formatPercent(summary.dominantRoute.sharePercent ?? 0)}, ${formatInt(summary.dominantRoute.hits ?? 0)} hits)`,
         );
       }
-      if (hottestRoute) {
-        lines.push(`- recent most-trimmed route: ${hottestRoute.key}=${formatInt(hottestRoute.value)} hits`);
+      if (summary.mostTrimmedRoute) {
+        lines.push(`- recent most-trimmed route: ${summary.mostTrimmedRoute.key}=${formatInt(summary.mostTrimmedRoute.value)} hits`);
       }
-      if (dominantPass) {
-        lines.push(`- recent dominant pass: ${dominantPass.key}=${formatInt(dominantPass.value)} ${unitLabel}`);
+      if (summary.dominantPass) {
+        lines.push(`- recent dominant pass: ${summary.dominantPass.key}=${formatInt(summary.dominantPass.value)} ${unitLabel}`);
       }
       if (topRoutes) lines.push(`- recent top routes: ${topRoutes}`);
       if (topPasses) lines.push(`- recent top passes: ${topPasses}`);

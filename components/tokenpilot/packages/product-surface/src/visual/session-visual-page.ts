@@ -764,6 +764,8 @@ function renderStability(item) {
 }
 
 function renderReduction(item) {
+  const data = state.sessionData.get((state.activeHost || "") + "::" + state.activeSessionId) || {};
+  const recentReduction = data.recentReduction || null;
   const passes = Array.isArray(item.report) ? item.report : [];
   const changedPasses = passes.filter((entry) => entry && entry.changed);
   el.panelTitle.textContent = "Reduction";
@@ -778,6 +780,15 @@ function renderReduction(item) {
     ["Item index", fmtInt(item.itemIndex)],
     ["Passes touched", fmtInt(changedPasses.length)],
     ["Path", item.dataPath || "-"],
+    ...(recentReduction && recentReduction.totalSavedChars > 0
+      ? [["Recent total", fmtInt(recentReduction.totalSavedChars)]]
+      : []),
+    ...(recentReduction && recentReduction.dominantRoute
+      ? [["Dominant route", recentReduction.dominantRoute.key + " (" + fmtInt(Math.round(Number(recentReduction.dominantRoute.sharePercent || 0))) + "%)"]]
+      : []),
+    ...(recentReduction && recentReduction.dominantPass
+      ? [["Dominant pass", recentReduction.dominantPass.key]]
+      : []),
   ].map(([label, value]) => '<div class="chip">' + escapeHtml(label) + ': ' + escapeHtml(value) + '</div>').join("");
   el.compareRoot.innerHTML = '<div class="compare">'
     + '<div class="pane"><div class="pane-label">Before Tool Segment</div><pre>' + escapeHtml(item.beforeText) + '</pre></div>'
