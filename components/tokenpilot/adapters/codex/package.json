@@ -27,6 +27,7 @@
     "build": "tsx build.ts",
     "start": "node dist/cli.js serve",
     "doctor:codex": "node --import tsx scripts/doctor-codex.ts",
+    "report-cache-audit:codex": "node --import tsx scripts/report-cache-audit-codex.ts",
     "install:codex": "node --import tsx scripts/install-codex.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

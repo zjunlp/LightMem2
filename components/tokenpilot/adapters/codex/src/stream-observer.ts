@@ -5,6 +5,7 @@ export type CodexStreamSnapshot = {
   usage?: Record<string, unknown>;
   responseId?: string;
   previousResponseId?: string;
+  responsePromptCacheKey?: string;
   rawStreamText: string;
 };
 
@@ -43,6 +44,7 @@ export function snapshotCodexResponsesStream(rawStreamText: string): CodexStream
   let usage: Record<string, unknown> | undefined;
   let responseId: string | undefined;
   let previousResponseId: string | undefined;
+  let responsePromptCacheKey: string | undefined;
 
   for (const chunk of rawStreamText.split("\n\n")) {
     const dataLines = chunk
@@ -62,8 +64,17 @@ export function snapshotCodexResponsesStream(rawStreamText: string): CodexStream
       if (typeof payload.previous_response_id === "string" && !previousResponseId) {
         previousResponseId = payload.previous_response_id;
       }
+      if (typeof payload.response?.prompt_cache_key === "string") {
+        responsePromptCacheKey = payload.response.prompt_cache_key;
+      }
+      if (typeof payload.prompt_cache_key === "string" && !responsePromptCacheKey) {
+        responsePromptCacheKey = payload.prompt_cache_key;
+      }
       if (payload.usage && typeof payload.usage === "object") {
         usage = payload.usage as Record<string, unknown>;
+      }
+      if (payload.response?.usage && typeof payload.response.usage === "object" && !usage) {
+        usage = payload.response.usage as Record<string, unknown>;
       }
       extractTextParts(payload.delta, assistantParts);
       extractTextParts(payload.output, assistantParts);
@@ -77,6 +88,7 @@ export function snapshotCodexResponsesStream(rawStreamText: string): CodexStream
     usage,
     responseId,
     previousResponseId,
+    responsePromptCacheKey,
     rawStreamText,
   };
 }

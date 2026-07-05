@@ -47,6 +47,7 @@ import {
 } from "./session-state.js";
 import { snapshotCodexResponsesStream } from "./stream-observer.js";
 import { appendTrace } from "./trace.js";
+import { appendCodexCacheAuditRecord, buildCodexCacheAuditSnapshot } from "./cache-audit.js";
 
 export type CodexProxyRuntime = {
   baseUrl: string;
@@ -217,6 +218,16 @@ export async function startCodexResponsesProxy(params: {
       syncPayloadFromEnvelope(payload, prepared.envelope, codec);
       normalizeResponsesInputForUpstream(payload?.input);
       const requestText = extractResponsesInputText(payload?.input);
+      const cacheAuditSnapshot = buildCodexCacheAuditSnapshot({
+        envelope: prepared.envelope,
+        sessionId,
+        model,
+        stream: payload.stream === true,
+        requestPromptCacheKey:
+          typeof prepared.envelope.metadata?.promptCacheKey === "string"
+            ? prepared.envelope.metadata.promptCacheKey
+            : null,
+      });
 
       await appendTrace(config.stateDir, {
         stage: "proxy_before_call",
@@ -260,6 +271,13 @@ export async function startCodexResponsesProxy(params: {
               model,
               originalRequestText,
               reducedRequestText: requestText,
+            });
+            await appendCodexCacheAuditRecord({
+              stateDir: config.stateDir,
+              snapshot: cacheAuditSnapshot,
+              responsePromptCacheKey: snapshot.responsePromptCacheKey ?? null,
+              usage: snapshot.usage ?? null,
+              status: upstreamResp.status,
             });
             await appendTrace(config.stateDir, {
               stage: "proxy_after_call",
@@ -342,6 +360,16 @@ export async function startCodexResponsesProxy(params: {
         previousResponseId = typeof decoded.metadata?.previousResponseId === "string" ? decoded.metadata.previousResponseId : undefined;
         assistantChars = decoded.assistantText?.length ?? 0;
         toolCallCount = decoded.toolCalls?.length ?? 0;
+        await appendCodexCacheAuditRecord({
+          stateDir: config.stateDir,
+          snapshot: cacheAuditSnapshot,
+          responsePromptCacheKey:
+            typeof decoded.metadata?.promptCacheKey === "string"
+              ? decoded.metadata.promptCacheKey
+              : null,
+          usage: decoded.usage ?? null,
+          status: upstreamResp.status,
+        });
       } catch {
         // Some upstream error payloads may not match the expected Responses shape.
       }
