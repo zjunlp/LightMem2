@@ -13,14 +13,18 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
+    "@tokenpilot/kernel": "workspace:*",
     "@tokenpilot/mcp": "workspace:*",
-    "@tokenpilot/product-surface": "workspace:*"
+    "@tokenpilot/product-surface": "workspace:*",
+    "@tokenpilot/runtime-core": "workspace:*"
   },
   "scripts": {
     "build": "tsx build.ts",
     "doctor:claude-code": "node --import tsx scripts/doctor-claude-code.ts",
     "install:claude-code": "node --import tsx scripts/install-claude-code.ts",
+    "report-cache-audit:claude-code": "node --import tsx scripts/report-cache-audit-claude-code.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"

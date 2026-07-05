@@ -20,15 +20,24 @@ importers:
 
   components/tokenpilot/adapters/claude-code:
     dependencies:
+      '@tokenpilot/decision':
+        specifier: workspace:*
+        version: link:../../packages/layers/decision
       '@tokenpilot/host-adapter':
         specifier: workspace:*
         version: link:../../packages/host-adapter
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
       '@tokenpilot/product-surface':
         specifier: workspace:*
         version: link:../../packages/product-surface
+      '@tokenpilot/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/runtime-core
     devDependencies:
       esbuild:
         specifier: ^0.25.10
