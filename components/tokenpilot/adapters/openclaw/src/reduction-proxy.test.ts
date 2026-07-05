@@ -712,7 +712,8 @@ test("prepareProxyRequest isolates developer dynamic context into a separate dev
 
   const developerItems = prepared.payload.input.filter((item: any) => item?.role === "developer");
   assert.equal(developerItems.length, 2);
-  assert.match(String(developerItems[0]?.content ?? ""), /<WORKDIR>/);
+  assert.match(String(developerItems[0]?.content ?? ""), /Your working directory is: \/tmp\/demo/);
+  assert.match(String(developerItems[0]?.content ?? ""), /Runtime: agent=test-agent \| host=demo/);
   assert.doesNotMatch(String(developerItems[0]?.content ?? ""), /WORKDIR: \/tmp\/demo/);
   assert.match(String(developerItems[1]?.content ?? ""), /WORKDIR: \/tmp\/demo/);
   assert.match(String(developerItems[1]?.content ?? ""), /AGENT_ID: test-agent/);

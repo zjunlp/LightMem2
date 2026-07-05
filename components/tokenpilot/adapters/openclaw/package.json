@@ -36,6 +36,7 @@
     "build": "tsx build.ts",
     "test": "node scripts/run-tests.mjs",
     "doctor:openclaw": "node --import tsx scripts/doctor-openclaw.ts",
+    "report-cache-audit:openclaw": "node --import tsx scripts/report-cache-audit-openclaw.ts",
     "pack:release": "bash ./scripts/pack_release.sh",
     "install:release": "bash ./scripts/install_release.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
