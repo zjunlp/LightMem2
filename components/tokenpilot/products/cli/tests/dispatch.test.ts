@@ -238,6 +238,139 @@ test("dispatch uses the default host and latest resolved codex session for hostl
   }
 });
 
+test("dispatch hostless report prefers the host with the latest stats over lastActiveHost", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-cli-report-latest-host-"));
+  const originalHome = process.env.HOME;
+  process.env.HOME = dir;
+  try {
+    const codexStateDir = join(dir, ".codex", "tokenpilot-state", "tokenpilot");
+    const claudeStateDir = join(dir, ".claude", "tokenpilot-state", "tokenpilot");
+    await mkdir(join(codexStateDir, "ux-effects", "sessions"), { recursive: true });
+    await mkdir(join(claudeStateDir, "ux-effects", "sessions"), { recursive: true });
+
+    await writeFile(
+      join(codexStateDir, "ux-effects", "latest.json"),
+      JSON.stringify({
+        at: "2026-06-29T12:20:00.000Z",
+        sessionId: "codex-session-latest",
+        model: "gpt-5.4",
+        countMode: "openai_tokens",
+        beforeCount: 5000,
+        afterCount: 2500,
+        savedCount: 2500,
+      }, null, 2),
+      "utf8",
+    );
+    await writeFile(
+      join(codexStateDir, "ux-effects", "sessions", "codex-session-latest.json"),
+      JSON.stringify({
+        sessionId: "codex-session-latest",
+        turns: 10,
+        latestCountMode: "openai_tokens",
+        tokenOptimizedTurns: 4,
+        tokenSavedCount: 2500,
+        avgSavedTokensPerOptimizedTurn: 625,
+        charOptimizedTurns: 0,
+        charSavedCount: 0,
+        avgSavedCharsPerOptimizedTurn: 0,
+        latestAt: "2026-06-29T12:20:00.000Z",
+      }, null, 2),
+      "utf8",
+    );
+
+    await writeFile(
+      join(claudeStateDir, "ux-effects", "latest.json"),
+      JSON.stringify({
+        at: "2026-06-28T12:20:00.000Z",
+        sessionId: "claude-session-older",
+        model: "claude-sonnet-4-6",
+        countMode: "chars",
+        beforeCount: 1000,
+        afterCount: 500,
+        savedCount: 500,
+      }, null, 2),
+      "utf8",
+    );
+    await writeFile(
+      join(claudeStateDir, "ux-effects", "sessions", "claude-session-older.json"),
+      JSON.stringify({
+        sessionId: "claude-session-older",
+        turns: 3,
+        latestCountMode: "chars",
+        tokenOptimizedTurns: 0,
+        tokenSavedCount: 0,
+        avgSavedTokensPerOptimizedTurn: 0,
+        charOptimizedTurns: 2,
+        charSavedCount: 1000,
+        avgSavedCharsPerOptimizedTurn: 500,
+        latestAt: "2026-06-28T12:20:00.000Z",
+      }, null, 2),
+      "utf8",
+    );
+
+    const useHost = await dispatchCli(["use", "claude-code"]);
+    assert.equal(useHost.text, "Default host = claude-code");
+
+    const report = await dispatchCli(["report"]);
+    assert.match(report.text, /Showing latest TokenPilot report from Codex/);
+    assert.match(report.text, /session: codex-session-latest/);
+
+    const persisted = await readCliContextState(join(dir, ".lightmem2", "state", "cli-context.json"));
+    assert.equal(persisted.lastActiveHost, "codex");
+    assert.equal(persisted.lastSessionByHost?.codex, "codex-session-latest");
+  } finally {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("dispatch explicit host report does not fallback to another host", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-cli-report-explicit-host-"));
+  const originalHome = process.env.HOME;
+  process.env.HOME = dir;
+  try {
+    const codexStateDir = join(dir, ".codex", "tokenpilot-state", "tokenpilot");
+    await mkdir(join(codexStateDir, "ux-effects", "sessions"), { recursive: true });
+    await writeFile(
+      join(codexStateDir, "ux-effects", "latest.json"),
+      JSON.stringify({
+        at: "2026-06-29T12:20:00.000Z",
+        sessionId: "codex-session-latest",
+        model: "gpt-5.4",
+        countMode: "openai_tokens",
+        beforeCount: 5000,
+        afterCount: 2500,
+        savedCount: 2500,
+      }, null, 2),
+      "utf8",
+    );
+    await writeFile(
+      join(codexStateDir, "ux-effects", "sessions", "codex-session-latest.json"),
+      JSON.stringify({
+        sessionId: "codex-session-latest",
+        turns: 10,
+        latestCountMode: "openai_tokens",
+        tokenOptimizedTurns: 4,
+        tokenSavedCount: 2500,
+        avgSavedTokensPerOptimizedTurn: 625,
+        charOptimizedTurns: 0,
+        charSavedCount: 0,
+        avgSavedCharsPerOptimizedTurn: 0,
+        latestAt: "2026-06-29T12:20:00.000Z",
+      }, null, 2),
+      "utf8",
+    );
+
+    const report = await dispatchCli(["claude-code", "report"]);
+    assert.equal(report.text, "No TokenPilot session stats yet.");
+  } finally {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("dispatch canonicalizes pinned codex host session ids before persisting CLI context", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightmem2-cli-codex-canonical-context-"));
   const originalHome = process.env.HOME;

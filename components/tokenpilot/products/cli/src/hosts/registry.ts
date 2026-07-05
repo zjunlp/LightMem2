@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { readCliHostPathOverrides } from "../context-store.js";
+import { readLatestUxEffect as readSharedLatestUxEffect } from "@tokenpilot/host-adapter";
 import type { VisualHostSource } from "@tokenpilot/product-surface";
 import {
   defaultTokenPilotClaudeCodeConfigPath,
@@ -9,6 +10,7 @@ import {
   defaultTokenPilotConfigPath,
   loadTokenPilotCodexConfig,
 } from "../../../../adapters/codex/src/config.js";
+import { readLatestUxEffect as readOpenClawLatestUxEffect } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
 import { resolveOpenClawConfigPath } from "../../../../adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
 import { resolveStateDir as resolveOpenClawStateDir } from "../../../../adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
 
@@ -33,6 +35,7 @@ type CliVisualHostDefinition = {
   hostId: CliHostId;
   displayName: string;
   resolveStateDir(): Promise<string | undefined>;
+  readLatestUxEffect(stateDir: string): Promise<{ at?: string } | null>;
 };
 
 export function parseCliHostId(value: string | undefined): CliHostId | undefined {
@@ -77,6 +80,9 @@ const CLI_VISUAL_HOST_DEFINITIONS: CliVisualHostDefinition[] = [
       const openclawConfig = await readOpenClawConfig();
       return resolveOpenClawStateDir(openclawConfig);
     },
+    readLatestUxEffect(stateDir: string) {
+      return readOpenClawLatestUxEffect(stateDir);
+    },
   },
   {
     hostId: "codex",
@@ -85,6 +91,9 @@ const CLI_VISUAL_HOST_DEFINITIONS: CliVisualHostDefinition[] = [
       const codexConfig = await loadTokenPilotCodexConfig(await resolveCodexTokenPilotConfigPath());
       return typeof codexConfig.stateDir === "string" ? codexConfig.stateDir : undefined;
     },
+    readLatestUxEffect(stateDir: string) {
+      return readSharedLatestUxEffect(stateDir);
+    },
   },
   {
     hostId: "claude-code",
@@ -92,6 +101,9 @@ const CLI_VISUAL_HOST_DEFINITIONS: CliVisualHostDefinition[] = [
     async resolveStateDir(): Promise<string | undefined> {
       const claudeConfig = await loadTokenPilotClaudeCodeConfig(await resolveClaudeCodeTokenPilotConfigPath());
       return typeof claudeConfig.stateDir === "string" ? claudeConfig.stateDir : undefined;
+    },
+    readLatestUxEffect(stateDir: string) {
+      return readSharedLatestUxEffect(stateDir);
     },
   },
 ];
@@ -108,4 +120,43 @@ export async function resolveCliVisualHosts(): Promise<VisualHostSource[]> {
     });
   }
   return hosts;
+}
+
+export async function resolveLatestCliReportHost(): Promise<{
+  hostId: CliHostId;
+  displayName: string;
+  latestAt: string;
+} | undefined> {
+  let latestHost:
+    | {
+      hostId: CliHostId;
+      displayName: string;
+      latestAt: string;
+      latestAtMs: number;
+    }
+    | undefined;
+
+  for (const definition of CLI_VISUAL_HOST_DEFINITIONS) {
+    const stateDir = String((await definition.resolveStateDir()) ?? "").trim();
+    if (!stateDir) continue;
+    const latest = await definition.readLatestUxEffect(stateDir);
+    const latestAt = typeof latest?.at === "string" ? latest.at.trim() : "";
+    const latestAtMs = latestAt ? Date.parse(latestAt) : Number.NaN;
+    if (!Number.isFinite(latestAtMs)) continue;
+    if (!latestHost || latestAtMs > latestHost.latestAtMs) {
+      latestHost = {
+        hostId: definition.hostId,
+        displayName: definition.displayName,
+        latestAt,
+        latestAtMs,
+      };
+    }
+  }
+
+  if (!latestHost) return undefined;
+  return {
+    hostId: latestHost.hostId,
+    displayName: latestHost.displayName,
+    latestAt: latestHost.latestAt,
+  };
 }

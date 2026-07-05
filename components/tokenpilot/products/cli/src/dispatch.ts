@@ -4,7 +4,7 @@ import {
   updateCliContextState,
 } from "./context-store.js";
 import type { CliHostPathOverrides } from "./hosts/factory.js";
-import { CLI_HOSTS, parseCliHostId, type CliHostId } from "./hosts/registry.js";
+import { CLI_HOSTS, parseCliHostId, resolveLatestCliReportHost, type CliHostId } from "./hosts/registry.js";
 import { createCliHostRuntime } from "./hosts/factory.js";
 import { handleStandaloneVisualCommandWithSelection } from "./hosts/visual.js";
 import { formatCliUsage } from "./usage.js";
@@ -155,23 +155,45 @@ export async function dispatchCli(argv: string[]): Promise<TokenPilotProductComm
     };
   }
 
+  let effectiveTarget = target;
+  let latestReportNotice: string | undefined;
+  if (
+    argv.length > 0
+    && commandArgs.length === 1
+    && commandArgs[0] === "report"
+    && !parseCliHostId(argv[0])
+  ) {
+    const latestHost = await resolveLatestCliReportHost();
+    if (latestHost) {
+      effectiveTarget = {
+        host: latestHost.hostId,
+        sessionId: latestHost.hostId === target.host ? target.sessionId : undefined,
+        pathOverrides: await resolvePathOverrides(latestHost.hostId),
+      };
+      latestReportNotice = `Showing latest TokenPilot report from ${latestHost.displayName} (${latestHost.latestAt}).`;
+    }
+  }
+
   const runtime = createCliHostRuntime({
-    host: target.host,
-    sessionId: target.sessionId,
-    pathOverrides: await resolvePathOverrides(target.host) ?? target.pathOverrides,
+    host: effectiveTarget.host,
+    sessionId: effectiveTarget.sessionId,
+    pathOverrides: await resolvePathOverrides(effectiveTarget.host) ?? effectiveTarget.pathOverrides,
   });
   const result = await runtime.handleCommand({
     args: commandArgs.join(" "),
-    sessionId: target.sessionId,
+    sessionId: effectiveTarget.sessionId,
   });
 
-  const resolvedSessionId = target.sessionId
-    ? await runtime.resolveSessionId(target.sessionId)
+  const resolvedSessionId = effectiveTarget.sessionId
+    ? await runtime.resolveSessionId(effectiveTarget.sessionId)
     : await runtime.maybeResolveLatestSessionId();
   await updateCliContextState({
-    host: target.host,
+    host: effectiveTarget.host,
     sessionId: resolvedSessionId,
-    pathOverrides: await resolvePathOverrides(target.host) ?? target.pathOverrides,
+    pathOverrides: await resolvePathOverrides(effectiveTarget.host) ?? effectiveTarget.pathOverrides,
   });
+  if (latestReportNotice && result.text.startsWith("TokenPilot report:")) {
+    return { text: `${latestReportNotice}\n${result.text}` };
+  }
   return result;
 }
