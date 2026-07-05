@@ -23,7 +23,7 @@ Supported:
 - stable-prefix rewriting
 - request-time reduction
 - lightweight session-state tracking from proxy + hooks
-- text-mode Codex session visual via `lightmem2 codex visual`
+- shared browser visual via `lightmem2 codex visual`
 - standalone `lightmem2 codex ...` command surface
 - local read-only Codex skill bridge for `status` / `report` / `doctor` / `visual`
 
@@ -58,6 +58,8 @@ cd /path/to/LightMem2
 npm --prefix components/tokenpilot/adapters/codex run install:codex
 ```
 
+If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
+
 The installer will:
 
 - keep the current active `model_provider`
@@ -86,21 +88,33 @@ disappear behind a separate `tokenpilot` provider bucket.
 
 ## Verify
 
-First, run the adapter doctor:
+You can run the adapter doctor immediately after install:
 
 ```bash
 cd /path/to/LightMem2
 npm --prefix components/tokenpilot/adapters/codex run doctor:codex
 ```
 
-Then verify through the shared CLI:
+Then use the first real-session path:
+
+1. Start Codex normally.
+2. If Codex asks you to review or trust the TokenPilot hooks, approve them.
+3. Open a new Codex session so `SessionStart` can start the local proxy.
+4. In another terminal, verify through the shared CLI:
 
 ```bash
 lightmem2 codex status
 lightmem2 codex doctor
+lightmem2 codex report
 lightmem2 codex mode normal
 lightmem2 codex reduction status
 ```
+
+Expected first-run shape:
+
+- `lightmem2 codex doctor` reports `proxy healthy: yes`
+- `lightmem2 codex status` shows `stabilizer` and `reduction` enabled
+- after a few turns, `lightmem2 codex report` no longer says `No TokenPilot session stats yet.`
 
 Once installed, Codex can use the real internal recovery tool named
 `memory_fault_recover` through the registered MCP server. Recovery hints in
@@ -108,7 +122,7 @@ trimmed payloads are no longer just protocol text.
 
 If install finishes in degraded MCP mode, Codex stable-prefix and reduction remain usable; only the real `memory_fault_recover` tool path is unavailable until MCP startup succeeds.
 
-For daemon-level checks:
+If doctor still reports `proxy healthy: no` after hooks are trusted and a new session has started, use the daemon fallback:
 
 ```bash
 tokenpilot-codex status
@@ -158,18 +172,16 @@ Not supported:
 `lightmem2 codex report` and `lightmem2 codex visual` intentionally serve different purposes:
 
 - `report`: savings-oriented summary from `ux-effects`
-- `visual`: text-mode session topology and recent-turn view from Codex proxy + hook traces
+- `visual`: shared browser visual surface preselected to the current Codex host and session
 
-Current `visual` output includes:
+Current visual data includes:
 
-- latest resolved session id
-- latest / previous response ids when available
-- recent response chain
-- workspace hint
-- last observed hook and tool
-- recent turn request / response / assistant char counts
+- stability snapshots
+- reduction snapshots
+- recent cache-audit summaries
+- browser-side host and session selection through the shared visual surface
 
-This is a lightweight observability layer for Codex. It is not yet the same browser visual surface used by the OpenClaw adapter.
+Codex still persists a lightweight observability layer from proxy + hook traces, but `lightmem2 codex visual` now opens the shared browser visual surface rather than a text-only view.
 
 ## Runtime Files
 
@@ -209,7 +221,7 @@ Expected install shape:
 - that provider's `base_url` is rewritten to `http://127.0.0.1:<port>/v1`
 - the real upstream base URL is stored in `~/.codex/tokenpilot.json`
 
-If Codex reports that hooks need review, trust the TokenPilot hooks in Codex and rerun the doctor.
+If Codex reports that hooks need review, trust the TokenPilot hooks in Codex, open a new session, and rerun the doctor.
 
 ## Package Scripts
 

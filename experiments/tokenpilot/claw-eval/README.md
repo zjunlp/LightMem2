@@ -71,12 +71,12 @@ When you prepare a fresh machine:
 
 ## Official runners
 
-The public runner surface is intentionally small:
+The recommended public runner surface is intentionally small:
 
 - `scripts/run_baseline.sh`
 - `scripts/run_method.sh`
 
-These are the canonical entrypoints for open-source use.
+These are the main entrypoints for reproduction.
 
 ### Baseline
 
@@ -112,7 +112,7 @@ bash experiments/tokenpilot/claw-eval/scripts/run_method.sh \
   --suite T001zh_email_triage \
   --session-mode isolated \
   --profile reduction \
-  --model tokenpilot/gpt-5.4-mini
+  --model lightmem2/gpt-5.4-mini
 ```
 
 Run all `general` categories in continuous method mode:
@@ -124,7 +124,7 @@ bash experiments/tokenpilot/claw-eval/scripts/run_method.sh \
   --session-mode continuous \
   --profile plugin \
   --by-category \
-  --model tokenpilot/gpt-5.4-mini
+  --model lightmem2/gpt-5.4-mini
 ```
 
 If your primary OpenClaw config is read-only or you want run-local isolation,
@@ -138,7 +138,7 @@ bash experiments/tokenpilot/claw-eval/scripts/run_method.sh \
   --profile plugin \
   --by-category \
   --tmp-openclaw \
-  --model tokenpilot/gpt-5.4-mini
+  --model lightmem2/gpt-5.4-mini
 ```
 
 ## Legacy wrappers
@@ -181,7 +181,7 @@ If you want a safer run-local copy, use `--tmp-openclaw` on the official runners
 ### 3. Duplicate plugin ids
 If the same plugin exists both in the vendored `plugins/` directory and in a previously installed OpenClaw extension path, OpenClaw may warn about duplicate plugin ids.
 
-### 4. Provider/runtime stability is separate from repo migration
+### 4. Provider/runtime stability is separate from repository layout
 A repo-internal smoke can still fail because of provider timeouts or runtime environment issues even when all local paths are correct.
 
 ## Related docs

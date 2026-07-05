@@ -23,7 +23,7 @@ Supported:
 - stable-prefix rewriting
 - request-time reduction
 - lightweight session-state and ux-effects tracking
-- text-mode `lightmem2 claude-code visual`
+- shared browser visual via `lightmem2 claude-code visual`
 - standalone `lightmem2 claude-code ...` command surface
 - local read-only Claude Code skill bridge for `status` / `report` / `doctor` / `visual`
 
@@ -58,6 +58,8 @@ cd /path/to/LightMem2
 npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
 ```
 
+If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
+
 The installer will:
 
 - update `~/.claude/settings.json` for local gateway routing
@@ -82,18 +84,23 @@ the existing `lightmem2 claude-code ...` CLI surface underneath.
 
 ## Verify
 
-First, run the adapter doctor:
+You can run the adapter doctor immediately after install:
 
 ```bash
 cd /path/to/LightMem2
 npm --prefix components/tokenpilot/adapters/claude-code run doctor:claude-code
 ```
 
-Then verify through the shared CLI:
+Then use the first real-session path:
+
+1. Start Claude Code normally.
+2. Open a new Claude Code session so `SessionStart` can auto-start the local gateway.
+3. In another terminal, verify through the shared CLI:
 
 ```bash
 lightmem2 claude-code status
 lightmem2 claude-code doctor
+lightmem2 claude-code report
 lightmem2 claude-code mode normal
 lightmem2 claude-code reduction status
 lightmem2 claude-code stabilizer target developer
@@ -102,6 +109,12 @@ lightmem2 claude-code stabilizer target developer
 The Claude Code gateway is now auto-started from the installed `SessionStart`
 hook. After the first Claude Code session starts, `lightmem2 claude-code doctor`
 should report `proxy healthy: yes` without a separate manual start step.
+
+Expected first-run shape:
+
+- `lightmem2 claude-code doctor` reports `proxy healthy: yes`
+- `lightmem2 claude-code status` shows `stabilizer` and `reduction` enabled
+- after a few turns, `lightmem2 claude-code report` no longer says `No TokenPilot session stats yet.`
 
 Claude Code currently supports `mode conservative` and `mode normal`.
 `mode aggressive` is not available on the current adapter.
@@ -167,19 +180,16 @@ Doctor checks report whether:
 - `report`
   - savings-oriented summary from `ux-effects`
 - `visual`
-  - text-mode session and recent-turn view from gateway + hooks observability state
+  - shared browser visual surface preselected to the current Claude Code host and session
 
-Current `visual` output includes:
+Current visual data includes:
 
-- latest resolved session id
-- latest response id
-- workspace hint when available
-- last observed hook and tool
-- recent turn request / response / assistant char counts
-- latest reduction savings summary
+- stability snapshots
+- reduction snapshots
+- recent cache-audit summaries
+- browser-side host and session selection through the shared visual surface
 
-This is a lightweight observability layer for Claude Code. It is not yet the
-same browser visual surface used by the OpenClaw adapter.
+Claude Code still persists lightweight observability state from gateway + hooks, but `lightmem2 claude-code visual` now opens the shared browser visual surface rather than a text-only view.
 
 ## Runtime Files
 

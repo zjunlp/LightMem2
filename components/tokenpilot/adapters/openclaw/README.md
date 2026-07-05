@@ -79,13 +79,13 @@ corepack pnpm typecheck
 When the current TokenPilot component is active, it registers an explicit provider namespace:
 
 ```text
-tokenpilot/<model>
+lightmem2/<model>
 ```
 
 Example:
 
 ```text
-tokenpilot/gpt-5.4-mini
+lightmem2/gpt-5.4-mini
 ```
 
 ## Runtime State

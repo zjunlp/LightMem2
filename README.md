@@ -40,6 +40,15 @@
 
 ---
 
+<span id='components'/>
+
+## 🧩 Components
+
+LightMem2 is intended to host multiple long-running-agent components over time.
+
+| Component | What It Does | How It Works | Effect |
+| :-- | :-- | :-- | :-- |
+| `TokenPilot` | Keeps long-running agent sessions smaller, cheaper, and easier to sustain | Stabilizes the reusable prompt prefix, trims oversized tool output before it poisons later turns, and limits how much old context is carried forward as sessions grow | Better cache reuse, lower token usage, lower cost, and less context bloat in shared sessions |
 
 <span id='contents'/>
 
@@ -48,13 +57,11 @@
 * <a href='#news'>📢 News</a>
 * <a href='#installation'>🔧 Installation</a>
 * <a href='#quickstart'>⚡ Quick Start</a>
-* <a href='#components'>🧩 Components</a>
 * <a href='#visual-results'>🖼️ Visual Results</a>
 * <a href='#architecture'>🏗️ Architecture</a>
 * <a href='#experiments'>🧪 Experiments</a>
-* <a href='#examples'>💡 Examples</a>
+* <a href='#commands'>💡 Commands</a>
 * <a href='#experimental-results'>📁 Experimental Results</a>
-* <a href='#configuration'>⚙️ Configuration</a>
 * <a href='#citation'>📄 Citation</a>
 
 <span id='news'/>
@@ -67,9 +74,9 @@
 
 ## 🔧 Installation
 
-### Installation Steps
+### 1. Prepare the Repository Once
 
-Clone the repository and build the shared packages first:
+Clone the repository and build the shared packages:
 
 ```bash
 git clone https://github.com/zjunlp/LightMem2.git
@@ -81,32 +88,53 @@ pnpm lightmem2:build
 pnpm lightmem2:install
 ```
 
-### OpenClaw
+### 2. Pick Your Host
 
-If your OpenClaw home or config path is not under the default `~/.openclaw`, you can override it with:
+Open the host you want and run the default install commands.
+
+<details>
+<summary><strong>OpenClaw</strong></summary>
+
+<br>
+
+Default install:
+
+```bash
+pnpm component:install:tokenpilot:openclaw
+```
+
+This installs the current TokenPilot OpenClaw adapter, updates `~/.openclaw/openclaw.json`, enables the plugin, switches `plugins.slots.contextEngine` to `layered-context`, applies the default `normal` mode, and tries to restart the OpenClaw gateway automatically.
+
+If your OpenClaw home or config path is not under the default `~/.openclaw`, set:
 
 ```bash
 export LIGHTMEM2_OPENCLAW_HOME="/path/to/openclaw-home"
 export OPENCLAW_CONFIG_PATH="/path/to/openclaw.json"
 ```
-Then just run the OpenClaw adapter install command:
+
+Then run the same install command again:
+
 ```bash
 pnpm component:install:tokenpilot:openclaw
 ```
 
-The OpenClaw installer will:
+</details>
 
-- package the current TokenPilot OpenClaw adapter
-- install it into `~/.openclaw/extensions/tokenpilot`
-- update `~/.openclaw/openclaw.json`
-- enable the TokenPilot plugin entry
-- switch `plugins.slots.contextEngine` to `layered-context`
-- apply the default `normal` runtime mode
-- try to restart the OpenClaw gateway automatically
+<details>
+<summary><strong>Codex CLI</strong></summary>
 
-### Codex CLI
+<br>
 
-If your Codex config files are not under the default `~/.codex`, you can override them with:
+Default install:
+
+```bash
+npm --prefix components/tokenpilot/adapters/codex run build
+npm --prefix components/tokenpilot/adapters/codex run install:codex
+```
+
+This keeps your current active Codex provider name, reroutes that provider through the local TokenPilot proxy, writes `~/.codex/tokenpilot.json`, registers hooks in `~/.codex/hooks.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server, and creates the standalone `lightmem2` CLI entrypoint at `~/.local/bin/lightmem2`.
+
+If your Codex config files are not under the default `~/.codex`, set:
 
 ```bash
 export CODEX_CONFIG_PATH="/path/to/config.toml"
@@ -114,36 +142,32 @@ export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
 ```
 
-Then build and install the Codex adapter:
+Then run the same install flow:
 
 ```bash
 npm --prefix components/tokenpilot/adapters/codex run build
 npm --prefix components/tokenpilot/adapters/codex run install:codex
 ```
 
-The Codex installer will:
+If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
 
-- add a TokenPilot model provider entry to Codex config
-- switch the default `model_provider` to that local TokenPilot provider
-- write TokenPilot runtime config to `~/.codex/tokenpilot.json`
-- register Codex hooks in `~/.codex/hooks.json`
-- configure the local proxy base URL served by `tokenpilot-codex`
+</details>
 
-The standalone CLI entrypoint is built from:
+<details>
+<summary><strong>Claude Code</strong></summary>
 
-```text
-components/tokenpilot/products/cli/dist/cli.js
+<br>
+
+Default install:
+
+```bash
+npm --prefix components/tokenpilot/adapters/claude-code run build
+npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
 ```
 
-The install step creates:
+This updates `~/.claude/settings.json` for local gateway routing, writes `~/.claude/tokenpilot.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server in `~/.claude/.claude.json`, installs a `SessionStart` hook that auto-starts the local gateway on first use, and preserves existing Claude files as `.tokenpilot.bak` backups before rewriting.
 
-```text
-~/.local/bin/lightmem2
-```
-
-### Claude Code
-
-If your Claude Code files are not under the default `~/.claude`, you can override them with:
+If your Claude Code files are not under the default `~/.claude`, set:
 
 ```bash
 export CLAUDE_CODE_SETTINGS_PATH="/path/to/settings.json"
@@ -151,47 +175,30 @@ export CLAUDE_CODE_MCP_CONFIG_PATH="/path/to/.claude.json"
 export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
 ```
 
-Then build and install the Claude Code adapter:
+Then run the same install flow:
 
 ```bash
 npm --prefix components/tokenpilot/adapters/claude-code run build
 npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
 ```
 
-The Claude Code installer will:
+If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
 
-- update `~/.claude/settings.json` for local gateway routing
-- enable the required tool-search environment flag
-- write TokenPilot runtime config to `~/.claude/tokenpilot.json`
-- register the shared `tokenpilot_memory_fault_recover` MCP server in `~/.claude/.claude.json`
-- preserve existing Claude files as `.tokenpilot.bak` backups before rewriting
+</details>
 
 <span id='quickstart'/>
 
 ## ⚡ Quick Start
 
-### 1. Use the Component Namespace
+Pick your host and open the matching one-pass setup below.
 
-When the current OpenClaw adapter is active, OpenClaw will expose models under:
+<details>
+<summary><strong>OpenClaw</strong></summary>
 
-```text
-lightmem2/<model>
-```
-
-For example:
-
-```text
-lightmem2/gpt-5.4-mini
-```
-
-For the current LightMem2 runtime path, use a `lightmem2/...` model instead of your original provider model.
-
-### 2. Verify It in a Real Session
-
-#### OpenClaw
+<br>
 
 1. Start or restart OpenClaw.
-2. Open a session with a `lightmem2/<model>` model.
+2. Open a session with a `lightmem2/<model>` model such as `lightmem2/gpt-5.4-mini`.
 3. Run:
 
 ```text
@@ -216,13 +223,11 @@ For a fuller runtime summary, run:
 /lightmem2 mode normal
 ```
 
-`/lightmem2 doctor` is the quickest integration self-check for the current
-OpenClaw adapter surface.
-`/lightmem2 visual` opens the local visual inspector for stability, reduction,
-and eviction snapshots.
+`/lightmem2 doctor` is the quickest integration self-check for the current OpenClaw adapter surface.
+`/lightmem2 visual` opens the local visual inspector for stability, reduction, and eviction snapshots.
 `/lightmem2 mode <conservative|normal|aggressive>` switches preset runtime behavior.
 
-If your current host does not expose internal slash commands, use the standalone CLI:
+You can also use the standalone CLI outside OpenClaw:
 
 ```bash
 lightmem2 openclaw status
@@ -232,112 +237,78 @@ lightmem2 openclaw visual
 lightmem2 openclaw mode normal
 ```
 
-#### Codex CLI
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong></summary>
+
+<br>
 
 The current Codex path uses the standalone CLI plus Codex hooks.
 
 1. Run the Codex install flow shown above.
 2. Start Codex normally.
-3. In another terminal, verify the adapter:
+3. If Codex asks you to review or trust the installed TokenPilot hooks, approve them.
+4. Open a new Codex session so `SessionStart` can start the local proxy.
+5. In another terminal, verify the adapter:
 
 ```bash
 lightmem2 codex status
 lightmem2 codex doctor
+lightmem2 codex report
 lightmem2 codex mode normal
 lightmem2 codex reduction status
 lightmem2 codex stabilizer target user
 ```
 
-For daemon-level inspection, you can also run:
+Expected first-run shape:
+
+- `lightmem2 codex doctor` reports `proxy healthy: yes`
+- `lightmem2 codex status` shows `stabilizer` and `reduction` enabled
+- after a few turns, `lightmem2 codex report` no longer says `No TokenPilot session stats yet.`
+
+Install success does not always mean the proxy is already running before the first trusted session.
+If doctor still reports `proxy healthy: no` after trusting hooks and opening a new Codex session, use the manual fallback:
 
 ```bash
 tokenpilot-codex status
 tokenpilot-codex start
 ```
 
-Codex currently supports `mode conservative` and `mode normal`.
-`mode aggressive` is not available on the current Codex adapter.
 
-For the full Codex adapter notes, see:
+</details>
 
-- [components/tokenpilot/adapters/codex/README.md](./components/tokenpilot/adapters/codex/README.md)
+<details>
+<summary><strong>Claude Code</strong></summary>
 
-#### Claude Code
+<br>
 
-The current Claude Code path also uses the standalone CLI, but routes requests
-through a local Anthropic-compatible gateway and a shared MCP recovery server.
+The current Claude Code path also uses the standalone CLI, but routes requests through a local Anthropic-compatible gateway and a shared MCP recovery server.
 
 1. Run the Claude Code install flow shown above.
 2. Start Claude Code normally.
-3. In another terminal, verify the adapter:
+3. Open a new Claude Code session so `SessionStart` can auto-start the local gateway.
+4. In another terminal, verify the adapter:
 
 ```bash
 lightmem2 claude-code status
 lightmem2 claude-code doctor
+lightmem2 claude-code report
 lightmem2 claude-code mode normal
 lightmem2 claude-code reduction status
 lightmem2 claude-code stabilizer target developer
 ```
 
-Claude Code currently supports `mode conservative` and `mode normal`.
-`mode aggressive` is not available on the current Claude Code adapter.
+Expected first-run shape:
 
-For the full Claude Code adapter notes, see:
+- `lightmem2 claude-code doctor` reports `proxy healthy: yes`
+- `lightmem2 claude-code status` shows `stabilizer` and `reduction` enabled
+- after a few turns, `lightmem2 claude-code report` no longer says `No TokenPilot session stats yet.`
 
-- [components/tokenpilot/adapters/claude-code/README.md](./components/tokenpilot/adapters/claude-code/README.md)
+Like Codex, install success does not guarantee that the gateway is already healthy before the first real session triggers `SessionStart`.
 
-For the current host capability matrix, see:
+</details>
 
-- [components/tokenpilot/HOSTS.md](./components/tokenpilot/HOSTS.md)
-
-### 3. Run the Built-In Smoke Test
-
-```bash
-bash docs/scripts/smoke_isolated_gateway.sh
-```
-
-Before running it, set your upstream provider info:
-
-```bash
-export LIGHTMEM2_API_KEY="your_api_key"
-export LIGHTMEM2_BASE_URL="https://your-openai-compatible-endpoint/v1"
-```
-
-If your machine does **not** need an upstream HTTP proxy, also clear:
-
-```bash
-export LIGHTMEM2_UPSTREAM_HTTP_PROXY=
-export LIGHTMEM2_UPSTREAM_HTTPS_PROXY=
-```
-
-The smoke script will:
-
-- create a temporary OpenClaw runtime home
-- wire LightMem2 as a local proxy provider
-- start a local gateway
-- send a minimal `Reply with exactly: pong` request
-
-### 4. Go Deeper
-
-Once the basic runtime path is working, use these component-level docs:
-
-- [components/README.md](./components/README.md) for the framework-level component index
-- [components/tokenpilot/README.md](./components/tokenpilot/README.md) for TokenPilot commands, configuration, runtime state, and debugging
-- [components/tokenpilot/adapters/codex/README.md](./components/tokenpilot/adapters/codex/README.md) for Codex-specific install, command scope, and proxy runtime notes
-- [components/tokenpilot/adapters/claude-code/README.md](./components/tokenpilot/adapters/claude-code/README.md) for Claude Code install, gateway routing, MCP recovery, and current command scope
-- [components/tokenpilot/products/cli/package.json](./components/tokenpilot/products/cli/package.json) for the standalone `lightmem2` CLI package
-- [experiments/README.md](./experiments/README.md) for top-level benchmark reproduction entrypoints
-- [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md) for the current TokenPilot benchmark hub
-
-<span id='components'/>
-
-## 🧩 Components
-
-LightMem2 is intended to host multiple long-running-agent components over time.
-
-| Component | Role | Main Docs | Experiments |
-| :-- | :-- | :-- | :-- |
-| `TokenPilot` | Runtime component for context stabilization, reduction, and lifecycle-aware eviction | [components/tokenpilot/README.md](./components/tokenpilot/README.md) | [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md) |
 
 <span id='visual-results'/>
 
@@ -346,7 +317,7 @@ LightMem2 is intended to host multiple long-running-agent components over time.
 The screenshots below come from the built-in visual inspector opened with:
 
 ```text
-/lightmem2 visual
+lightmem2 visual
 ```
 
 <details>
@@ -409,39 +380,46 @@ LightMem2/
 
 ## 🧪 Experiments
 
-LightMem2 keeps benchmark adapters, task definitions, and runner scripts under:
-
-```text
-experiments/
-```
-
-The root entry for experiment reproduction is:
+Use these following docs for benchmark-specific assets, environment setup, and runner commands. Experiment entrypoints:
 
 - [experiments/README.md](./experiments/README.md)
-
-The current component-level experiment hub is:
-
 - [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md)
-
-The currently documented benchmark subtrees are:
-
 - [experiments/tokenpilot/pinchbench/README.md](./experiments/tokenpilot/pinchbench/README.md)
 - [experiments/tokenpilot/claw-eval/README.md](./experiments/tokenpilot/claw-eval/README.md)
 
-Recommended reproduction flow:
 
-1. Finish the installation steps in this root README and verify the plugin in a real OpenClaw session.
-2. Open [experiments/README.md](./experiments/README.md) and choose the benchmark you want to reproduce.
-3. Open [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md) for the current component-level benchmark index.
-4. Download the required benchmark data bundle from the shared Google Drive described in [experiments/README.md](./experiments/README.md).
-5. Follow the benchmark-specific README for local asset placement, environment setup, and official runner commands.
-6. Run the benchmark from its `scripts/run_baseline.sh` or `scripts/run_method.sh` entrypoint.
+<span id='commands'/>
 
-<span id='examples'/>
+## 💡 Commands
 
-## 💡 Examples
+Use the basic commands first, then the session-aware and advanced ones when you need them.
 
-The first in-session commands to care about are:
+Shared standalone CLI patterns:
+
+```bash
+lightmem2 report
+lightmem2 visual
+lightmem2 use openclaw
+lightmem2 use codex session <session-id>
+lightmem2 context
+lightmem2 <host> session <session-id> report
+```
+
+- `lightmem2 report` shows the latest available report across hosts
+- `lightmem2 visual` opens the shared browser visual and lets you switch hosts and sessions
+- `lightmem2 use <host>` sets the default host for hostless CLI commands
+- `lightmem2 use <host> session <session-id>` pins the default session for later `report` and `visual`
+- `lightmem2 context` shows the current default host, pinned session, and remembered config target
+- `lightmem2 <host> session <session-id> report` reads one specific session directly
+
+Pick your host for the command surface below.
+
+<details>
+<summary><strong>OpenClaw</strong></summary>
+
+<br>
+
+Inside an OpenClaw session:
 
 ```text
 /lightmem2 status
@@ -449,21 +427,92 @@ The first in-session commands to care about are:
 /lightmem2 doctor
 /lightmem2 visual
 /lightmem2 mode normal
+/lightmem2 stabilizer target developer
+/lightmem2 reduction mode balanced
+/lightmem2 eviction on
 /lightmem2 help
 ```
 
-Use them in that order:
+Outside OpenClaw, the standalone CLI supports the same host directly:
 
-- `/lightmem2 status` confirms the component is active
-- `/lightmem2 report` shows savings after a few turns
-- `/lightmem2 doctor` checks the current OpenClaw adapter installation and config surface
-- `/lightmem2 visual` opens the local visualization page for runtime effects
-- `/lightmem2 mode <conservative|normal|aggressive>` switches preset runtime behavior
-- `/lightmem2 help` shows the full command surface
+```bash
+lightmem2 openclaw status
+lightmem2 openclaw report
+lightmem2 openclaw doctor
+lightmem2 openclaw visual
+lightmem2 openclaw mode normal
+lightmem2 openclaw session <session-id> report
+```
 
-For full command details, runtime state, and debugging notes, see:
+Useful OpenClaw-only controls:
 
-- [components/tokenpilot/README.md](./components/tokenpilot/README.md)
+- `mode aggressive` enables the most aggressive runtime policy preset
+- `eviction ...` controls lifecycle-aware context eviction
+- `settings details on` expands status output with more runtime detail
+- `stabilizer ...` and `reduction ...` let you tune prefix stabilization and observation reduction directly
+
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong></summary>
+
+<br>
+
+Use the standalone CLI:
+
+```bash
+lightmem2 codex status
+lightmem2 codex report
+lightmem2 codex doctor
+lightmem2 codex visual
+lightmem2 codex session <session-id> report
+lightmem2 codex reduction status
+lightmem2 codex stabilizer target developer
+lightmem2 codex mode normal
+lightmem2 codex reduction mode balanced
+lightmem2 codex help
+```
+
+Useful Codex controls:
+
+- `stabilizer on|off` toggles stable-prefix rewriting
+- `stabilizer target <developer|user>` chooses where dynamic context is attached
+- `reduction on|off` toggles observation reduction
+- `reduction mode <light|balanced>` switches between lighter and stronger trimming
+- `reduction pass toolPayloadTrim off` disables one specific reduction pass
+
+</details>
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+<br>
+
+Use the standalone CLI:
+
+```bash
+lightmem2 claude-code status
+lightmem2 claude-code report
+lightmem2 claude-code doctor
+lightmem2 claude-code visual
+lightmem2 claude-code session <session-id> report
+lightmem2 claude-code reduction status
+lightmem2 claude-code stabilizer target developer
+lightmem2 claude-code mode normal
+lightmem2 claude-code reduction mode balanced
+lightmem2 claude-code help
+```
+
+Useful Claude Code controls:
+
+- `stabilizer on|off` toggles stable-prefix rewriting
+- `stabilizer target <developer|user>` chooses where dynamic context is attached
+- `reduction on|off` toggles observation reduction
+- `reduction mode <light|balanced>` switches between lighter and stronger trimming
+- `reduction pass toolPayloadTrim off` disables one specific reduction pass
+
+</details>
+
 
 <span id='experimental-results'/>
 
@@ -474,12 +523,10 @@ The tables below summarize the current LightMem2 runtime path, implemented today
 `Isolated` mode evaluates each task in a fresh session, focusing on single-task behavior without cross-task history carryover.
 `Continuous` mode evaluates longer-running shared-session workflows, where context accumulation and cache reuse matter much more.
 
-For exact reproduction commands, start from:
-
-- [experiments/README.md](./experiments/README.md)
-- [experiments/tokenpilot/README.md](./experiments/tokenpilot/README.md)
+For exact reproduction commands and benchmark-specific setup, start from: [experiments/README.md](./experiments/README.md)
 
 ### PinchBench
+PinchBench logs and output bundles: [PinchBench Result](https://drive.google.com/drive/u/0/folders/11hrLzrreLnBFLz5bttx11lGUcO39QkLc)
 
 #### Isolated Mode
 
@@ -516,6 +563,7 @@ For exact reproduction commands, start from:
 PinchBench abbreviations: Prod=Productivity, Res=Research, Write=Writing, Code=Coding, Anal=Analysis, CSV=CSV Analysis, Log=Log Analysis, Meet=Meeting Analysis, Mem=Memory, Skill=Skills, Integ=Integrations.
 
 ### Claw-Eval
+Claw-Eval logs and output bundles: [Claw-Eval Result](https://drive.google.com/drive/u/0/folders/1694iNhrAzc8JtWTiUUALXsopZ8s6suCS)
 
 #### Isolated Mode
 
@@ -550,63 +598,6 @@ PinchBench abbreviations: Prod=Productivity, Res=Research, Write=Writing, Code=C
 | **LightMem2** | 60.8 | 58.8 | 61.8 | 52.5 | 32.1 | 64.2 | 57.3 | 89.2 | 65.8 | 76.8 | 45.2 | 70.9 | 21.430 | 9.928 | 0.338 | **10.58** |
 
 Claw-Eval abbreviations: Wkfl=Workflow, Ops=Ops, Fin=Finance, Off=Office QA, Comm=Communication, Prod=Productivity, Oprn=Operations, Safe=Safety, Term=Terminal, MM=Multimodal, Oth=Others.
-
-<span id='configuration'/>
-
-## ⚙️ Configuration
-
-The exact config file and install surface depend on the host adapter:
-
-- OpenClaw: `~/.openclaw/openclaw.json`
-- Codex CLI: `~/.codex/tokenpilot.json`
-- Claude Code: `~/.claude/tokenpilot.json`
-
-### Default Runtime Mode
-
-The current install path applies `normal` mode by default.
-
-- `conservative`: stabilizer on, lighter reduction preset, eviction off
-- `normal`: stabilizer on, balanced reduction preset, eviction off
-- `aggressive`: stabilizer on, aggressive reduction preset, eviction on with task-state estimator on
-
-You can switch modes with the host command surface:
-
-```text
-/lightmem2 mode conservative
-/lightmem2 mode normal
-/lightmem2 mode aggressive
-```
-
-For Codex, use:
-
-```bash
-lightmem2 codex mode conservative
-lightmem2 codex mode normal
-```
-
-For Claude Code, use:
-
-```bash
-lightmem2 claude-code mode conservative
-lightmem2 claude-code mode normal
-```
-
-Recommended starting behavior:
-
-- keep `stabilizer` enabled
-- keep `reduction` enabled
-- leave `eviction` off until the basic runtime path is already working
-
-Advanced estimator options, reduction-pass tuning, memory settings, runtime
-state layout, and debugging details are intentionally kept out of the root
-README.
-
-For full host-specific configuration, see:
-
-- [components/tokenpilot/README.md](./components/tokenpilot/README.md)
-- [components/tokenpilot/adapters/openclaw/README.md](./components/tokenpilot/adapters/openclaw/README.md)
-- [components/tokenpilot/adapters/codex/README.md](./components/tokenpilot/adapters/codex/README.md)
-- [components/tokenpilot/adapters/claude-code/README.md](./components/tokenpilot/adapters/claude-code/README.md)
 
 <span id='citation'/>
 
@@ -649,5 +640,5 @@ We thank all the contributors to this project, more contributors are welcome!
 - [AgentSwing](https://github.com/Alibaba-NLP/DeepResearch) — Adaptive parallel context management routing for web agents
 - [MemOS](https://github.com/MemTensor/MemOS) — Memory operating system for LLM agents
 - [LightMem](https://github.com/zjunlp/LightMem) — Lightweight memory-augmented generation
-
-🙌 We thank all the contributors to this project, and welcome further contributions from the community. We also thank the authors of the baseline methods evaluated in our experiments, including [LLMLingua-2](https://github.com/microsoft/LLMLingua), [SelectiveContext](https://github.com/liyucheng09/Selective_Context), [Pichay](https://github.com/fsgeek/pichay), [MemoBrain](https://github.com/qhjqhj00/MemoBrain), [AgentSwing](https://github.com/Alibaba-NLP/DeepResearch), and [MemOS](https://github.com/MemTensor/MemOS), for making their work publicly available.
+- [Headroom](https://github.com/chopratejas/headroom) — Compresses everything when AI agent reads
+🙌 We thank all the contributors to this project, and welcome further contributions from the community. 

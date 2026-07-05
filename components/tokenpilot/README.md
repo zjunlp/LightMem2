@@ -13,10 +13,20 @@ Within the current LightMem2 runtime path, TokenPilot primarily addresses this t
 
 Use the root [README.md](../../README.md) for the fastest first-run path:
 
-- install the repo
-- install the plugin
-- open a `lightmem2/<model>` session
-- verify with `/lightmem2 status`
+- `OpenClaw`
+  - install the repo
+  - install the plugin
+  - open a `lightmem2/<model>` session
+  - verify with `/lightmem2 status`
+- `Codex CLI`
+  - install the adapter
+  - trust hooks if Codex asks for review
+  - open a new Codex session to trigger `SessionStart`
+  - verify with `lightmem2 codex doctor`
+- `Claude Code`
+  - install the adapter
+  - open a new Claude Code session to trigger `SessionStart`
+  - verify with `lightmem2 claude-code doctor`
 
 Use [components/README.md](../README.md) if you want the framework-level
 component index before diving into TokenPilot-specific details.
@@ -97,9 +107,11 @@ Host integration index:
 Supported host adapters:
 
 - `OpenClaw`: production adapter with the broadest public feature set
-- `Codex CLI`: adapter with stable-prefix, reduction, MCP recovery, report, doctor, and text visual
+- `Codex CLI`: adapter with stable-prefix, reduction, MCP recovery, report, doctor, and shared browser visual
   - installs by rerouting the active Codex provider through a local TokenPilot proxy, while preserving existing session history under the same provider name
-- `Claude Code`: adapter with gateway routing, stable-prefix, reduction, MCP recovery, report, doctor, and text visual
+  - first successful verification usually happens after hooks are trusted and a new Codex session triggers `SessionStart`
+- `Claude Code`: adapter with gateway routing, stable-prefix, reduction, MCP recovery, report, doctor, and shared browser visual
+  - first successful verification usually happens after a new Claude Code session triggers `SessionStart`
 
 Shared product surfaces:
 
@@ -141,6 +153,15 @@ lightmem2 codex reduction status
 lightmem2 codex stabilizer target user
 ```
 
+Recommended first-run order for Codex:
+
+1. `npm --prefix components/tokenpilot/adapters/codex run install:codex`
+2. trust hooks in Codex if prompted
+3. open a new Codex session
+4. `lightmem2 codex doctor`
+5. `lightmem2 codex status`
+6. after a few turns, `lightmem2 codex report`
+
 Current Claude Code CLI equivalents:
 
 ```bash
@@ -152,6 +173,14 @@ lightmem2 claude-code mode normal
 lightmem2 claude-code reduction status
 lightmem2 claude-code stabilizer target developer
 ```
+
+Recommended first-run order for Claude Code:
+
+1. `npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code`
+2. open a new Claude Code session
+3. `lightmem2 claude-code doctor`
+4. `lightmem2 claude-code status`
+5. after a few turns, `lightmem2 claude-code report`
 
 Notes:
 

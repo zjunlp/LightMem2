@@ -51,6 +51,7 @@ Legend:
 - preserves the current active Codex provider name and reroutes that provider's `base_url` through the local proxy
 - uses the standalone `lightmem2 codex ...` CLI surface instead of in-host slash commands
 - supports stable-prefix, reduction, report, doctor, browser visual, and real MCP recovery
+- first successful verification usually comes after hooks are trusted and a new Codex session triggers `SessionStart`
 - intentionally does not expose `settings`, `eviction`, or `mode aggressive`
 
 ### Claude Code
@@ -58,6 +59,7 @@ Legend:
 - uses local Anthropic-compatible gateway routing plus lightweight hooks for observability
 - uses the standalone `lightmem2 claude-code ...` CLI surface instead of in-host slash commands
 - supports stable-prefix, reduction, report, doctor, browser visual, and real MCP recovery
+- first successful verification usually comes after a new Claude Code session triggers `SessionStart`
 - intentionally does not expose `settings`, `eviction`, or `mode aggressive`
 
 ### Shared Visual Surface

@@ -30,7 +30,7 @@ Use the root [README.md](../README.md) first if you want the fastest path to:
 
 - install the repo
 - install the current component
-- verify the runtime path in a real OpenClaw session
+- verify the runtime path in a real session
 
 Use a component subtree when you need component-specific material such as:
 
@@ -47,10 +47,14 @@ Use a component subtree when you need component-specific material such as:
 components/
 └── tokenpilot/
     ├── adapters/
-    │   └── openclaw/
+    │   ├── openclaw/
+    │   ├── codex/
+    │   └── claude-code/
     ├── README.md
+    ├── products/
     └── packages/
         ├── host-adapter/
+        ├── product-surface/
         ├── runtime-core/
         ├── kernel/
         └── layers/
@@ -61,6 +65,8 @@ components/
 At the repository level, the framework name is `LightMem2`.
 
 At the current runtime-compatibility layer, the shipped component still uses
-the established `tokenpilot` namespace for commands, model routing, plugin id,
-and persisted state. That boundary is intentional for now so the repo can move
-toward a multi-component layout without breaking the working OpenClaw path.
+the established `tokenpilot` namespace for plugin id and persisted state. On
+OpenClaw, the current public session model prefix is `lightmem2/<model>`, while
+Codex CLI and Claude Code use the standalone `lightmem2 <host> ...` command
+surface. That boundary is intentional for now so the repo can move toward a
+multi-component layout without breaking the current working paths.

@@ -3,31 +3,8 @@
 This directory contains the PinchBench experiment harness for the current
 LightMem2 runtime path.
 
-At the current stage, the migration scope is intentionally narrow:
-
-- dataset: `PinchBench` only
-- settings: `isolated` and `continuous`
-- active paths:
-  - current LightMem2 method runs through the TokenPilot component
-  - single-agent baseline runs
-
-Out of scope for the first consolidation pass:
-
-- baseline cleanup and revalidation
-- `ClawEval`
-- `FrontierScience`
-- multi-agent / MAS variants
-- legacy wrapper scripts that were only used for old ablations
-
-This subtree documents the benchmark surface for the current public LightMem2
-runtime release, where the TokenPilot component is the active context-management path.
-
-The migration is now in an intermediate state:
-
-- dataset tasks and assets have already been copied here
-- dataset-side Python harness files have already been copied here
-- the active single-agent method path now runs from this subtree
-- the active single-agent baseline path now runs from this subtree
+This subtree keeps the public PinchBench benchmark surface for the current
+TokenPilot-based LightMem2 method path and its matching single-agent baseline.
 
 ## Current Contents
 
@@ -45,7 +22,7 @@ The migration is now in an intermediate state:
 - `scripts/`
   - current home for the official baseline/method runners and shared helpers
 - `run/`
-  - local runner helpers; large logs/results should not be committed
+  - local helper wrappers; large logs and result bundles should not be committed
 
 ## External data and result storage
 
@@ -82,12 +59,12 @@ Before running a fresh machine:
 
 ## Official runners
 
-The public runner surface is intentionally small:
+The recommended public runner surface is intentionally small:
 
 - `scripts/run_baseline.sh`
 - `scripts/run_method.sh`
 
-These are the canonical entrypoints for open-source use.
+These are the main entrypoints for reproduction.
 
 ### Baseline
 
@@ -110,7 +87,7 @@ cd /path/to/LightMem2
 bash experiments/tokenpilot/pinchbench/scripts/run_method.sh \
   --suite automated-only \
   --session-mode isolated \
-  --model tokenpilot/gpt-5.4-mini
+  --model lightmem2/gpt-5.4-mini
 ```
 
 Continuous method run:
@@ -120,7 +97,7 @@ cd /path/to/LightMem2
 bash experiments/tokenpilot/pinchbench/scripts/run_method.sh \
   --suite automated-only \
   --session-mode continuous \
-  --model tokenpilot/gpt-5.4-mini
+  --model lightmem2/gpt-5.4-mini
 ```
 
 ## Auxiliary runners
@@ -132,14 +109,7 @@ The following scripts remain useful, but they are not the primary public API:
 - `scripts/run.sh`
   - convenience wrapper that launches the default experiment matrix
 
-## Immediate Goal
+## Notes
 
-The first real consolidation target is:
-
-1. keep cleaning the migrated PinchBench wrapper surface
-2. keep only:
-   - PinchBench
-   - isolated mode
-   - continuous mode
-   - single-agent method and baseline paths
-3. defer MAS and other benchmark families until this active path is stable
+- The method examples use `lightmem2/<model>` because the benchmark runs through the current OpenClaw LightMem2 provider path.
+- If you need broader batch orchestration, use the auxiliary `scripts/run_experiment_matrix.sh` wrapper after the main baseline and method runners work on your machine.

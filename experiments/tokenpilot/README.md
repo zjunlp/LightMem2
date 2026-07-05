@@ -7,7 +7,7 @@ Use the root [README.md](../../README.md) first if you still need to:
 
 - install the repository
 - install the component
-- verify a real `tokenpilot/<model>` session
+- verify the runtime path in a real session
 
 Use [../README.md](../README.md) for the top-level experiment entry across the
 repository.
@@ -24,7 +24,7 @@ The current public experiment surface includes:
 ## Recommended Workflow
 
 1. Finish the installation and quick-start flow in the root [README.md](../../README.md).
-2. Confirm the current TokenPilot runtime path works in a real OpenClaw session.
+2. Confirm the current TokenPilot runtime path works in a real session on the host you plan to use for the benchmark.
 3. Pick the benchmark you want from the table above.
 4. Follow that benchmark README for assets, environment setup, and official commands.
 
