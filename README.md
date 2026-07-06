@@ -1,4 +1,6 @@
-<h1 align="center">LightMem2</h1>
+<p align="center">
+  <img src="./figs/LightMem2_logo.png" alt="LightMem2 logo" width="220">
+</p>
 
 <p align="center">
   A modular framework for long-running agent memory and context management
@@ -641,4 +643,5 @@ We thank all the contributors to this project, more contributors are welcome!
 - [MemOS](https://github.com/MemTensor/MemOS) — Memory operating system for LLM agents
 - [LightMem](https://github.com/zjunlp/LightMem) — Lightweight memory-augmented generation
 - [Headroom](https://github.com/chopratejas/headroom) — Compresses everything when AI agent reads
+
 🙌 We thank all the contributors to this project, and welcome further contributions from the community. 
