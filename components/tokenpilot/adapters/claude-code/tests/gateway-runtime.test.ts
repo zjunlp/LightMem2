@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -31,6 +32,46 @@ async function reserveUnusedPort(): Promise<number> {
       });
     });
   });
+}
+
+async function startTestJsonServer(handler: (
+  req: import("node:http").IncomingMessage,
+  body: string,
+) => {
+  status?: number;
+  headers?: Record<string, string>;
+  payload?: unknown;
+}): Promise<{ baseUrl: string; close(): Promise<void> }> {
+  const port = await reserveUnusedPort();
+  const server = createHttpServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+    }
+    const body = Buffer.concat(chunks).toString("utf8");
+    const result = handler(req, body);
+    res.statusCode = result.status ?? 200;
+    res.setHeader("content-type", "application/json");
+    for (const [key, value] of Object.entries(result.headers ?? {})) {
+      res.setHeader(key, value);
+    }
+    res.end(JSON.stringify(result.payload ?? {}));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    },
+  };
 }
 
 test("gateway runtime serves health and forwards Claude Messages requests", async () => {
@@ -105,6 +146,177 @@ test("gateway runtime serves health and forwards Claude Messages requests", asyn
     assert.equal(((seenPayloads[0] as Record<string, unknown>).model), "claude-sonnet-4-6");
   } finally {
     await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("gateway runtime proxies Claude model discovery and count_tokens for Anthropic-compatible upstreams", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-probes-"));
+  const proxyPort = await reserveUnusedPort();
+  const seenRequests: Array<{ method: string; url: string; auth?: string; xApiKey?: string }> = [];
+  const upstream = await startTestJsonServer((req, body) => {
+    seenRequests.push({
+      method: String(req.method ?? ""),
+      url: String(req.url ?? ""),
+      auth: typeof req.headers.authorization === "string" ? req.headers.authorization : undefined,
+      xApiKey: typeof req.headers["x-api-key"] === "string" ? req.headers["x-api-key"] : undefined,
+    });
+    if (req.method === "GET" && req.url === "/anthropic/v1/models") {
+      return {
+        payload: {
+          data: [{ id: "deepseek-chat", type: "model", display_name: "DeepSeek Chat" }],
+        },
+      };
+    }
+    if (req.method === "POST" && req.url === "/anthropic/v1/messages/count_tokens") {
+      return {
+        payload: {
+          input_tokens: 42,
+        },
+      };
+    }
+    if (req.method === "POST" && req.url === "/anthropic/v1/messages") {
+      const parsed = JSON.parse(body) as { model?: string };
+      return {
+        payload: {
+          id: "msg_probe_1",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: String(parsed.model ?? "ok") }],
+        },
+      };
+    }
+    return {
+      status: 404,
+      payload: {
+        error: "not found",
+      },
+    };
+  });
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      upstreamBaseUrl: `${upstream.baseUrl}/anthropic`,
+    }),
+    logger: createConsoleLogger(false),
+  });
+
+  try {
+    const modelsResp = await fetch(`${runtime.baseUrl}/v1/models`, {
+      headers: {
+        authorization: "Bearer inbound-token",
+      },
+    });
+    assert.equal(modelsResp.status, 200);
+    const models = await modelsResp.json() as { data?: Array<{ id?: string }> };
+    assert.equal(models.data?.[0]?.id, "deepseek-chat");
+
+    const countResp = await fetch(`${runtime.baseUrl}/v1/messages/count_tokens`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer inbound-token",
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        system: "stay stable",
+        messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+      }),
+    });
+    assert.equal(countResp.status, 200);
+    const countPayload = await countResp.json() as { input_tokens?: number };
+    assert.equal(countPayload.input_tokens, 42);
+
+    const requestResp = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer inbound-token",
+        "x-session-id": "sess-probes-1",
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        stream: false,
+        messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+        max_tokens: 64,
+      }),
+    });
+    assert.equal(requestResp.status, 200);
+    const payload = await requestResp.json() as { content?: Array<{ text?: string }> };
+    assert.equal(payload.content?.[0]?.text, "deepseek-chat");
+
+    assert.deepEqual(
+      seenRequests.map((item) => [item.method, item.url]),
+      [
+        ["GET", "/anthropic/v1/models"],
+        ["POST", "/anthropic/v1/messages/count_tokens"],
+        ["POST", "/anthropic/v1/messages"],
+      ],
+    );
+    assert.equal(seenRequests[0]?.auth, "Bearer inbound-token");
+    assert.equal(seenRequests[0]?.xApiKey, undefined);
+  } finally {
+    await runtime.close();
+    await upstream.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("gateway runtime synthesizes a local model list when DeepSeek anthropic /v1/models is unavailable", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-model-fallback-"));
+  const proxyPort = await reserveUnusedPort();
+  const upstream = await startTestJsonServer((req, body) => {
+    if (req.method === "GET" && req.url === "/anthropic/v1/models") {
+      return {
+        status: 404,
+        payload: {},
+      };
+    }
+    if (req.method === "POST" && req.url === "/anthropic/v1/messages") {
+      const parsed = JSON.parse(body) as { model?: string };
+      return {
+        payload: {
+          id: "msg_fallback_1",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: String(parsed.model ?? "ok") }],
+        },
+      };
+    }
+    if (req.method === "POST" && req.url === "/anthropic/v1/messages/count_tokens") {
+      return {
+        payload: {
+          input_tokens: 7,
+        },
+      };
+    }
+    return {
+      status: 404,
+      payload: {},
+    };
+  });
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      upstreamBaseUrl: `${upstream.baseUrl}/anthropic`,
+    }),
+    logger: createConsoleLogger(false),
+  });
+
+  try {
+    const modelsResp = await fetch(`${runtime.baseUrl}/v1/models`);
+    assert.equal(modelsResp.status, 200);
+    const models = await modelsResp.json() as { data?: Array<{ id?: string }> };
+    const ids = (models.data ?? []).map((item) => item.id);
+    assert.ok(ids.length > 0);
+    assert.ok(ids.some((id) => typeof id === "string" && id.startsWith("claude-")));
+  } finally {
+    await runtime.close();
+    await upstream.close();
     await rm(dir, { recursive: true, force: true });
   }
 });

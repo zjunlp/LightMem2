@@ -142,6 +142,13 @@ function shouldAdoptSettingsUpstream(
   return !normalizedCurrent || normalizedCurrent === normalizedDefault;
 }
 
+function mapDeepSeekModelToClaudeVisibleModel(value: unknown): string | undefined {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!normalized.startsWith("deepseek-")) return undefined;
+  if (normalized.includes("flash")) return "claude-haiku-4-5";
+  return "claude-sonnet-4-6";
+}
+
 export async function installClaudeCodeTokenPilot(params?: {
   settingsPath?: string;
   tokenPilotConfigPath?: string;
@@ -195,6 +202,19 @@ export async function installClaudeCodeTokenPilot(params?: {
   if (shouldAdoptSettingsUpstream(config.upstreamBaseUrl, existingAnthropicBaseUrl, proxyBaseUrl)) {
     config.upstreamBaseUrl = existingAnthropicBaseUrl.replace(/\/+$/, "");
   }
+  const visibleModelEnvKeys = [
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "CLAUDE_CODE_SUBAGENT_MODEL",
+  ] as const;
+  const firstDeepSeekModel = visibleModelEnvKeys
+    .map((key) => typeof existingEnv[key] === "string" ? String(existingEnv[key]).trim() : "")
+    .find((value) => value.toLowerCase().startsWith("deepseek-"));
+  if (!String(config.upstreamModel ?? "").trim() && firstDeepSeekModel) {
+    config.upstreamModel = firstDeepSeekModel;
+  }
   await writeTokenPilotClaudeCodeConfig(config, tokenPilotConfigPath);
   const mcpServer = resolveClaudeCodeMcpServerSpecForInstall(config.stateDir);
   const mcpProbeServer = resolveClaudeCodeMcpServerSpecForProbe(config.stateDir);
@@ -203,6 +223,12 @@ export async function installClaudeCodeTokenPilot(params?: {
     ANTHROPIC_BASE_URL: proxyBaseUrl,
     [CLAUDE_TOOL_SEARCH_ENV]: CLAUDE_TOOL_SEARCH_DEFAULT,
   };
+  for (const key of visibleModelEnvKeys) {
+    const visibleModel = mapDeepSeekModelToClaudeVisibleModel(env[key]);
+    if (visibleModel) {
+      env[key] = visibleModel;
+    }
+  }
   const hooks = asRecord(root.hooks);
   const command = resolveClaudeCodeHookCommandForInstall();
   const handler = () => ({

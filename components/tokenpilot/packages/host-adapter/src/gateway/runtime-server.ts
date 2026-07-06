@@ -16,9 +16,16 @@ export async function startHostGatewayRuntimeServer(params: {
   requestPath: string;
   basePath?: string;
   healthPayload: unknown;
+  handleRoute?(args: {
+    req: IncomingMessage;
+    res: ServerResponse;
+    pathname: string;
+    readBody(): Promise<string>;
+  }): Promise<boolean | void>;
   handleRequest(args: {
     req: IncomingMessage;
     res: ServerResponse;
+    pathname: string;
     body: string;
   }): Promise<void>;
   handleError?(args: {
@@ -30,18 +37,34 @@ export async function startHostGatewayRuntimeServer(params: {
   const basePath = params.basePath ?? "/v1";
   const server = createServer(async (req, res) => {
     try {
-      if (req.method === "GET" && req.url === "/health") {
+      let bodyPromise: Promise<string> | null = null;
+      const pathname = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+      const readBody = () => {
+        bodyPromise ??= readHttpRequestBody(req);
+        return bodyPromise;
+      };
+      if (req.method === "GET" && pathname === "/health") {
         sendJsonResponse(res, 200, params.healthPayload);
         return;
       }
-      if (req.method !== "POST" || req.url !== params.requestPath) {
+      if (params.handleRoute) {
+        const handled = await params.handleRoute({
+          req,
+          res,
+          pathname,
+          readBody,
+        });
+        if (handled) return;
+      }
+      if (req.method !== "POST" || pathname !== params.requestPath) {
         sendJsonResponse(res, 404, { error: "not found" });
         return;
       }
-      const body = await readHttpRequestBody(req);
+      const body = await readBody();
       await params.handleRequest({
         req,
         res,
+        pathname,
         body,
       });
     } catch (error) {

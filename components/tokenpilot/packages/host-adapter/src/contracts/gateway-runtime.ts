@@ -37,6 +37,7 @@ export type HostGatewayForwarder = {
       upstream: HostGatewayUpstreamConfig;
       payload: unknown;
       inboundAuthorization?: string;
+      inboundHeaders?: Record<string, string | string[] | undefined>;
     },
   ): Promise<HostGatewayHttpResponse>;
   requestStream(
@@ -44,6 +45,7 @@ export type HostGatewayForwarder = {
       upstream: HostGatewayUpstreamConfig;
       payload: unknown;
       inboundAuthorization?: string;
+      inboundHeaders?: Record<string, string | string[] | undefined>;
     },
   ): Promise<HostGatewayStreamResponse>;
 };
