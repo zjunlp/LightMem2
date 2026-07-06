@@ -16,6 +16,7 @@ export type TokenPilotClaudeCodeConfig = {
   upstreamBaseUrl: string;
   upstreamApiKey?: string;
   upstreamModel?: string;
+  visibleModels: string[];
   hooks: {
     dynamicContextTarget: "developer" | "user";
   };
@@ -59,6 +60,19 @@ function numberValue(value: unknown, fallback: number, min: number, max: number)
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function stringArrayValue(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    const normalized = stringValue(entry);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
 }
 
 function sanitizeClaudeReductionPassOptions(raw: unknown): Record<string, Record<string, unknown>> {
@@ -135,6 +149,7 @@ export function normalizeTokenPilotClaudeCodeConfig(
     upstreamBaseUrl: (stringValue(obj.upstreamBaseUrl) ?? defaultClaudeUpstreamBaseUrl()).replace(/\/+$/, ""),
     upstreamApiKey: stringValue(obj.upstreamApiKey),
     upstreamModel: stringValue(obj.upstreamModel),
+    visibleModels: stringArrayValue(obj.visibleModels),
     hooks: {
       dynamicContextTarget: hooks.dynamicContextTarget === "user" ? "user" : "developer",
     },

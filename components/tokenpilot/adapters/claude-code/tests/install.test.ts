@@ -178,7 +178,12 @@ test("installClaudeCodeTokenPilot rewrites top-level deepseek model to a Claude-
     const tokenPilotConfigPath = join(dir, "tokenpilot.json");
     await writeFile(
       settingsPath,
-      `${JSON.stringify({ model: "deepseek-chat" }, null, 2)}\n`,
+      `${JSON.stringify({
+        model: "deepseek-chat",
+        env: {
+          ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic",
+        },
+      }, null, 2)}\n`,
       "utf8",
     );
 
@@ -196,8 +201,55 @@ test("installClaudeCodeTokenPilot rewrites top-level deepseek model to a Claude-
 
     const tokenPilotConfig = JSON.parse(await readFile(tokenPilotConfigPath, "utf8")) as {
       upstreamModel?: string;
+      visibleModels?: string[];
     };
     assert.equal(tokenPilotConfig.upstreamModel, "deepseek-chat");
+    assert.deepEqual(tokenPilotConfig.visibleModels, ["deepseek-chat"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("installClaudeCodeTokenPilot preserves generic Anthropic-compatible model ids for later proxy discovery", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-install-generic-models-"));
+  try {
+    const settingsPath = join(dir, "settings.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+    await writeFile(
+      settingsPath,
+      `${JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: "https://open.bigmodel.cn/api/anthropic",
+          ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.2[1m]",
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-4.7",
+          CLAUDE_CODE_SUBAGENT_MODEL: "glm-4.7",
+        },
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    await installClaudeCodeTokenPilot({
+      settingsPath,
+      mcpConfigPath: join(dir, ".claude.json"),
+      tokenPilotConfigPath,
+      probeMcp: false,
+    });
+
+    const settings = JSON.parse(await readFile(settingsPath, "utf8")) as {
+      env?: Record<string, string>;
+    };
+    assert.equal(settings.env?.ANTHROPIC_DEFAULT_SONNET_MODEL, "glm-5.2[1m]");
+    assert.equal(settings.env?.ANTHROPIC_DEFAULT_HAIKU_MODEL, "glm-4.7");
+    assert.equal(settings.env?.CLAUDE_CODE_SUBAGENT_MODEL, "glm-4.7");
+
+    const tokenPilotConfig = JSON.parse(await readFile(tokenPilotConfigPath, "utf8")) as {
+      upstreamBaseUrl?: string;
+      upstreamModel?: string;
+      visibleModels?: string[];
+    };
+    assert.equal(tokenPilotConfig.upstreamBaseUrl, "https://open.bigmodel.cn/api/anthropic");
+    assert.equal(tokenPilotConfig.upstreamModel, "glm-5.2[1m]");
+    assert.deepEqual(tokenPilotConfig.visibleModels, ["glm-5.2[1m]", "glm-4.7"]);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -71,10 +71,11 @@ const defaultAnthropicProfile: AnthropicProviderProfile = {
     return true;
   },
   visibleModelIds(config: TokenPilotClaudeCodeConfig): string[] {
-    return uniqueStrings([
+    const configured = uniqueStrings([
+      ...config.visibleModels,
       config.upstreamModel,
-      ...DEFAULT_VISIBLE_CLAUDE_MODELS,
     ]);
+    return configured.length > 0 ? configured : [...DEFAULT_VISIBLE_CLAUDE_MODELS];
   },
   mapVisibleModelToUpstreamModel(_config: TokenPilotClaudeCodeConfig, model: string): string {
     return model;
@@ -131,9 +132,5 @@ export function rewriteInstalledClaudeVisibleModel(
   config: TokenPilotClaudeCodeConfig,
   value: unknown,
 ): string | undefined {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (normalized.startsWith("deepseek-")) {
-    return deepSeekAnthropicProfile.rewriteInstalledVisibleModel(value);
-  }
   return resolveAnthropicProviderProfile(config).rewriteInstalledVisibleModel(value);
 }

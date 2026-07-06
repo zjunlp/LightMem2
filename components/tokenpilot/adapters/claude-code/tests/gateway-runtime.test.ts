@@ -321,6 +321,82 @@ test("gateway runtime synthesizes a local model list when DeepSeek anthropic /v1
   }
 });
 
+test("gateway runtime synthesizes configured third-party model ids when upstream model discovery is unavailable", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-generic-models-"));
+  const proxyPort = await reserveUnusedPort();
+  const seenRequests: Array<{ method: string; url: string; body?: { model?: string } }> = [];
+  const upstream = await startTestJsonServer((req, body) => {
+    const parsed = body ? JSON.parse(body) as { model?: string } : undefined;
+    seenRequests.push({
+      method: String(req.method ?? ""),
+      url: String(req.url ?? ""),
+      body: parsed,
+    });
+    if (req.method === "POST" && req.url === "/anthropic/v1/messages") {
+      return {
+        payload: {
+          id: "msg_generic_1",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: String(parsed?.model ?? "ok") }],
+        },
+      };
+    }
+    return {
+      status: 404,
+      payload: {
+        error: "not found",
+      },
+    };
+  });
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      upstreamBaseUrl: `${upstream.baseUrl}/anthropic`,
+      upstreamModel: "glm-5.2[1m]",
+      visibleModels: ["glm-5.2[1m]", "glm-4.7"],
+    }),
+    logger: createConsoleLogger(false),
+  });
+
+  try {
+    const modelsResp = await fetch(`${runtime.baseUrl}/v1/models`);
+    assert.equal(modelsResp.status, 200);
+    const models = await modelsResp.json() as { data?: Array<{ id?: string }> };
+    assert.deepEqual(models.data?.map((entry) => entry.id), ["glm-5.2[1m]", "glm-4.7"]);
+
+    const requestResp = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-session-id": "sess-generic-models-1",
+      },
+      body: JSON.stringify({
+        model: "glm-5.2[1m]",
+        stream: false,
+        messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+        max_tokens: 64,
+      }),
+    });
+    assert.equal(requestResp.status, 200);
+    const payload = await requestResp.json() as { content?: Array<{ text?: string }> };
+    assert.equal(payload.content?.[0]?.text, "glm-5.2[1m]");
+    assert.deepEqual(
+      seenRequests.map((item) => [item.method, item.url, item.body?.model]),
+      [
+        ["GET", "/anthropic/v1/models", undefined],
+        ["POST", "/anthropic/v1/messages", "glm-5.2[1m]"],
+      ],
+    );
+  } finally {
+    await runtime.close();
+    await upstream.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("gateway runtime records session-state and ux-effects after a reduced request", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-state-"));
   const proxyPort = await reserveUnusedPort();

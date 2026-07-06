@@ -143,6 +143,18 @@ function shouldAdoptSettingsUpstream(
   return !normalizedCurrent || normalizedCurrent === normalizedDefault;
 }
 
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
 export async function installClaudeCodeTokenPilot(params?: {
   settingsPath?: string;
   tokenPilotConfigPath?: string;
@@ -204,12 +216,16 @@ export async function installClaudeCodeTokenPilot(params?: {
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "CLAUDE_CODE_SUBAGENT_MODEL",
   ] as const;
-  const firstDeepSeekModel = visibleModelEnvKeys
+  const configuredVisibleModels = uniqueStrings(
+    visibleModelEnvKeys
     .map((key) => typeof existingEnv[key] === "string" ? String(existingEnv[key]).trim() : "")
-    .concat(existingRootModel ? [existingRootModel] : [])
-    .find((value) => value.toLowerCase().startsWith("deepseek-"));
-  if (!String(config.upstreamModel ?? "").trim() && firstDeepSeekModel) {
-    config.upstreamModel = firstDeepSeekModel;
+      .concat(existingRootModel ? [existingRootModel] : []),
+  );
+  if (!String(config.upstreamModel ?? "").trim() && configuredVisibleModels[0]) {
+    config.upstreamModel = configuredVisibleModels[0];
+  }
+  if (configuredVisibleModels.length > 0) {
+    config.visibleModels = configuredVisibleModels;
   }
   await writeTokenPilotClaudeCodeConfig(config, tokenPilotConfigPath);
   const mcpServer = resolveClaudeCodeMcpServerSpecForInstall(config.stateDir);
