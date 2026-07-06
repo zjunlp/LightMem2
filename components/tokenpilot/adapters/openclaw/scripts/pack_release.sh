@@ -18,11 +18,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "${PACK_TMP_DIR}/package/dist"
-mkdir -p "${PACK_TMP_DIR}/package/scripts"
-cp dist/index.js "${PACK_TMP_DIR}/package/dist/index.js"
-cp dist/index.js.map "${PACK_TMP_DIR}/package/dist/index.js.map"
-cp scripts/token_counter.py "${PACK_TMP_DIR}/package/scripts/token_counter.py"
+mkdir -p "${PACK_TMP_DIR}/package"
+cp -R dist "${PACK_TMP_DIR}/package/dist"
 cp README.md "${PACK_TMP_DIR}/package/README.md"
 cp openclaw.plugin.json "${PACK_TMP_DIR}/package/openclaw.plugin.json"
 
