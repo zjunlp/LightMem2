@@ -720,6 +720,78 @@ function renderCacheAuditFingerprintGroups(groups) {
     + '</div>';
 }
 
+function findMatchingCacheAuditEntry(item, entries) {
+  if (!item || !Array.isArray(entries) || entries.length === 0) return null;
+  const exactResponseMatch = entries.find((entry) =>
+    entry
+    && entry.responsePromptCacheKey
+    && item.promptCacheKeyAfter
+    && entry.responsePromptCacheKey === item.promptCacheKeyAfter,
+  );
+  if (exactResponseMatch) return exactResponseMatch;
+  const exactRequestMatch = entries.find((entry) =>
+    entry
+    && entry.requestPromptCacheKey
+    && item.promptCacheKeyAfter
+    && entry.requestPromptCacheKey === item.promptCacheKeyAfter,
+  );
+  if (exactRequestMatch) return exactRequestMatch;
+  if (!item.at) return entries[0] || null;
+  const itemTime = new Date(item.at).getTime();
+  if (!Number.isFinite(itemTime)) return entries[0] || null;
+  let bestEntry = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const entry of entries) {
+    if (!entry?.at) continue;
+    const entryTime = new Date(entry.at).getTime();
+    if (!Number.isFinite(entryTime)) continue;
+    const delta = Math.abs(entryTime - itemTime);
+    if (delta > 15 * 1000) continue;
+    if (delta < bestDelta) {
+      bestEntry = entry;
+      bestDelta = delta;
+    }
+  }
+  return bestEntry || entries[0] || null;
+}
+
+function findMatchingCacheAuditGroup(entry, groups) {
+  if (!entry || !Array.isArray(groups) || groups.length === 0) return null;
+  return groups.find((group) =>
+    group && group.stablePrefixFingerprint === entry.stablePrefixFingerprint,
+  ) || null;
+}
+
+function renderPromptCacheTransition(item, matchedCacheEntry, matchedFingerprintGroup, cacheAuditSummary) {
+  const matchedFingerprint = matchedFingerprintGroup?.stablePrefixFingerprint
+    || matchedCacheEntry?.stablePrefixFingerprint
+    || "-";
+  const matchedRequestKey = matchedCacheEntry?.requestPromptCacheKey || "-";
+  const matchedResponseKey = matchedCacheEntry?.responsePromptCacheKey || "-";
+  const warmSummary = cacheAuditSummary && Number(cacheAuditSummary.warmCandidates || 0) > 0
+    ? fmtInt(cacheAuditSummary.warmHits || 0) + "/" + fmtInt(cacheAuditSummary.warmCandidates || 0)
+      + " (" + String(cacheAuditSummary.hitRatePercent || 0) + "%)"
+    : "0/0";
+  return '<div class="pass-list" style="margin-top:16px;">'
+    + '<div class="pass-item"><strong>Prefix Stability Snapshot</strong>'
+    + '<br />prompt cache transition=' + escapeHtml(item.promptCacheKeyBefore || "-")
+    + ' -> ' + escapeHtml(item.promptCacheKeyAfter || "-")
+    + '<br />matched fingerprint=' + escapeHtml(matchedFingerprint)
+    + ' · warm hits=' + escapeHtml(warmSummary)
+    + '<br />matched request key=' + escapeHtml(matchedRequestKey)
+    + '<br />matched response key=' + escapeHtml(matchedResponseKey)
+    + '</div>'
+    + '</div>';
+}
+
+function renderStabilityContextPanels(item) {
+  return '<div class="pass-list" style="margin-top:16px;">'
+    + '<div class="diff-block"><div class="pane-label">Developer Before</div><pre>' + escapeHtml(item.developerBefore || "") + '</pre></div>'
+    + '<div class="diff-block"><div class="pane-label">Developer Canonical</div><pre>' + escapeHtml(item.developerCanonical || "") + '</pre></div>'
+    + '<div class="diff-block"><div class="pane-label">Developer Forwarded</div><pre>' + escapeHtml(item.developerForwarded || "") + '</pre></div>'
+    + '</div>';
+}
+
 function buildReductionCallKey(item) {
   if (!item) return "";
   return String(item.requestId || "") + "::" + String(item.at || "");
@@ -935,16 +1007,22 @@ function renderStability(item) {
   const cacheAuditSummary = data.cacheAuditSummary || null;
   const recentCacheAudit = data.recentCacheAudit || [];
   const recentCacheAuditGroups = data.recentCacheAuditGroups || [];
-  el.panelTitle.textContent = "Stability";
+  const matchedCacheEntry = findMatchingCacheAuditEntry(item, recentCacheAudit);
+  const matchedFingerprintGroup = findMatchingCacheAuditGroup(matchedCacheEntry, recentCacheAuditGroups);
+  el.panelTitle.textContent = "Cache Stability";
   el.panelMeta.innerHTML = '<span>' + escapeHtml(fmtDate(item.at)) + '</span>'
     + '<span>target ' + escapeHtml(item.dynamicContextTarget) + '</span>'
     + '<span>model ' + escapeHtml(item.model || item.upstreamModel || "unknown") + '</span>';
   el.stats.innerHTML = [
     ["Cache key before", item.promptCacheKeyBefore || "-"],
     ["Cache key after", item.promptCacheKeyAfter || "-"],
+    ["Matched fingerprint", matchedFingerprintGroup?.stablePrefixFingerprint || matchedCacheEntry?.stablePrefixFingerprint || "-"],
     ["User rewrites", fmtInt(item.userContentRewrites)],
     ["Sender blocks", fmtInt(item.senderMetadataBlocksBefore) + " -> " + fmtInt(item.senderMetadataBlocksAfter)],
     ["First turn candidate", String(Boolean(item.firstTurnCandidate))],
+    ...(cacheAuditSummary
+      ? [["Warm hit rate", fmtInt(cacheAuditSummary.warmHits || 0) + "/" + fmtInt(cacheAuditSummary.warmCandidates || 0) + " (" + String(cacheAuditSummary.hitRatePercent || 0) + "%)"]]
+      : []),
   ].map(([label, value]) => '<div class="chip">' + escapeHtml(label) + ': ' + escapeHtml(value) + '</div>').join("");
   el.compareRoot.innerHTML = '<div class="pass-list">'
     + renderDiffBlock("Root Prompt -> Canonical", item.developerBefore, item.developerCanonical)
@@ -956,7 +1034,9 @@ function renderStability(item) {
       + '</div>'
     : "";
   el.passRoot.innerHTML =
-    dynamicContextBlock
+    renderPromptCacheTransition(item, matchedCacheEntry, matchedFingerprintGroup, cacheAuditSummary)
+    + renderStabilityContextPanels(item)
+    + dynamicContextBlock
     + renderCacheAuditPanel(cacheAuditSummary)
     + renderCacheAuditFingerprintGroups(recentCacheAuditGroups)
     + renderCacheAuditRecentTable(recentCacheAudit);

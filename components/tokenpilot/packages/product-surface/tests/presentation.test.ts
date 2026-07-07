@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import vm from "node:vm";
 
 import { buildSessionReportText, formatSessionReport, loadSessionReportData, renderSessionReport } from "../src/presentation.js";
 import { renderVisualPageHtml, renderVisualPageScript } from "../src/visual/session-visual-page.js";
@@ -93,6 +94,13 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   const script = renderVisualPageScript();
 
   assert.match(script, /Cache Audit/);
+  assert.match(script, /Cache Stability/);
+  assert.match(script, /Prefix Stability Snapshot/);
+  assert.match(script, /prompt cache transition=/);
+  assert.match(script, /matched fingerprint=/);
+  assert.match(script, /Developer Before/);
+  assert.match(script, /Developer Canonical/);
+  assert.match(script, /Developer Forwarded/);
   assert.match(script, /Fingerprint Group #/);
   assert.match(script, /Recent Cache Request #/);
   assert.match(script, /No reduction segments in this call/);
@@ -115,6 +123,11 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   assert.match(script, /cached tokens=/);
   assert.match(script, /entropy hotspots=/);
   assert.match(script, /drift hotspots=/);
+});
+
+test("renderVisualPageScript is syntactically valid javascript", () => {
+  const script = renderVisualPageScript();
+  assert.doesNotThrow(() => new vm.Script(script));
 });
 
 test("buildSessionReportText renders empty-state reports with overview", () => {
