@@ -65,6 +65,9 @@ LightMem2 is intended to host multiple long-running-agent components over time.
 * <a href='#commands'>💡 Commands</a>
 * <a href='#experimental-results'>📁 Experimental Results</a>
 * <a href='#citation'>📄 Citation</a>
+* <a href='#contributing'>🤝 Contributing</a>
+* <a href='#contributors'>🎉 Contributors</a>
+* <a href='#community'>💬 Community</a>
 
 <span id='news'/>
 
@@ -625,6 +628,13 @@ Please cite our paper if you use LightMem2 in your work.
 
 ```
 
+<span id='contributing'/>
+
+## 🤝 Contributing
+
+We welcome bug fixes, host adapter improvements, onboarding fixes, tests, and documentation updates, see [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+
+
 ## 🎉Contributors
 
 <a href="https://github.com/zjunlp/LightMem2/graphs/contributors">
@@ -632,7 +642,6 @@ Please cite our paper if you use LightMem2 in your work.
 </a>
 
 We thank all the contributors to this project, more contributors are welcome!
-
 #### Other Related Projects
 
 - [LLMLingua-2](https://github.com/microsoft/LLMLingua) — Token-level prompt compression
@@ -644,4 +653,9 @@ We thank all the contributors to this project, more contributors are welcome!
 - [LightMem](https://github.com/zjunlp/LightMem) — Lightweight memory-augmented generation
 - [Headroom](https://github.com/chopratejas/headroom) — Compresses everything when AI agent reads
 
-🙌 We thank all the contributors to this project, and welcome further contributions from the community. 
+<span id='community'/>
+
+## 💬 Community
+
+- [Discord](https://discord.gg/gHdVfWz3) — setup help, debugging, feedback, and user discussion
+- GitHub Issues — reproducible bugs, feature requests, and integration regressions
