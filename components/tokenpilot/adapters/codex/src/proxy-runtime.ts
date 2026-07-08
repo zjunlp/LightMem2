@@ -223,6 +223,10 @@ export async function startCodexResponsesProxy(params: {
         sessionId,
         model,
         stream: payload.stream === true,
+        originalRequestPromptCacheKey:
+          typeof prepared.envelope.metadata?.originalPromptCacheKey === "string"
+            ? prepared.envelope.metadata.originalPromptCacheKey
+            : null,
         requestPromptCacheKey:
           typeof prepared.envelope.metadata?.promptCacheKey === "string"
             ? prepared.envelope.metadata.promptCacheKey

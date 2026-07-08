@@ -22,10 +22,37 @@ function computeStablePromptCacheKey(model: string, stableTexts: string[]): stri
   return `lightmem2-codex-${digest}`;
 }
 
+type CodexPromptRewrite = ReturnType<typeof rewriteTextForStablePrefix>;
+
+function normalizeCodexAgentSeparator(text: string): string {
+  return String(text ?? "").replace(/agent=<AGENT_ID>\s+\|/g, "agent=<AGENT_ID>|");
+}
+
+function rewriteCodexPromptForStablePrefix(promptText: string): CodexPromptRewrite {
+  const rewrite = rewriteTextForStablePrefix(promptText);
+  return {
+    ...rewrite,
+    canonicalText: normalizeCodexAgentSeparator(rewrite.canonicalText),
+    forwardedText: normalizeCodexAgentSeparator(rewrite.forwardedText),
+  };
+}
+
+function scoreRootPromptCandidate(message: HostRequestEnvelope["messages"][number]): number {
+  const originalRole = (message as any)?.metadata?.__codexOriginalRole;
+  const text = extractContentText((message as any)?.content);
+  let score = 0;
+  if (originalRole === "developer") score += 4;
+  else if (originalRole === "system") score += 2;
+  if (/Your working directory is:/i.test(text)) score += 2;
+  if (/Runtime:\s*agent=/i.test(text)) score += 2;
+  return score;
+}
+
 function findRootPromptCandidate(messages: HostRequestEnvelope["messages"]): {
   index: number;
   text: string;
 } | null {
+  let best: { index: number; text: string; score: number } | null = null;
   for (let index = 0; index < messages.length; index += 1) {
     const message = messages[index] as any;
     if (!message || typeof message !== "object") continue;
@@ -33,9 +60,37 @@ function findRootPromptCandidate(messages: HostRequestEnvelope["messages"]): {
     const originalRole = message.metadata?.__codexOriginalRole;
     if (originalRole !== "developer" && originalRole !== "system") continue;
     const text = extractContentText(message.content);
-    if (text.trim()) return { index, text };
+    if (!text.trim()) continue;
+    const score = scoreRootPromptCandidate(message);
+    if (!best || score > best.score) {
+      best = { index, text, score };
+    }
   }
-  return null;
+  return best ? { index: best.index, text: best.text } : null;
+}
+
+function mergeDynamicContextTexts(...texts: Array<string | undefined>): string {
+  const merged: string[] = [];
+  for (const text of texts) {
+    for (const line of String(text ?? "").split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || merged.includes(trimmed)) continue;
+      merged.push(trimmed);
+    }
+  }
+  return merged.join("\n");
+}
+
+function uniqueStablePromptParts(stableTexts: string[]): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const text of stableTexts) {
+    const normalized = text.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(text);
+  }
+  return unique;
 }
 
 function hasDeveloperDynamicContextMessage(
@@ -90,14 +145,21 @@ export function prepareCodexStablePrefix(
   config: TokenPilotCodexConfig,
 ): HostRequestEnvelope {
   if (!config.modules.stabilizer || config.proxyMode.pureForward) return envelope;
+  const originalPromptCacheKey =
+    typeof envelope.metadata?.promptCacheKey === "string" && envelope.metadata.promptCacheKey.trim().length > 0
+      ? envelope.metadata.promptCacheKey
+      : undefined;
 
   const candidate = findRootPromptCandidate(envelope.messages);
   const instructionText = typeof envelope.instructions === "string" ? envelope.instructions : "";
   const instructionRewrite = instructionText.trim()
-    ? rewriteTextForStablePrefix(instructionText)
+    ? rewriteCodexPromptForStablePrefix(instructionText)
     : null;
-  const rootRewrite = candidate ? rewriteTextForStablePrefix(candidate.text) : null;
-  const dynamicContextText = rootRewrite?.dynamicContextText || instructionRewrite?.dynamicContextText || "";
+  const rootRewrite = candidate ? rewriteCodexPromptForStablePrefix(candidate.text) : null;
+  const dynamicContextText = mergeDynamicContextTexts(
+    instructionRewrite?.dynamicContextText,
+    rootRewrite?.dynamicContextText,
+  );
   const target = config.hooks.dynamicContextTarget;
 
   let rewrittenEnvelope = envelope;
@@ -132,18 +194,16 @@ export function prepareCodexStablePrefix(
     });
   }
 
-  const stablePromptParts = [
+  const stablePromptParts = uniqueStablePromptParts([
     instructionRewrite?.canonicalText ?? instructionText,
     rootRewrite?.canonicalText ?? candidate?.text ?? "",
-  ];
-  const existingPromptCacheKey =
-    typeof rewrittenEnvelope.metadata?.promptCacheKey === "string"
-      ? rewrittenEnvelope.metadata.promptCacheKey.trim()
-      : "";
+  ]);
+  const nextPromptCacheKey = computeStablePromptCacheKey(envelope.model, stablePromptParts);
 
   const nextMetadata = {
     ...(rewrittenEnvelope.metadata ?? {}),
-    promptCacheKey: existingPromptCacheKey || computeStablePromptCacheKey(envelope.model, stablePromptParts),
+    originalPromptCacheKey,
+    promptCacheKey: nextPromptCacheKey,
     promptCacheRetention: "24h",
   };
 

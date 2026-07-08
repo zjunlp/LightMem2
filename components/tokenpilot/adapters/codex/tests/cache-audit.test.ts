@@ -16,6 +16,7 @@ function record(overrides: Partial<CodexCacheAuditRecord>): CodexCacheAuditRecor
     },
     entropyFindings: [],
     driftReasons: [],
+    originalRequestPromptCacheKey: "host-req-1",
     requestPromptCacheKey: "req-1",
     responsePromptCacheKey: "req-1",
     cachedInputTokens: 0,

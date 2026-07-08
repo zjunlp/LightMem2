@@ -61,6 +61,9 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
         proxyPort,
         stateDir,
         upstreamProvider: "OpenAI",
+        ux: {
+          details: true,
+        } as any,
         hooks: {
           dynamicContextTarget: "user",
         },
@@ -157,7 +160,7 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
     assert.equal(upstream.requests.length, 1);
     assert.equal(upstream.requests[0]?.model, "gpt-5.4-mini");
     assert.match(String(upstream.requests[0]?.instructions ?? ""), /Your working directory is: \/repo\/demo/);
-    assert.match(String(upstream.requests[0]?.instructions ?? ""), /Runtime: agent=agent-123 \|/);
+    assert.doesNotMatch(String(upstream.requests[0]?.instructions ?? ""), /Runtime: agent=agent-123 \|/);
     assertRecoveryProtocolText(String(upstream.requests[0]?.instructions ?? ""));
     assert.equal(Array.isArray(upstream.requests[0]?.tools), true);
     assert.equal((upstream.requests[0]?.tools as Array<any>)[0]?.function?.name, "a_tool");
@@ -250,6 +253,7 @@ test("Codex host e2e wires install, proxy reduction, report/visual, and MCP reco
       .map((line) => JSON.parse(line) as Record<string, unknown>);
     assert.equal(cacheAuditLines.length > 0, true);
     assert.equal(typeof cacheAuditLines[0]?.stablePrefixFingerprint, "string");
+    assert.equal(cacheAuditLines[0]?.originalRequestPromptCacheKey, null);
     assert.equal(typeof cacheAuditLines[0]?.requestPromptCacheKey, "string");
     assert.equal(Array.isArray(cacheAuditLines[0]?.entropyFindings), true);
     assert.equal(Array.isArray(cacheAuditLines[0]?.driftReasons), true);
@@ -468,6 +472,7 @@ test("Codex cold and warm requests expose prompt cache hit usage when stable pre
       const requestBody = {
         model: "tokenpilot/gpt-5.4-mini",
         stream: false,
+        prompt_cache_key: "pk-codex-warm-session-1",
         instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
         input: [
           {
@@ -499,7 +504,129 @@ test("Codex cold and warm requests expose prompt cache hit usage when stable pre
       const bodyB = await responseB.json() as Record<string, unknown>;
       assert.equal(typeof upstream.requests[0]?.prompt_cache_key, "string");
       assert.equal(upstream.requests[0]?.prompt_cache_key, upstream.requests[1]?.prompt_cache_key);
+      assert.notEqual(upstream.requests[0]?.prompt_cache_key, "pk-codex-warm-session-1");
       assertColdWarmCacheUsage([bodyA.usage, bodyB.usage]);
+
+      const sessions = await readVisualSessionList(stateDir);
+      const targetSession = sessions.find((entry) => Number(entry.cacheAuditSummary?.warmHits ?? 0) > 0);
+      assert.equal(typeof targetSession?.sessionId, "string");
+      const sessionId = String(targetSession?.sessionId ?? "");
+      assert.match(sessionId, /^codex-synth-/);
+      assert.equal(targetSession?.cacheAuditSummary?.warmCandidates, 1);
+      assert.equal(targetSession?.cacheAuditSummary?.warmHits, 1);
+      assert.equal(targetSession?.cacheAuditSummary?.warmMisses, 0);
+
+      const visual = await readVisualSessionData(stateDir, sessionId);
+      assert.equal(visual.cacheAuditSummary?.warmCandidates, 1);
+      assert.equal(visual.cacheAuditSummary?.warmHits, 1);
+      assert.equal(visual.cacheAuditSummary?.warmMisses, 0);
+      assert.equal((visual.recentCacheAudit?.length ?? 0) >= 2, true);
+      assert.equal(visual.recentCacheAudit?.[0]?.diagnosis.matchedResult, "warm hit");
+      assert.equal((visual.recentCacheAudit?.[0]?.cachedInputTokens ?? 0) > 0, true);
+      assert.deepEqual(visual.recentCacheAudit?.[0]?.driftKeys ?? [], []);
+
+      const warmFingerprintGroup = visual.recentCacheAuditGroups?.find((group) => group.warmHitCount > 0);
+      assert.equal(typeof warmFingerprintGroup?.stablePrefixFingerprint, "string");
+      assert.equal(warmFingerprintGroup?.warmHitCount, 1);
+    } finally {
+      await runtime.close();
+      await upstream.close();
+    }
+  });
+});
+
+test("Codex rewrites different inbound prompt_cache_key values to the same stable upstream key", async () => {
+  await withTempHome("lightmem2-codex-force-key-rewrite-", async (homeDir) => {
+    const proxyPort = await reserveUnusedPort();
+    const stateDir = join(homeDir, ".codex", "tokenpilot-state", "tokenpilot");
+    const codexConfigPath = defaultCodexConfigPath();
+    const tokenPilotConfigPath = defaultTokenPilotConfigPath();
+    const upstream = await startMockCachingJsonUpstream();
+
+    await mkdir(join(homeDir, ".codex"), { recursive: true });
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({
+        proxyPort,
+        stateDir,
+        upstreamProvider: "OpenAI",
+        hooks: {
+          dynamicContextTarget: "user",
+        },
+        reduction: {
+          triggerMinChars: 999999,
+          maxToolChars: 999999,
+          passes: {
+            readStateCompaction: false,
+            toolPayloadTrim: false,
+            htmlSlimming: false,
+            execOutputTruncation: false,
+            agentsStartupOptimization: false,
+          },
+        },
+      }),
+      tokenPilotConfigPath,
+    );
+
+    const codexToml = [
+      "model_provider = \"tokenpilot\"",
+      "",
+      "[model_providers.tokenpilot]",
+      "name = \"TokenPilot\"",
+      `base_url = ${JSON.stringify(`http://127.0.0.1:${proxyPort}/v1`)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+      "[model_providers.OpenAI]",
+      "name = \"OpenAI\"",
+      `base_url = ${JSON.stringify(upstream.baseUrl)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n");
+    await writeFile(codexConfigPath, codexToml, "utf8");
+
+    const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+    const runtime = await startCodexResponsesProxy({
+      config,
+      logger: createConsoleLogger(false),
+      codexConfigPath,
+    });
+
+    try {
+      const makeBody = (promptCacheKey: string) => JSON.stringify({
+        model: "tokenpilot/gpt-5.4-mini",
+        stream: false,
+        prompt_cache_key: promptCacheKey,
+        instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+        input: [
+          {
+            role: "developer",
+            content: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: "say hi" }],
+          },
+        ],
+      });
+
+      const responseA = await fetch(`${runtime.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: makeBody("legacy-key-a"),
+      });
+      const responseB = await fetch(`${runtime.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: makeBody("legacy-key-b"),
+      });
+
+      assert.equal(responseA.status, 200);
+      assert.equal(responseB.status, 200);
+      assert.equal(typeof upstream.requests[0]?.prompt_cache_key, "string");
+      assert.equal(upstream.requests[0]?.prompt_cache_key, upstream.requests[1]?.prompt_cache_key);
+      assert.notEqual(upstream.requests[0]?.prompt_cache_key, "legacy-key-a");
+      assert.notEqual(upstream.requests[1]?.prompt_cache_key, "legacy-key-b");
     } finally {
       await runtime.close();
       await upstream.close();
@@ -629,13 +756,166 @@ test("Codex requests reuse synth sessions through prompt_cache_key when previous
         assert.equal(bindings[1]?.sessionId, latestSessionId);
         assert.equal(bindings[0]?.responseId, "resp-pk-1");
         assert.equal(bindings[1]?.responseId, "resp-pk-2");
-        assert.equal(requests[0]?.prompt_cache_key, "pk-codex-session-1");
-        assert.equal(requests[1]?.prompt_cache_key, "pk-codex-session-1");
+        assert.equal(typeof requests[0]?.prompt_cache_key, "string");
+        assert.equal(requests[0]?.prompt_cache_key, requests[1]?.prompt_cache_key);
+        assert.notEqual(requests[0]?.prompt_cache_key, "pk-codex-session-1");
       } finally {
         await runtime.close();
       }
     } finally {
       await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  });
+});
+
+test("Codex cache audit reports cold miss and drift key when stable prefix changes", async () => {
+  await withTempHome("lightmem2-codex-cache-drift-", async (homeDir) => {
+    const proxyPort = await reserveUnusedPort();
+    const stateDir = join(homeDir, ".codex", "tokenpilot-state", "tokenpilot");
+    const codexConfigPath = defaultCodexConfigPath();
+    const tokenPilotConfigPath = defaultTokenPilotConfigPath();
+
+    const upstream = await startMockCachingJsonUpstream();
+    await mkdir(join(homeDir, ".codex"), { recursive: true });
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({
+        proxyPort,
+        stateDir,
+        upstreamProvider: "OpenAI",
+        hooks: {
+          dynamicContextTarget: "user",
+        },
+        reduction: {
+          triggerMinChars: 999999,
+          maxToolChars: 999999,
+          passes: {
+            readStateCompaction: false,
+            toolPayloadTrim: false,
+            htmlSlimming: false,
+            execOutputTruncation: false,
+            agentsStartupOptimization: false,
+          },
+        },
+      }),
+      tokenPilotConfigPath,
+    );
+
+    const codexToml = [
+      "model_provider = \"tokenpilot\"",
+      "",
+      "[model_providers.tokenpilot]",
+      "name = \"TokenPilot\"",
+      `base_url = ${JSON.stringify(`http://127.0.0.1:${proxyPort}/v1`)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+      "[model_providers.OpenAI]",
+      "name = \"OpenAI\"",
+      `base_url = ${JSON.stringify(upstream.baseUrl)}`,
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n");
+    await writeFile(codexConfigPath, codexToml, "utf8");
+
+    const config = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+    const runtime = await startCodexResponsesProxy({
+      config,
+      logger: createConsoleLogger(false),
+      codexConfigPath,
+    });
+
+    try {
+      const shared = {
+        model: "tokenpilot/gpt-5.4-mini",
+        stream: false,
+        input: [
+          {
+            role: "developer",
+            content: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: "say hi" }],
+          },
+        ],
+      };
+
+      const requestA = {
+        ...shared,
+        instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+      };
+      const requestB = {
+        ...shared,
+        instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+      };
+      const requestC = {
+        ...shared,
+        instructions: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nUse concise bullets.",
+        input: [
+          {
+            role: "developer",
+            content: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nUse concise bullets.",
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: "say hi" }],
+          },
+        ],
+      };
+
+      const responseA = await fetch(`${runtime.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestA),
+      });
+      const bodyA = await responseA.json() as Record<string, unknown>;
+      const responseB = await fetch(`${runtime.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...requestB,
+          previous_response_id: bodyA.id,
+        }),
+      });
+      const bodyB = await responseB.json() as Record<string, unknown>;
+      const responseC = await fetch(`${runtime.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...requestC,
+          previous_response_id: bodyB.id,
+        }),
+      });
+
+      assert.equal(responseA.status, 200);
+      assert.equal(responseB.status, 200);
+      assert.equal(responseC.status, 200);
+
+      const bodyC = await responseC.json() as Record<string, unknown>;
+      assertColdWarmCacheUsage([bodyA.usage, bodyB.usage]);
+      assert.equal((bodyC.usage as Record<string, unknown>)?.cache_read_input_tokens ?? 0, 0);
+
+      const sessions = await readVisualSessionList(stateDir);
+      const targetSession = sessions.find((entry) => Number(entry.cacheAuditSummary?.warmHits ?? 0) > 0);
+      assert.equal(typeof targetSession?.sessionId, "string");
+      const sessionId = String(targetSession?.sessionId ?? "");
+
+      const visual = await readVisualSessionData(stateDir, sessionId);
+      assert.equal(visual.cacheAuditSummary?.warmCandidates, 1);
+      assert.equal(visual.cacheAuditSummary?.warmHits, 1);
+      assert.equal(visual.cacheAuditSummary?.warmMisses, 0);
+      assert.equal(visual.cacheAuditSummary?.hitRatePercent, 100);
+
+      const diagnosticEntry = visual.recentCacheAudit?.find((entry) => entry.diagnosis.matchedResult !== "warm hit");
+      assert.equal(typeof diagnosticEntry?.stablePrefixFingerprint, "string");
+      assert.equal(diagnosticEntry?.cachedInputTokens, 0);
+      assert.equal(diagnosticEntry?.diagnosis.matchedResult, "cold start");
+      assert.match(diagnosticEntry?.diagnosis.currentState ?? "", /Cold start/i);
+      assert.match(diagnosticEntry?.diagnosis.optimizationHint ?? "", /(Session-local|Cold start)/i);
+    } finally {
+      await runtime.close();
+      await upstream.close();
     }
   });
 });
@@ -1004,6 +1284,7 @@ test("Codex proxy merges hook-observed metadata into the synthesized session whe
         const latest = JSON.parse(latestRaw) as { sessionId?: string };
         const synthSessionId = String(latest.sessionId ?? "");
         assert.match(synthSessionId, /^codex-synth-/);
+        assert.notEqual(synthSessionId, "019f-real-codex-session");
 
         const synthSnapshotRaw = await readFile(
           join(stateDir, "session-state", "sessions", `${encodeURIComponent(synthSessionId)}.json`),

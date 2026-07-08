@@ -39,6 +39,7 @@ export function buildCodexCacheAuditSnapshot(params: {
   sessionId: string;
   model: string;
   stream: boolean;
+  originalRequestPromptCacheKey?: string | null;
   requestPromptCacheKey?: string | null;
 }): CacheAuditSnapshot {
   return buildCacheAuditSnapshot(params);
