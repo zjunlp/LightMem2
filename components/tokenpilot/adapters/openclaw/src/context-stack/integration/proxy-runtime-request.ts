@@ -478,6 +478,7 @@ export async function prepareProxyRequest(args: {
     sessionId: resolvedSessionId,
     model: requestEnvelope.model,
     stream: requestEnvelope.stream,
+    originalRequestPromptCacheKey: originalPromptCacheKey || null,
     requestPromptCacheKey:
       typeof requestEnvelope.metadata?.promptCacheKey === "string"
         ? requestEnvelope.metadata.promptCacheKey

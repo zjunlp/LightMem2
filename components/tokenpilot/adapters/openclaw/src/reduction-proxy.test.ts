@@ -267,6 +267,40 @@ test("rewritePayloadForStablePrefix derives different cache keys for different s
   assert.notEqual(outA.promptCacheKey, outB.promptCacheKey);
 });
 
+test("rewritePayloadForStablePrefix overrides inbound prompt_cache_key and converges legacy keys for the same stable prefix", () => {
+  const makePayload = (promptCacheKey: string) => ({
+    prompt_cache_key: promptCacheKey,
+    instructions: "Global instructions A",
+    input: [
+      {
+        role: "developer",
+        content: "Developer prompt A\nYour working directory is: /tmp/demo",
+      },
+      {
+        role: "user",
+        content: "Please continue.",
+      },
+    ],
+  });
+
+  const payloadA = makePayload("legacy-key-a");
+  const payloadB = makePayload("legacy-key-b");
+
+  const outA = hooks.rewritePayloadForStablePrefix(payloadA, "tokenpilot/gpt-5.4-mini", {
+    dynamicContextTarget: "developer",
+  });
+  const outB = hooks.rewritePayloadForStablePrefix(payloadB, "tokenpilot/gpt-5.4-mini", {
+    dynamicContextTarget: "developer",
+  });
+
+  assert.match(outA.promptCacheKey, /^runtime-pfx-/);
+  assert.equal(outA.promptCacheKey, payloadA.prompt_cache_key);
+  assert.equal(outB.promptCacheKey, payloadB.prompt_cache_key);
+  assert.equal(outA.promptCacheKey, outB.promptCacheKey);
+  assert.notEqual(outA.promptCacheKey, "legacy-key-a");
+  assert.notEqual(outB.promptCacheKey, "legacy-key-b");
+});
+
 test("applyProxyReductionToInput still runs with policy-only before-call modules", async () => {
   const cfg = hooks.normalizeConfig({
     modules: {

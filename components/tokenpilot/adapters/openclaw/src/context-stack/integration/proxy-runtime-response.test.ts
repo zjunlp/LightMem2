@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PassThrough, Readable, Writable } from "node:stream";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { handleNonStreamingProxyResponse, handleStreamingProxyResponse } from "./proxy-runtime-response.js";
 
@@ -165,7 +168,6 @@ test("handleNonStreamingProxyResponse forwards reduced JSON response and records
 test("handleStreamingProxyResponse forwards stream and records stream ux after finish", async () => {
   const recordedUx: any[] = [];
   const traces: any[] = [];
-  const cacheAuditRecords: any[] = [];
   const stream = Readable.from([
     Buffer.from('data: {"response":{"prompt_cache_key":"pk-stream-2"}}\n\n'),
     Buffer.from('data: {"usage":{"input_tokens":120,"input_tokens_details":{"cached_tokens":80}}}\n\n'),
@@ -242,5 +244,83 @@ test("handleStreamingProxyResponse forwards stream and records stream ux after f
   assert.equal(recordedUx.length, 1);
   assert.equal(recordedUx[0].savedCount, "hello original canonical".length - "hello reduced canonical".length);
   assert.equal(traces.some((item) => item.stage === "proxy_stream_forward"), true);
-  assert.equal(cacheAuditRecords.length, 0);
+});
+
+test("handleStreamingProxyResponse records cache-audit response prompt_cache_key and usage from SSE stream", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-stream-cache-audit-"));
+  const stream = Readable.from([
+    Buffer.from('data: {"response":{"prompt_cache_key":"pk-stream-2"}}\n\n'),
+    Buffer.from('data: {"usage":{"input_tokens":120,"input_tokens_details":{"cached_tokens":80}}}\n\n'),
+    Buffer.from('data: {"type":"response.output_text.done","text":"Hello world"}\n\n'),
+    Buffer.from("data: [DONE]\n\n"),
+  ]);
+  const res = createMockResponse();
+
+  try {
+    await handleStreamingProxyResponse({
+      cfg: {
+        stateDir,
+      },
+      res,
+      helpers: {
+        requestUpstreamResponsesStream: async () => ({
+          status: 200,
+          headers: { "content-type": "text/event-stream; charset=utf-8" },
+          stream,
+          transport: "fetch",
+        }),
+        appendTaskStateTrace: async () => undefined,
+        extractProviderResponseText: () => "Hello world",
+        contentToText: (value: unknown) => String(value ?? ""),
+        countTokensWithFallback: async (_model: string, text: string) => ({
+          count: text.length,
+          mode: "chars" as const,
+        }),
+        recordUxEffect: async () => undefined,
+      },
+      logger: {
+        warn: () => undefined,
+        info: () => undefined,
+        error: () => undefined,
+        debug: () => undefined,
+      },
+      upstream: {
+        baseUrl: "https://example.com/v1",
+        apiKey: "test-key",
+        apiFamily: "openai-responses",
+      },
+      activePayload: {
+        input: [{ role: "user", content: "hello" }],
+      },
+      resolvedSessionId: "session-stream",
+      model: "tokenpilot/gpt-5.4-mini",
+      upstreamModel: "gpt-5.4-mini",
+      proxyPureForward: false,
+      originalInputText: "hello original",
+      afterReductionInputText: "hello reduced",
+      beforeReductionCanonicalInput: "hello original canonical",
+      afterReductionCanonicalInput: "hello reduced canonical",
+      reductionApplied: { savedChars: 10 },
+      cacheAuditSnapshot: {
+        sessionId: "session-stream",
+        model: "tokenpilot/gpt-5.4-mini",
+        stream: true,
+        stablePrefixFingerprint: "fp-stream",
+        stablePrefix: { schemaVersion: 1, stableCore: [], semiStableContext: [] },
+        entropyFindings: [],
+        driftReasons: [],
+        requestPromptCacheKey: "pk-stream-1",
+      },
+    } as any);
+
+    const raw = await readFile(join(stateDir, "cache-audit.jsonl"), "utf8");
+    const records = raw.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    assert.equal(records.length, 1);
+    assert.equal(records[0]?.requestPromptCacheKey, "pk-stream-1");
+    assert.equal(records[0]?.responsePromptCacheKey, "pk-stream-2");
+    assert.equal(records[0]?.cachedInputTokens, 80);
+    assert.equal(records[0]?.baselineKind, "none");
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });

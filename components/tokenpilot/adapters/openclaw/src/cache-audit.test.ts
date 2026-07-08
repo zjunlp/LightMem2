@@ -16,6 +16,7 @@ function makeRecord(overrides: Partial<OpenClawCacheAuditRecord>): OpenClawCache
     },
     entropyFindings: [],
     driftReasons: [],
+    originalRequestPromptCacheKey: "host-pk-1",
     requestPromptCacheKey: "pk-1",
     responsePromptCacheKey: "pk-1",
     cachedInputTokens: 0,
