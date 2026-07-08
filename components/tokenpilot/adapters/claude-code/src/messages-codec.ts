@@ -212,16 +212,21 @@ export function createClaudeMessagesPayloadCodec(
     },
     encodeRequest(envelope): unknown {
       const payload = asRecord(envelope.rawPayload);
-        const nextPayload: Record<string, unknown> = {
-          ...payload,
-          model: envelope.model,
-          stream: envelope.stream,
-          messages: envelope.messages.map((message) => hostMessageToAnthropicMessage(message)),
-        };
+      const nextPayload: Record<string, unknown> = {
+        ...payload,
+        model: envelope.model,
+        stream: envelope.stream,
+        messages: envelope.messages.map((message) => hostMessageToAnthropicMessage(message)),
+      };
       if (Array.isArray(envelope.tools)) nextPayload.tools = envelope.tools;
       else delete nextPayload.tools;
       if (typeof envelope.instructions === "string") nextPayload.system = envelope.instructions;
       else delete nextPayload.system;
+      if (typeof envelope.metadata?.promptCacheKey === "string") {
+        nextPayload.prompt_cache_key = envelope.metadata.promptCacheKey;
+      } else {
+        delete nextPayload.prompt_cache_key;
+      }
       return nextPayload;
     },
     decodeResponse(rawResponse): HostResponseEnvelope {

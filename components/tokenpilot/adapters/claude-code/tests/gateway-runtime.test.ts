@@ -833,12 +833,17 @@ test("gateway runtime applies stable-prefix rewrite before forwarding", async ()
     assert.equal(requestResp.status, 200);
     assert.equal(seenPayloads.length, 1);
     assert.equal(seenPayloads[0]?.model, "claude-sonnet-4-6");
-    assertStablePrefixRewrite({
-      sanitizedPromptText: String(seenPayloads[0]?.system ?? ""),
-      dynamicContextText: String(((seenPayloads[0]?.messages as Array<Record<string, unknown>>)?.[0]?.content as Array<Record<string, unknown>>)?.[0]?.text ?? ""),
-      workdir: "/tmp/demo",
-      agentId: "agent-123",
-    });
+    assert.match(String(seenPayloads[0]?.prompt_cache_key ?? ""), /^lightmem2-claude-/);
+    assert.match(String(seenPayloads[0]?.system ?? ""), /Your working directory is: \/tmp\/demo/);
+    assert.doesNotMatch(String(seenPayloads[0]?.system ?? ""), /Runtime: agent=agent-123\s*\|/);
+    assert.match(
+      String(((seenPayloads[0]?.messages as Array<Record<string, unknown>>)?.[0]?.content as Array<Record<string, unknown>>)?.[0]?.text ?? ""),
+      /WORKDIR: \/tmp\/demo/,
+    );
+    assert.match(
+      String(((seenPayloads[0]?.messages as Array<Record<string, unknown>>)?.[0]?.content as Array<Record<string, unknown>>)?.[0]?.text ?? ""),
+      /AGENT_ID: agent-123/,
+    );
     assert.match(String(seenPayloads[0]?.system ?? ""), /Be precise\./);
     assertRecoveryProtocolText(String(seenPayloads[0]?.system ?? ""));
     const forwardedMessages = seenPayloads[0]?.messages as Array<Record<string, unknown>>;
@@ -923,8 +928,250 @@ test("gateway runtime supports developer-targeted stable-prefix injection", asyn
     assert.equal(visual.stability.length, 1);
     assert.equal(visual.stability[0]?.dynamicContextTarget, "developer");
     assert.match(visual.stability[0]?.developerForwarded ?? "", /WORKDIR: \/tmp\/demo/);
+    assert.match(String(seenPayloads[0]?.prompt_cache_key ?? ""), /^lightmem2-claude-/);
   } finally {
     await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("gateway runtime reuses the same Claude prompt_cache_key for the same stable prefix", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-cache-key-"));
+  const proxyPort = await reserveUnusedPort();
+  const seenPayloads: Record<string, unknown>[] = [];
+  const forwarder: HostGatewayForwarder = {
+    async request(params) {
+      seenPayloads.push(params.payload as Record<string, unknown>);
+      return {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+        text: JSON.stringify({
+          id: "msg_test_cache_key",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+        }),
+      };
+    },
+    async requestStream() {
+      throw new Error("stream path should not be used in this test");
+    },
+  };
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      hooks: {
+        dynamicContextTarget: "user",
+      },
+    }),
+    logger: createConsoleLogger(false),
+    forwarder,
+  });
+
+  try {
+    for (const agentId of ["agent-123", "agent-456"]) {
+      const requestResp = await fetch(`${runtime.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-session-id": "sess-runtime-cache-key",
+        },
+        body: JSON.stringify({
+          model: "tokenpilot/claude-sonnet-4-6",
+          stream: false,
+          system: `Your working directory is: /tmp/demo\nRuntime: agent=${agentId} |\nBe precise.`,
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: "hello" }],
+            },
+          ],
+          max_tokens: 256,
+        }),
+      });
+      assert.equal(requestResp.status, 200);
+    }
+
+    assert.equal(seenPayloads.length, 2);
+    assert.equal(seenPayloads[0]?.prompt_cache_key, seenPayloads[1]?.prompt_cache_key);
+  } finally {
+    await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("gateway runtime overrides inbound Claude prompt_cache_key and converges legacy keys for the same stable prefix", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-force-cache-key-"));
+  const proxyPort = await reserveUnusedPort();
+  const seenPayloads: Record<string, unknown>[] = [];
+  const forwarder: HostGatewayForwarder = {
+    async request(params) {
+      seenPayloads.push(params.payload as Record<string, unknown>);
+      return {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+        text: JSON.stringify({
+          id: `msg_force_cache_${seenPayloads.length}`,
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+        }),
+      };
+    },
+    async requestStream() {
+      throw new Error("stream path should not be used in this test");
+    },
+  };
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      hooks: {
+        dynamicContextTarget: "user",
+      },
+    }),
+    logger: createConsoleLogger(false),
+    forwarder,
+  });
+
+  try {
+    for (const inboundKey of ["legacy-key-a", "legacy-key-b"]) {
+      const response = await fetch(`${runtime.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-session-id": "sess-runtime-force-cache-key",
+        },
+        body: JSON.stringify({
+          model: "tokenpilot/claude-sonnet-4-6",
+          stream: false,
+          prompt_cache_key: inboundKey,
+          system: "Your working directory is: /tmp/demo\nRuntime: agent=agent-123 |\nBe precise.",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: "hello" }],
+            },
+          ],
+          max_tokens: 256,
+        }),
+      });
+      assert.equal(response.status, 200);
+    }
+
+    assert.equal(seenPayloads.length, 2);
+    assert.equal(typeof seenPayloads[0]?.prompt_cache_key, "string");
+    assert.equal(seenPayloads[0]?.prompt_cache_key, seenPayloads[1]?.prompt_cache_key);
+    assert.notEqual(seenPayloads[0]?.prompt_cache_key, "legacy-key-a");
+    assert.notEqual(seenPayloads[1]?.prompt_cache_key, "legacy-key-b");
+  } finally {
+    await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("gateway runtime caches unsupported prompt_cache_key for Anthropic-compatible upstreams and skips retry later", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-claude-gateway-capability-"));
+  const proxyPort = await reserveUnusedPort();
+  const seenRequests: Array<Record<string, unknown>> = [];
+  const upstream = await startTestJsonServer((_req, body) => {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    seenRequests.push(parsed);
+    if ("prompt_cache_key" in parsed) {
+      return {
+        status: 400,
+        payload: {
+          error: {
+            message: "Unsupported parameter: prompt_cache_key",
+            type: "bad_response_status_code",
+            param: "",
+            code: "bad_response_status_code",
+          },
+        },
+      };
+    }
+    return {
+      payload: {
+        id: `msg_cap_${seenRequests.length}`,
+        type: "message",
+        role: "assistant",
+        content: [{ type: "text", text: "ok" }],
+      },
+    };
+  });
+
+  const runtime = await startClaudeCodeGatewayRuntime({
+    config: normalizeTokenPilotClaudeCodeConfig({
+      stateDir: join(dir, "state"),
+      proxyPort,
+      upstreamBaseUrl: `${upstream.baseUrl}/anthropic`,
+      hooks: {
+        dynamicContextTarget: "user",
+      },
+    }),
+    logger: createConsoleLogger(false),
+  });
+
+  try {
+    const requestBody = JSON.stringify({
+      model: "tokenpilot/claude-sonnet-4-6",
+      stream: false,
+      system: "Your working directory is: /tmp/demo\nRuntime: agent=agent-123 |\nBe precise.",
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "hello" }],
+        },
+      ],
+      max_tokens: 256,
+    });
+
+    const first = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-session-id": "sess-runtime-capability-1",
+      },
+      body: requestBody,
+    });
+    const second = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-session-id": "sess-runtime-capability-1",
+      },
+      body: requestBody,
+    });
+
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(seenRequests.length, 3);
+    assert.equal(typeof seenRequests[0]?.prompt_cache_key, "string");
+    assert.equal("prompt_cache_key" in (seenRequests[1] ?? {}), false);
+    assert.equal("prompt_cache_key" in (seenRequests[2] ?? {}), false);
+
+    const capabilityRaw = await readFile(
+      join(
+        dir,
+        "state",
+        "upstream-capabilities",
+        "anthropic-messages",
+        encodeURIComponent(`${upstream.baseUrl}/anthropic/v1/messages`) + ".json",
+      ),
+      "utf8",
+    );
+    const capability = JSON.parse(capabilityRaw) as { unsupportedOptionalFields?: string[] };
+    assert.deepEqual(capability.unsupportedOptionalFields, ["prompt_cache_key"]);
+  } finally {
+    await runtime.close();
+    await upstream.close();
     await rm(dir, { recursive: true, force: true });
   }
 });

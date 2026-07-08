@@ -5,6 +5,8 @@ import {
   createClaudeMessagesPayloadCodec,
   extractMessagesInputText,
 } from "../src/messages-codec.js";
+import { normalizeTokenPilotClaudeCodeConfig } from "../src/config.js";
+import { prepareClaudeStablePrefix } from "../src/stable-prefix.js";
 
 test("extractMessagesInputText flattens Anthropic content blocks", () => {
   const text = extractMessagesInputText([
@@ -122,4 +124,32 @@ test("claude request path canonicalizes tools before encode", async () => {
   assert.equal(encoded.tools[1]?.name, "z_tool");
   assert.deepEqual(Object.keys(encoded.tools[0]?.input_schema?.properties ?? {}), ["a", "b"]);
   assert.deepEqual(Object.keys(encoded.tools[1]?.input_schema?.properties ?? {}), ["a", "z"]);
+});
+
+test("claude stable prefix rewrites inbound prompt_cache_key before encode", () => {
+  const codec = createClaudeMessagesPayloadCodec();
+  const request = codec.decodeRequest({
+    model: "claude-sonnet-4-6",
+    stream: false,
+    system: "Your working directory is: /repo/demo\nRuntime: agent=agent-123 |\nBe precise.",
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "hello" }],
+      },
+    ],
+    prompt_cache_key: "legacy-key-a",
+    metadata: { sessionId: "sess-cache-key-rewrite" },
+  });
+
+  const prepared = prepareClaudeStablePrefix(request, normalizeTokenPilotClaudeCodeConfig({
+    hooks: {
+      dynamicContextTarget: "user",
+    },
+  }));
+  const encoded = codec.encodeRequest(prepared) as Record<string, unknown>;
+
+  assert.equal(typeof encoded.prompt_cache_key, "string");
+  assert.notEqual(encoded.prompt_cache_key, "legacy-key-a");
+  assert.match(String(encoded.prompt_cache_key ?? ""), /^lightmem2-claude-/);
 });

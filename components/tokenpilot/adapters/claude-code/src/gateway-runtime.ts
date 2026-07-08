@@ -28,7 +28,7 @@ import {
 } from "./session-state.js";
 import { prepareClaudeStablePrefix } from "./stable-prefix.js";
 import { appendClaudeCodeTrace } from "./trace.js";
-import { defaultClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./upstream.js";
+import { createClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./upstream.js";
 import { appendClaudeCodeCacheAuditRecord, buildClaudeCodeCacheAuditSnapshot } from "./cache-audit.js";
 import { buildAnthropicGatewayModelList, mapClaudeVisibleModelToUpstreamModel } from "./provider-profile.js";
 import { resolveLatestClaudeCodeSessionId } from "./session-state.js";
@@ -202,7 +202,7 @@ export async function startClaudeCodeGatewayRuntime(params: {
   await mkdir(config.stateDir, { recursive: true });
   const upstream = resolveClaudeCodeUpstream(config);
   const codec = createClaudeMessagesPayloadCodec();
-  const forwarder = params.forwarder ?? defaultClaudeCodeGatewayForwarder;
+  const forwarder = params.forwarder ?? createClaudeCodeGatewayForwarder(config);
   const streamObserver = params.streamObserver ?? createSseJsonStreamObserver({
     responseIdPaths: [["message", "id"], ["id"]],
     usagePaths: [["usage"]],
@@ -368,6 +368,10 @@ export async function startClaudeCodeGatewayRuntime(params: {
         sessionId,
         model: prepared.envelope.model,
         stream: prepared.envelope.stream,
+        originalRequestPromptCacheKey:
+          typeof prepared.envelope.metadata?.originalPromptCacheKey === "string"
+            ? prepared.envelope.metadata.originalPromptCacheKey
+            : null,
         requestPromptCacheKey:
           typeof prepared.envelope.metadata?.promptCacheKey === "string"
             ? prepared.envelope.metadata.promptCacheKey
