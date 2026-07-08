@@ -647,14 +647,30 @@ function renderDiffBlock(title, beforeText, afterText) {
     + '</div></div>';
 }
 
-function renderCacheAuditPanel(cacheAuditSummary) {
+function findLatestNonWarmCacheAuditEntry(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  return entries.find((entry) => entry?.diagnosis?.matchedResult === "cold miss" || entry?.diagnosis?.matchedResult === "cold start") || null;
+}
+
+function renderCacheAuditPanel(cacheAuditSummary, entries) {
   if (!cacheAuditSummary) return "";
+  const latestNonWarm = findLatestNonWarmCacheAuditEntry(entries);
   const entropy = Array.isArray(cacheAuditSummary.topEntropyKinds) && cacheAuditSummary.topEntropyKinds.length > 0
     ? cacheAuditSummary.topEntropyKinds.map((entry) => entry.key + "=" + fmtInt(entry.count)).join(", ")
     : "(none)";
   const drift = Array.isArray(cacheAuditSummary.topDriftKeys) && cacheAuditSummary.topDriftKeys.length > 0
     ? cacheAuditSummary.topDriftKeys.map((entry) => entry.key + "=" + fmtInt(entry.count)).join(", ")
     : "(none)";
+  const latestNonWarmDrift = Array.isArray(latestNonWarm?.driftKeys) && latestNonWarm.driftKeys.length > 0
+    ? latestNonWarm.driftKeys.join(", ")
+    : "";
+  const latestNonWarmEntropy = Array.isArray(latestNonWarm?.entropyKinds) && latestNonWarm.entropyKinds.length > 0
+    ? latestNonWarm.entropyKinds.join(", ")
+    : "(none)";
+  const latestNonWarmHint = latestNonWarm?.diagnosis?.optimizationHint || "(none)";
+  const latestNonWarmLabel = latestNonWarm?.diagnosis?.matchedResult === "cold start"
+    ? "latest cold start"
+    : "latest cold miss";
   const rewriteCount = Number(
     cacheAuditSummary.responsePromptCacheKeyRewriteCount
     ?? cacheAuditSummary.promptCacheKeyMismatchCount
@@ -669,6 +685,9 @@ function renderCacheAuditPanel(cacheAuditSummary) {
     + '<br />response key rewrites=' + escapeHtml(fmtInt(rewriteCount))
     + '<br />entropy hotspots=' + escapeHtml(entropy)
     + '<br />drift hotspots=' + escapeHtml(drift)
+    + '<br />' + escapeHtml(latestNonWarmLabel) + ' ' + escapeHtml(latestNonWarmDrift ? 'drift' : 'entropy') + '='
+      + escapeHtml(latestNonWarmDrift || latestNonWarmEntropy)
+    + '<br />' + escapeHtml(latestNonWarmLabel) + ' hint=' + escapeHtml(latestNonWarmHint)
     + '</div>'
     + '</div>';
 }
@@ -678,6 +697,7 @@ function renderCacheAuditRecentTable(entries) {
   return '<div class="pass-list" style="margin-top:16px;">'
     + entries.map((entry, index) => {
       const requestKey = entry.requestPromptCacheKey || "-";
+      const originalRequestKey = entry.originalRequestPromptCacheKey || "-";
       const responseKey = entry.responsePromptCacheKey || "-";
       const entropy = Array.isArray(entry.entropyKinds) && entry.entropyKinds.length > 0
         ? entry.entropyKinds.join(", ")
@@ -692,6 +712,7 @@ function renderCacheAuditRecentTable(entries) {
         + ' · stream=' + escapeHtml(String(Boolean(entry.stream)))
         + '<br />model=' + escapeHtml(entry.model || "-")
         + ' · fingerprint=' + escapeHtml(entry.stablePrefixFingerprint || "-")
+        + '<br />original request key=' + escapeHtml(originalRequestKey)
         + '<br />request key=' + escapeHtml(requestKey)
         + '<br />response key=' + escapeHtml(responseKey)
         + '<br />entropy=' + escapeHtml(entropy)
@@ -711,6 +732,9 @@ function renderCacheAuditFingerprintGroups(groups) {
       const requestKeys = Array.isArray(group.requestPromptCacheKeys) && group.requestPromptCacheKeys.length > 0
         ? group.requestPromptCacheKeys.join(", ")
         : "(none)";
+      const originalRequestKeys = Array.isArray(group.originalRequestPromptCacheKeys) && group.originalRequestPromptCacheKeys.length > 0
+        ? group.originalRequestPromptCacheKeys.join(", ")
+        : "(none)";
       const responseKeys = Array.isArray(group.responsePromptCacheKeys) && group.responsePromptCacheKeys.length > 0
         ? group.responsePromptCacheKeys.join(", ")
         : "(none)";
@@ -728,6 +752,7 @@ function renderCacheAuditFingerprintGroups(groups) {
         + ' · rewrites=' + escapeHtml(fmtInt(group.rewriteCount))
         + '<br />latest=' + escapeHtml(fmtDate(group.latestAt))
         + ' · model=' + escapeHtml(group.latestModel || "-")
+        + '<br />original request keys=' + escapeHtml(originalRequestKeys)
         + '<br />request keys=' + escapeHtml(requestKeys)
         + '<br />response keys=' + escapeHtml(responseKeys)
         + '<br />entropy=' + escapeHtml(entropy)
@@ -786,128 +811,55 @@ function findMatchingCacheAuditGroup(entry, groups) {
   ) || null;
 }
 
-function buildStabilityOptimizationHint(params) {
-  const matchedEntry = params?.matchedCacheEntry || null;
-  const matchedResult = params?.matchedResult || "unmatched";
-  const rewriteDetected = Boolean(params?.rewriteDetected);
-  const entropyKinds = Array.isArray(matchedEntry?.entropyKinds) ? matchedEntry.entropyKinds : [];
-  const driftKeys = Array.isArray(matchedEntry?.driftKeys) ? matchedEntry.driftKeys : [];
-  if (matchedResult === "warm hit") {
-    return "Warm hit: keep this prefix shape stable and watch for new drift or entropy spikes before changing sanitization.";
-  }
-  if (driftKeys.length > 0) {
-    return "Fingerprint drift: move volatile prompt fragments out of stable prefix, or shift them into dynamic context before the next request.";
-  }
-  if (entropyKinds.includes("abs_path")) {
-    return "Absolute-path entropy: strengthen path canonicalization so stable prefix keeps placeholders instead of host-specific filesystem paths.";
-  }
-  if (entropyKinds.includes("uuid") || entropyKinds.includes("timestamp") || entropyKinds.includes("long_number")) {
-    return "Runtime-ID entropy: strip timestamps, UUIDs, or long numeric identifiers out of stable prefix and keep them in dynamic context only.";
-  }
-  if (rewriteDetected) {
-    return "Response key rewrite only: treat this as an observability signal first; optimize request-side prefix stability before reacting to response key churn.";
-  }
-  if (matchedResult === "cold miss") {
-    return "Cold miss without obvious drift: compare this request against the previous fingerprint group and check for subtle tool or prompt-structure changes.";
-  }
-  return "No matching cache audit entry: expand observability coverage first, then re-check whether this stability snapshot lines up with a request-side cache record.";
+function renderCacheKillerPanel(matchedCacheEntry) {
+  const killers = Array.isArray(matchedCacheEntry?.diagnosis?.killers)
+    ? matchedCacheEntry.diagnosis.killers
+    : [];
+  if (killers.length === 0) return "";
+  return '<div class="pass-list" style="margin-top:16px;">'
+    + killers.map((killer, index) => (
+      '<div class="pass-item"><strong>Cache Killer #' + escapeHtml(String(index + 1)) + '</strong>'
+      + '<br />trigger=' + escapeHtml(killer.title)
+      + '<br />harness fix=' + escapeHtml(killer.fix)
+      + '<br />detail=' + escapeHtml(killer.detail)
+      + '</div>'
+    )).join("")
+    + '</div>';
 }
 
-function describeStabilityCause(params) {
-  const matchedEntry = params?.matchedCacheEntry || null;
-  const matchedResult = params?.matchedResult || "unmatched";
-  const rewriteDetected = Boolean(params?.rewriteDetected);
-  const entropyKinds = Array.isArray(matchedEntry?.entropyKinds) ? matchedEntry.entropyKinds : [];
-  const driftKeys = Array.isArray(matchedEntry?.driftKeys) ? matchedEntry.driftKeys : [];
-  if (matchedResult === "warm hit") {
-    return "Warm hit already happened for this prefix fingerprint.";
-  }
-  if (driftKeys.length > 0 && entropyKinds.length > 0) {
-    return "Cold miss: both prefix drift and unstable tokens were detected.";
-  }
-  if (driftKeys.length > 0) {
-    return "Cold miss: stable-prefix text drifted across requests.";
-  }
-  if (entropyKinds.includes("abs_path")) {
-    return "Cold miss: absolute filesystem paths are still leaking into the stable prefix.";
-  }
-  if (entropyKinds.includes("uuid") || entropyKinds.includes("timestamp") || entropyKinds.includes("long_number")) {
-    return "Cold miss: runtime identifiers are still leaking into the stable prefix.";
-  }
-  if (rewriteDetected) {
-    return "Request side looked stable, but upstream rewrote the response cache key.";
-  }
-  if (matchedResult === "cold miss") {
-    return "Cold miss: no explicit drift hotspot was recorded, so this is likely structural prompt churn.";
-  }
-  return "No matched cache-audit request was found for this stability snapshot yet.";
-}
-
-function buildWarmCacheActionItems(params) {
-  const matchedEntry = params?.matchedCacheEntry || null;
-  const matchedResult = params?.matchedResult || "unmatched";
-  const rewriteDetected = Boolean(params?.rewriteDetected);
-  const entropyKinds = Array.isArray(matchedEntry?.entropyKinds) ? matchedEntry.entropyKinds : [];
-  const driftKeys = Array.isArray(matchedEntry?.driftKeys) ? matchedEntry.driftKeys : [];
-  const items = [];
-  if (matchedResult === "warm hit") {
-    items.push("Keep the canonical stable-prefix text byte-stable across adjacent turns.");
-    items.push("Only let dynamic context change; avoid expanding new volatile lines back into the stable prefix.");
-    return items;
-  }
-  if (driftKeys.length > 0) {
-    items.push("Freeze the canonical stable-prefix text across turns; move changing lines into dynamic context instead of the stable core.");
-  }
-  if (entropyKinds.includes("abs_path")) {
-    items.push("Canonicalize absolute paths before fingerprinting so repeated requests keep the same placeholder-based prefix shape.");
-  }
-  if (entropyKinds.includes("uuid") || entropyKinds.includes("timestamp") || entropyKinds.includes("long_number")) {
-    items.push("Strip timestamps, UUIDs, and long numeric IDs out of the stable prefix and inject them only through dynamic context.");
-  }
-  if (rewriteDetected) {
-    items.push("Treat response-side cache-key rewrites as audit-only; the harness should keep request-side keys and prefix fingerprints stable first.");
-  }
-  if (items.length === 0 && matchedResult === "cold miss") {
-    items.push("Compare this request against the previous fingerprint group and keep tool ordering, prompt scaffolding, and stable-prefix framing identical.");
-  }
-  if (items.length === 0) {
-    items.push("Capture one more adjacent request so the harness can compare fingerprints and learn a stable warm-up target.");
-  }
-  return items;
+function renderHarnessRuleHints(matchedCacheEntry) {
+  const lines = Array.isArray(matchedCacheEntry?.diagnosis?.harnessRules)
+    ? matchedCacheEntry.diagnosis.harnessRules
+    : [];
+  if (lines.length === 0) return "";
+  return '<div class="pass-list" style="margin-top:16px;">'
+    + '<div class="pass-item"><strong>Harness Rule Hints</strong>'
+    + lines.map((line, index) => '<br />rule ' + escapeHtml(String(index + 1)) + '=' + escapeHtml(line)).join("")
+    + '</div>'
+    + '</div>';
 }
 
 function renderWarmCachePlan(item, matchedCacheEntry, matchedFingerprintGroup) {
-  const rewriteDetected = matchedCacheEntry?.requestPromptCacheKey
-    && matchedCacheEntry?.responsePromptCacheKey
-    && matchedCacheEntry.requestPromptCacheKey !== matchedCacheEntry.responsePromptCacheKey;
-  const matchedResult = Number(matchedCacheEntry?.cachedInputTokens || 0) > 0
-    ? "warm hit"
-    : matchedCacheEntry
-      ? "cold miss"
-      : "unmatched";
-  const currentState = describeStabilityCause({
-    matchedCacheEntry,
-    matchedResult,
-    rewriteDetected,
-  });
-  const targetState = matchedResult === "warm hit"
-    ? "Target state: keep the same fingerprint and let adjacent turns stay warm."
-    : "Target state: same request cache key + same stable-prefix fingerprint + cached input tokens > 0 on the next adjacent turn.";
-  const actionItems = buildWarmCacheActionItems({
-    matchedCacheEntry,
-    matchedResult,
-    rewriteDetected,
-  });
+  const diagnosis = matchedCacheEntry?.diagnosis || {
+    currentState: "No matched cache-audit request was found for this stability snapshot yet.",
+    targetState: "Target state: same request cache key + same stable-prefix fingerprint + cached input tokens > 0 on the next adjacent turn.",
+    optimizationHint: "No matching cache audit entry: expand observability coverage first, then re-check whether this stability snapshot lines up with a request-side cache record.",
+    matchedResult: "unmatched",
+    rewriteDetected: false,
+    harnessRules: [],
+    killers: [],
+  };
   const matchedFingerprint = matchedFingerprintGroup?.stablePrefixFingerprint
     || matchedCacheEntry?.stablePrefixFingerprint
     || item.promptCacheKeyAfter
     || "-";
   return '<div class="pass-list" style="margin-top:16px;">'
     + '<div class="pass-item"><strong>Warm Cache Plan</strong>'
-    + '<br />current state=' + escapeHtml(currentState)
-    + '<br />target state=' + escapeHtml(targetState)
+    + '<br />current state=' + escapeHtml(diagnosis.currentState)
+    + '<br />target state=' + escapeHtml(diagnosis.targetState)
     + '<br />reference fingerprint=' + escapeHtml(matchedFingerprint)
-    + actionItems.map((line, index) => '<br />action ' + escapeHtml(String(index + 1)) + '=' + escapeHtml(line)).join("")
+    + (Array.isArray(diagnosis.harnessRules) ? diagnosis.harnessRules.slice(0, 2) : [])
+      .map((line, index) => '<br />action ' + escapeHtml(String(index + 1)) + '=' + escapeHtml(line)).join("")
     + '<br />diff guide=repeat the canonical shape below, and keep newly changing text in the dynamic-tail diff instead of the stable prefix.'
     + '</div>'
     + '</div>';
@@ -925,19 +877,11 @@ function renderPromptCacheTransition(item, matchedCacheEntry, matchedFingerprint
   const matchedDrift = Array.isArray(matchedCacheEntry?.driftKeys) && matchedCacheEntry.driftKeys.length > 0
     ? matchedCacheEntry.driftKeys.join(", ")
     : "(none)";
-  const rewriteDetected = matchedCacheEntry?.requestPromptCacheKey
-    && matchedCacheEntry?.responsePromptCacheKey
-    && matchedCacheEntry.requestPromptCacheKey !== matchedCacheEntry.responsePromptCacheKey;
-  const matchedResult = Number(matchedCacheEntry?.cachedInputTokens || 0) > 0
-    ? "warm hit"
-    : matchedCacheEntry
-      ? "cold miss"
-      : "unmatched";
-  const optimizationHint = buildStabilityOptimizationHint({
-    matchedCacheEntry,
-    matchedResult,
-    rewriteDetected,
-  });
+  const diagnosis = matchedCacheEntry?.diagnosis || {
+    matchedResult: "unmatched",
+    rewriteDetected: false,
+    optimizationHint: "No matching cache audit entry: expand observability coverage first, then re-check whether this stability snapshot lines up with a request-side cache record.",
+  };
   const warmSummary = cacheAuditSummary && Number(cacheAuditSummary.warmCandidates || 0) > 0
     ? fmtInt(cacheAuditSummary.warmHits || 0) + "/" + fmtInt(cacheAuditSummary.warmCandidates || 0)
       + " (" + String(cacheAuditSummary.hitRatePercent || 0) + "%)"
@@ -948,13 +892,13 @@ function renderPromptCacheTransition(item, matchedCacheEntry, matchedFingerprint
     + ' -> ' + escapeHtml(item.promptCacheKeyAfter || "-")
     + '<br />matched fingerprint=' + escapeHtml(matchedFingerprint)
     + ' · warm hits=' + escapeHtml(warmSummary)
-    + '<br />matched result=' + escapeHtml(matchedResult)
-    + ' · rewrite detected=' + escapeHtml(String(Boolean(rewriteDetected)))
+    + '<br />matched result=' + escapeHtml(diagnosis.matchedResult)
+    + ' · rewrite detected=' + escapeHtml(String(Boolean(diagnosis.rewriteDetected)))
     + '<br />matched request key=' + escapeHtml(matchedRequestKey)
     + '<br />matched response key=' + escapeHtml(matchedResponseKey)
     + '<br />matched entropy=' + escapeHtml(matchedEntropy)
     + '<br />matched drift=' + escapeHtml(matchedDrift)
-    + '<br />optimization hint=' + escapeHtml(optimizationHint)
+    + '<br />optimization hint=' + escapeHtml(diagnosis.optimizationHint)
     + '</div>'
     + '</div>';
 }
@@ -1280,9 +1224,11 @@ function renderStability(item) {
   el.passRoot.innerHTML =
     renderWarmCachePlan(item, matchedCacheEntry, matchedFingerprintGroup)
     + renderPromptCacheTransition(item, matchedCacheEntry, matchedFingerprintGroup, cacheAuditSummary)
+    + renderCacheKillerPanel(matchedCacheEntry)
+    + renderHarnessRuleHints(matchedCacheEntry)
     + renderStabilityContextPanels(item)
     + dynamicContextBlock
-    + renderCacheAuditPanel(cacheAuditSummary)
+    + renderCacheAuditPanel(cacheAuditSummary, recentCacheAudit)
     + renderCacheAuditFingerprintGroups(recentCacheAuditGroups)
     + renderCacheAuditRecentTable(recentCacheAudit);
   const toggleFingerprintGroupsBtn = document.getElementById("toggleFingerprintGroupsBtn");
@@ -1405,7 +1351,7 @@ function renderReduction(item) {
     segmentsHtml
     + selectedSegmentDetails
     + passesHtml
-    + renderCacheAuditPanel(cacheAuditSummary)
+    + renderCacheAuditPanel(cacheAuditSummary, recentCacheAudit)
     + renderCacheAuditFingerprintGroups(recentCacheAuditGroups)
     + renderCacheAuditRecentTable(recentCacheAudit);
   el.passRoot.querySelectorAll("[data-segment-index]").forEach((node) => {
@@ -1447,7 +1393,7 @@ function renderEviction(item) {
     : "";
   el.passRoot.innerHTML =
     archiveBlock
-    + renderCacheAuditPanel(cacheAuditSummary)
+    + renderCacheAuditPanel(cacheAuditSummary, recentCacheAudit)
     + renderCacheAuditFingerprintGroups(recentCacheAuditGroups)
     + renderCacheAuditRecentTable(recentCacheAudit);
   const toggleFingerprintGroupsBtn = document.getElementById("toggleFingerprintGroupsBtn");

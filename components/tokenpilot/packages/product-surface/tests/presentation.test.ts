@@ -36,6 +36,14 @@ test("formatSessionReport prefers char aggregates when latest mode is chars", ()
       topEntropyKinds: [{ key: "abs_path", count: 2 }],
       topDriftKeys: [{ key: "instructions", count: 1 }],
     },
+    latestNonWarmCacheDiagnosis: {
+      at: "2026-07-08T10:01:00.000Z",
+      matchedResult: "cold miss",
+      driftKeys: ["instructions"],
+      entropyKinds: [],
+      currentState: "Cold miss: stable-prefix text drifted across requests.",
+      optimizationHint: "Fingerprint drift: move volatile prompt fragments out of stable prefix, or shift them into dynamic context before the next request.",
+    },
   });
 
   assert.match(text, /saved chars: 162,795/);
@@ -49,6 +57,8 @@ test("formatSessionReport prefers char aggregates when latest mode is chars", ()
   assert.match(text, /response cache key rewrites: 3/);
   assert.match(text, /cache entropy hotspots: abs_path=2/);
   assert.match(text, /cache drift hotspots: instructions=1/);
+  assert.match(text, /latest cold miss drift: instructions/);
+  assert.match(text, /latest cold miss hint: Fingerprint drift/);
 });
 
 test("formatSessionReport falls back to token aggregates when latest mode is unset", () => {
@@ -104,6 +114,10 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   assert.match(script, /matched drift=/);
   assert.match(script, /optimization hint=/);
   assert.match(script, /Warm Cache Plan/);
+  assert.match(script, /Cache Killer #/);
+  assert.match(script, /harness fix=/);
+  assert.match(script, /Harness Rule Hints/);
+  assert.match(script, /rule '/);
   assert.match(script, /current state=/);
   assert.match(script, /target state=/);
   assert.match(script, /action '/);
@@ -131,6 +145,9 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   assert.match(script, /Show fewer fingerprint groups/);
   assert.match(script, / · latest/);
   assert.match(script, /response key rewrites=/);
+  assert.match(script, /latest cold start/);
+  assert.match(script, /latest cold miss/);
+  assert.match(script, /hint=/);
   assert.match(script, /fingerprint=/);
   assert.match(script, /request key=/);
   assert.match(script, /cached tokens=/);

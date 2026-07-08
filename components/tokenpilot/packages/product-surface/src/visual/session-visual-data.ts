@@ -1,9 +1,11 @@
 import { readdir, readFile, mkdir, appendFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import {
+  diagnoseCacheAudit,
   readRecentCacheAuditRecordsForSession,
   summarizeCacheAudit,
   type CacheAuditRecord,
+  type CacheAuditDiagnosis,
   type CacheAuditSummary,
 } from "@tokenpilot/host-adapter";
 import { readRecentReductionMetrics, summarizeRecentReductionMetrics, type RecentReductionMetricsSummary } from "../metrics.js";
@@ -166,12 +168,26 @@ export type VisualCacheAuditEntry = {
   model: string;
   stream: boolean;
   stablePrefixFingerprint: string;
+  originalRequestPromptCacheKey: string | null;
   requestPromptCacheKey: string | null;
   responsePromptCacheKey: string | null;
   cachedInputTokens: number;
   status: number;
+  baselineKind: "identity" | "request_key" | "session" | "none";
   entropyKinds: string[];
   driftKeys: string[];
+  entropyFindings: Array<{
+    kind: string;
+    segmentKey: string;
+    layer: string;
+    detail: string;
+  }>;
+  driftReasons: Array<{
+    kind: string;
+    key: string;
+    detail: string;
+  }>;
+  diagnosis: CacheAuditDiagnosis;
 };
 
 export type VisualCacheAuditGroup = {
@@ -181,6 +197,7 @@ export type VisualCacheAuditGroup = {
   requestCount: number;
   warmHitCount: number;
   rewriteCount: number;
+  originalRequestPromptCacheKeys: string[];
   requestPromptCacheKeys: string[];
   responsePromptCacheKeys: string[];
   entropyKinds: string[];
@@ -193,16 +210,42 @@ function toVisualCacheAuditEntry(record: CacheAuditRecord): VisualCacheAuditEntr
     model: record.model,
     stream: record.stream,
     stablePrefixFingerprint: record.stablePrefixFingerprint,
+    originalRequestPromptCacheKey: record.originalRequestPromptCacheKey ?? null,
     requestPromptCacheKey: record.requestPromptCacheKey,
     responsePromptCacheKey: record.responsePromptCacheKey,
     cachedInputTokens: Number(record.cachedInputTokens ?? 0),
     status: Number(record.status ?? 0),
+    baselineKind: record.baselineKind ?? "none",
     entropyKinds: Array.isArray(record.entropyFindings)
       ? record.entropyFindings.map((entry) => String(entry.kind || "")).filter(Boolean)
       : [],
     driftKeys: Array.isArray(record.driftReasons)
       ? record.driftReasons.map((entry) => String(entry.key || "")).filter(Boolean)
       : [],
+    entropyFindings: Array.isArray(record.entropyFindings)
+      ? record.entropyFindings.map((entry) => ({
+        kind: String(entry.kind || ""),
+        segmentKey: String(entry.segmentKey || ""),
+        layer: String(entry.layer || ""),
+        detail: String(entry.detail || ""),
+      }))
+      : [],
+    driftReasons: Array.isArray(record.driftReasons)
+      ? record.driftReasons.map((entry) => ({
+        kind: String(entry.kind || ""),
+        key: String(entry.key || ""),
+        detail: String(entry.detail || ""),
+      }))
+      : [],
+    diagnosis: diagnoseCacheAudit({
+      stablePrefixFingerprint: record.stablePrefixFingerprint,
+      requestPromptCacheKey: record.requestPromptCacheKey,
+      responsePromptCacheKey: record.responsePromptCacheKey,
+      cachedInputTokens: Number(record.cachedInputTokens ?? 0),
+      baselineKind: record.baselineKind ?? "none",
+      entropyFindings: Array.isArray(record.entropyFindings) ? record.entropyFindings : [],
+      driftReasons: Array.isArray(record.driftReasons) ? record.driftReasons : [],
+    }),
   };
 }
 
@@ -318,6 +361,7 @@ function groupVisualCacheAuditEntries(
       requestCount: 0,
       warmHitCount: 0,
       rewriteCount: 0,
+      originalRequestPromptCacheKeys: [],
       requestPromptCacheKeys: [],
       responsePromptCacheKeys: [],
       entropyKinds: [],
@@ -336,6 +380,10 @@ function groupVisualCacheAuditEntries(
       current.latestAt = entry.at;
       current.latestModel = entry.model;
     }
+    current.originalRequestPromptCacheKeys = stableUnique([
+      ...current.originalRequestPromptCacheKeys,
+      entry.originalRequestPromptCacheKey ?? "",
+    ]);
     current.requestPromptCacheKeys = stableUnique([
       ...current.requestPromptCacheKeys,
       entry.requestPromptCacheKey ?? "",

@@ -145,6 +145,7 @@ test("readVisualSessionData returns reduction snapshot route and ux aggregate", 
           stablePrefix: { schemaVersion: 1, stableCore: [], semiStableContext: [] },
           entropyFindings: [{ kind: "abs_path", segmentKey: "instructions", layer: "stable_core", detail: "path" }],
           driftReasons: [{ kind: "segment_text_changed", key: "instructions", detail: "changed" }],
+          originalRequestPromptCacheKey: "host-pk-1",
           requestPromptCacheKey: "pk-1",
           responsePromptCacheKey: "pk-1",
           cachedInputTokens: 0,
@@ -160,6 +161,7 @@ test("readVisualSessionData returns reduction snapshot route and ux aggregate", 
           stablePrefix: { schemaVersion: 1, stableCore: [], semiStableContext: [] },
           entropyFindings: [{ kind: "abs_path", segmentKey: "instructions", layer: "stable_core", detail: "path" }],
           driftReasons: [{ kind: "segment_text_changed", key: "instructions", detail: "changed" }],
+          originalRequestPromptCacheKey: "host-pk-2",
           requestPromptCacheKey: "pk-1",
           responsePromptCacheKey: "pk-2",
           cachedInputTokens: 64,
@@ -197,14 +199,20 @@ test("readVisualSessionData returns reduction snapshot route and ux aggregate", 
     assert.equal(data.cacheAuditSummary?.promptCacheKeyMismatchCount, 1);
     assert.equal(data.recentCacheAudit?.length, 2);
     assert.equal(data.recentCacheAudit?.[0]?.cachedInputTokens, 64);
+    assert.equal(data.recentCacheAudit?.[0]?.originalRequestPromptCacheKey, "host-pk-2");
     assert.equal(data.recentCacheAudit?.[0]?.requestPromptCacheKey, "pk-1");
     assert.equal(data.recentCacheAudit?.[0]?.responsePromptCacheKey, "pk-2");
     assert.equal(data.recentCacheAudit?.[0]?.entropyKinds[0], "abs_path");
     assert.equal(data.recentCacheAudit?.[0]?.driftKeys[0], "instructions");
+    assert.equal(data.recentCacheAudit?.[0]?.diagnosis.matchedResult, "warm hit");
+    assert.equal(data.recentCacheAudit?.[0]?.diagnosis.rewriteDetected, true);
+    assert.equal((data.recentCacheAudit?.[0]?.diagnosis.killers.length ?? 0) > 0, true);
+    assert.equal((data.recentCacheAudit?.[0]?.diagnosis.harnessRules.length ?? 0) > 0, true);
     assert.equal(data.recentCacheAuditGroups?.length, 1);
     assert.equal(data.recentCacheAuditGroups?.[0]?.requestCount, 2);
     assert.equal(data.recentCacheAuditGroups?.[0]?.warmHitCount, 1);
     assert.equal(data.recentCacheAuditGroups?.[0]?.rewriteCount, 1);
+    assert.equal(data.recentCacheAuditGroups?.[0]?.originalRequestPromptCacheKeys.join(","), "host-pk-2,host-pk-1");
     assert.equal(data.recentCacheAuditGroups?.[0]?.stablePrefixFingerprint, "fp-1");
     const sessions = await readVisualSessionList(stateDir);
     assert.equal(sessions[0]?.latestCountMode, "chars");
