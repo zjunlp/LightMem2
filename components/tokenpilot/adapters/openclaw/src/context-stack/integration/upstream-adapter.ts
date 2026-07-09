@@ -4,6 +4,19 @@ export function isCompletionsApiFamily(apiFamily: string | undefined): boolean {
   return String(apiFamily ?? "openai-responses").toLowerCase().includes("completions");
 }
 
+function cloneUsageDetails(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return { ...(value as Record<string, unknown>) };
+}
+
+function readCachedTokens(...details: Array<Record<string, unknown> | undefined>): number | undefined {
+  for (const detail of details) {
+    const value = Number(detail?.cached_tokens);
+    if (Number.isFinite(value) && value >= 0) return value;
+  }
+  return undefined;
+}
+
 function normalizeInputTextContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -125,6 +138,7 @@ function responsesToolChoiceToChatCompletionsToolChoice(toolChoice: any): any {
 }
 
 export function responsesPayloadToChatCompletions(payload: any): any {
+  const stream = payload?.stream === true;
   const input = Array.isArray(payload?.input) ? payload.input : [];
   const messages = input.flatMap((item: any) => responsesInputItemToChatCompletionsMessages(item));
   const model = typeof payload?.model === "string" ? payload.model : undefined;
@@ -137,7 +151,8 @@ export function responsesPayloadToChatCompletions(payload: any): any {
     messages,
     temperature: typeof payload?.temperature === "number" ? payload.temperature : 0,
     max_tokens: typeof payload?.max_output_tokens === "number" ? payload.max_output_tokens : undefined,
-    stream: payload?.stream === true,
+    stream,
+    stream_options: stream ? { include_usage: true } : undefined,
     tools: tools && tools.length > 0 ? tools : undefined,
     tool_choice: toolChoice,
     parallel_tool_calls: payload?.parallel_tool_calls === false ? false : undefined,
@@ -159,6 +174,11 @@ export function chatCompletionsToResponsesText(raw: string): string {
       ? message.content.map((x: any) => typeof x?.text === "string" ? x.text : typeof x === "string" ? x : "").filter(Boolean).join("\n")
       : "";
   const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  const promptTokensDetails = cloneUsageDetails(parsed?.usage?.prompt_tokens_details);
+  const inputTokensDetails = cloneUsageDetails(parsed?.usage?.input_tokens_details) ?? promptTokensDetails;
+  const completionTokensDetails = cloneUsageDetails(parsed?.usage?.completion_tokens_details);
+  const outputTokensDetails = cloneUsageDetails(parsed?.usage?.output_tokens_details) ?? completionTokensDetails;
+  const cachedInputTokens = readCachedTokens(inputTokensDetails, promptTokensDetails);
   const inputTokens = Number(parsed?.usage?.input_tokens ?? parsed?.usage?.prompt_tokens ?? 0);
   const outputTokens = Number(parsed?.usage?.output_tokens ?? parsed?.usage?.completion_tokens ?? 0);
   const totalTokens = Number(parsed?.usage?.total_tokens ?? (inputTokens + outputTokens));
@@ -192,8 +212,14 @@ export function chatCompletionsToResponsesText(raw: string): string {
     ],
     usage: {
       input_tokens: Number.isFinite(inputTokens) ? inputTokens : 0,
+      cache_read_input_tokens: cachedInputTokens,
+      cached_tokens: cachedInputTokens,
+      input_tokens_details: inputTokensDetails,
       output_tokens: Number.isFinite(outputTokens) ? outputTokens : 0,
+      output_tokens_details: outputTokensDetails,
       total_tokens: Number.isFinite(totalTokens) ? totalTokens : 0,
+      prompt_tokens_details: promptTokensDetails,
+      completion_tokens_details: completionTokensDetails,
     },
     output_text: text,
   };

@@ -1,6 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { formatSseEvent, type ChatCompletionsSseState } from "./upstream-sse-shared.js";
 
+function cloneUsageDetails(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return { ...(value as Record<string, unknown>) };
+}
+
+function readCachedTokens(...details: Array<Record<string, unknown> | undefined>): number | undefined {
+  for (const detail of details) {
+    const value = Number(detail?.cached_tokens);
+    if (Number.isFinite(value) && value >= 0) return value;
+  }
+  return undefined;
+}
+
 export function extractChatCompletionDeltaText(choice: any): string {
   const content = choice?.delta?.content;
   if (typeof content === "string") return content;
@@ -16,10 +29,19 @@ export function extractChatCompletionDeltaText(choice: any): string {
 }
 
 export function buildResponsesCompletedPayload(state: ChatCompletionsSseState): any {
+  const promptTokensDetails = cloneUsageDetails(state.usage?.prompt_tokens_details);
+  const inputTokensDetails = cloneUsageDetails(state.usage?.input_tokens_details) ?? promptTokensDetails;
+  const completionTokensDetails = cloneUsageDetails(state.usage?.completion_tokens_details);
+  const outputTokensDetails = cloneUsageDetails(state.usage?.output_tokens_details) ?? completionTokensDetails;
+  const cachedInputTokens = readCachedTokens(inputTokensDetails, promptTokensDetails);
   const usage = state.usage != null
     ? {
       input_tokens: Number(state.usage?.input_tokens ?? state.usage?.prompt_tokens ?? 0),
+      cache_read_input_tokens: cachedInputTokens,
+      cached_tokens: cachedInputTokens,
+      input_tokens_details: inputTokensDetails,
       output_tokens: Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0),
+      output_tokens_details: outputTokensDetails,
       total_tokens: Number(
         state.usage?.total_tokens
           ?? (
@@ -27,6 +49,8 @@ export function buildResponsesCompletedPayload(state: ChatCompletionsSseState): 
             + Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0)
           ),
       ),
+      prompt_tokens_details: promptTokensDetails,
+      completion_tokens_details: completionTokensDetails,
     }
     : {
       input_tokens: 0,

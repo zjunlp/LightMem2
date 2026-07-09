@@ -1137,6 +1137,25 @@ test("responsesPayloadToChatCompletions preserves tools and function call histor
   assert.equal(out.messages[2].content, "{\"content\":\"hello\"}");
 });
 
+test("responsesPayloadToChatCompletions requests usage in streaming completions mode", () => {
+  const payload = {
+    model: "gpt-5.4-mini",
+    stream: true,
+    input: [
+      {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "hello" }],
+      },
+    ],
+  };
+
+  const out = hooks.responsesPayloadToChatCompletions(payload);
+
+  assert.equal(out.stream, true);
+  assert.deepEqual(out.stream_options, { include_usage: true });
+});
+
 test("chatCompletionsToResponsesText converts tool calls back into responses output", () => {
   const raw = JSON.stringify({
     id: "chatcmpl_123",
@@ -1165,7 +1184,13 @@ test("chatCompletionsToResponsesText converts tool calls back into responses out
     ],
     usage: {
       prompt_tokens: 100,
+      prompt_tokens_details: {
+        cached_tokens: 64,
+      },
       completion_tokens: 12,
+      completion_tokens_details: {
+        reasoning_tokens: 0,
+      },
       total_tokens: 112,
     },
   });
@@ -1182,8 +1207,22 @@ test("chatCompletionsToResponsesText converts tool calls back into responses out
   assert.equal(out.output[0].arguments, "{\"path\":\"/tmp/docs/README.md\"}");
   assert.deepEqual(out.usage, {
     input_tokens: 100,
+    cache_read_input_tokens: 64,
+    cached_tokens: 64,
+    input_tokens_details: {
+      cached_tokens: 64,
+    },
     output_tokens: 12,
+    output_tokens_details: {
+      reasoning_tokens: 0,
+    },
     total_tokens: 112,
+    prompt_tokens_details: {
+      cached_tokens: 64,
+    },
+    completion_tokens_details: {
+      reasoning_tokens: 0,
+    },
   });
 });
 
@@ -1193,7 +1232,7 @@ test("convertChatCompletionsSseToResponsesSse preserves output text and usage in
     "",
     'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{"content":"world"}}]}',
     "",
-    'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":12,"total_tokens":112}}',
+    'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"prompt_tokens_details":{"cached_tokens":64},"completion_tokens":12,"completion_tokens_details":{"reasoning_tokens":0},"total_tokens":112}}',
     "",
     "data: [DONE]",
     "",
@@ -1206,7 +1245,11 @@ test("convertChatCompletionsSseToResponsesSse preserves output text and usage in
   assert.match(out, /response\.completed/);
   assert.match(out, /Hello world/);
   assert.match(out, /"input_tokens":100/);
+  assert.match(out, /"cache_read_input_tokens":64/);
+  assert.match(out, /"cached_tokens":64/);
+  assert.match(out, /"input_tokens_details":\{"cached_tokens":64\}/);
   assert.match(out, /"output_tokens":12/);
+  assert.match(out, /"output_tokens_details":\{"reasoning_tokens":0\}/);
   assert.match(out, /"total_tokens":112/);
 });
 
@@ -1216,7 +1259,7 @@ test("convertChatCompletionsSseToResponsesSse preserves usage emitted after fini
     "",
     'data: {"id":"chatcmpl_2","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
     "",
-    'data: {"id":"chatcmpl_2","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[],"usage":{"prompt_tokens":222,"completion_tokens":33,"total_tokens":255}}',
+    'data: {"id":"chatcmpl_2","object":"chat.completion.chunk","created":1780766344,"model":"gpt-5.4-mini","choices":[],"usage":{"prompt_tokens":222,"prompt_tokens_details":{"cached_tokens":80},"completion_tokens":33,"completion_tokens_details":{"reasoning_tokens":0},"total_tokens":255}}',
     "",
     "data: [DONE]",
     "",
@@ -1227,6 +1270,10 @@ test("convertChatCompletionsSseToResponsesSse preserves usage emitted after fini
   assert.match(out, /response\.completed/);
   assert.match(out, /Hello/);
   assert.match(out, /"input_tokens":222/);
+  assert.match(out, /"cache_read_input_tokens":80/);
+  assert.match(out, /"cached_tokens":80/);
+  assert.match(out, /"input_tokens_details":\{"cached_tokens":80\}/);
   assert.match(out, /"output_tokens":33/);
+  assert.match(out, /"output_tokens_details":\{"reasoning_tokens":0\}/);
   assert.match(out, /"total_tokens":255/);
 });
