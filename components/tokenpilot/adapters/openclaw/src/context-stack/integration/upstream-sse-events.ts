@@ -14,6 +14,17 @@ function readCachedTokens(...details: Array<Record<string, unknown> | undefined>
   return undefined;
 }
 
+function normalizeCacheWriteTokens(usage: any): number {
+  const direct = Number(
+    usage?.cache_write_tokens
+      ?? usage?.cache_creation_input_tokens
+      ?? usage?.cacheWriteTokens
+      ?? usage?.cacheWrite
+      ?? 0,
+  );
+  return Number.isFinite(direct) && direct >= 0 ? direct : 0;
+}
+
 export function extractChatCompletionDeltaText(choice: any): string {
   const content = choice?.delta?.content;
   if (typeof content === "string") return content;
@@ -34,23 +45,37 @@ export function buildResponsesCompletedPayload(state: ChatCompletionsSseState): 
   const completionTokensDetails = cloneUsageDetails(state.usage?.completion_tokens_details);
   const outputTokensDetails = cloneUsageDetails(state.usage?.output_tokens_details) ?? completionTokensDetails;
   const cachedInputTokens = readCachedTokens(inputTokensDetails, promptTokensDetails);
+  const inputTokens = Number(state.usage?.input_tokens ?? state.usage?.prompt_tokens ?? 0);
+  const outputTokens = Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0);
+  const totalTokens = Number(
+    state.usage?.total_tokens
+      ?? (
+        Number(state.usage?.input_tokens ?? state.usage?.prompt_tokens ?? 0)
+        + Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0)
+      ),
+  );
+  const cacheWriteTokens = normalizeCacheWriteTokens(state.usage);
   const usage = state.usage != null
     ? {
-      input_tokens: Number(state.usage?.input_tokens ?? state.usage?.prompt_tokens ?? 0),
+      input_tokens: inputTokens,
+      inputTokens: inputTokens,
       cache_read_input_tokens: cachedInputTokens,
+      cacheReadTokens: cachedInputTokens,
+      cacheRead: cachedInputTokens,
       cached_tokens: cachedInputTokens,
+      cachedTokens: cachedInputTokens,
       input_tokens_details: inputTokensDetails,
-      output_tokens: Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0),
+      output_tokens: outputTokens,
+      outputTokens: outputTokens,
       output_tokens_details: outputTokensDetails,
-      total_tokens: Number(
-        state.usage?.total_tokens
-          ?? (
-            Number(state.usage?.input_tokens ?? state.usage?.prompt_tokens ?? 0)
-            + Number(state.usage?.output_tokens ?? state.usage?.completion_tokens ?? 0)
-          ),
-      ),
+      total_tokens: totalTokens,
+      totalTokens: totalTokens,
+      cache_write_tokens: cacheWriteTokens,
+      cacheWriteTokens: cacheWriteTokens,
+      cacheWrite: cacheWriteTokens,
       prompt_tokens_details: promptTokensDetails,
       completion_tokens_details: completionTokensDetails,
+      providerRaw: state.usage && typeof state.usage === "object" ? state.usage : undefined,
     }
     : {
       input_tokens: 0,

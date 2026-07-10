@@ -760,6 +760,21 @@ function readInputTokens(usage: unknown): number {
   return toNum(raw?.input_tokens ?? raw?.prompt_tokens ?? raw?.inputTokens ?? raw?.promptTokens) ?? 0;
 }
 
+function readCacheReadTokens(usage: unknown): number | undefined {
+  const usageRecord = asRecord(usage);
+  const direct = toNum(usageRecord?.cacheReadTokens ?? usageRecord?.cacheRead ?? usageRecord?.cachedTokens);
+  if (direct !== undefined) return direct;
+  const raw = asRecord(usageRecord?.providerRaw);
+  const inputDetails = asRecord(raw?.input_tokens_details);
+  const promptDetails = asRecord(raw?.prompt_tokens_details);
+  return toNum(
+    raw?.cache_read_input_tokens
+      ?? raw?.cached_tokens
+      ?? inputDetails?.cached_tokens
+      ?? promptDetails?.cached_tokens,
+  );
+}
+
 function readStableChars(ctx: RuntimeTurnContext): number {
   return ctx.segments
     .filter((segment) => segment.kind === "stable")
@@ -1830,7 +1845,7 @@ export function createPolicyModule(cfg: PolicyModuleConfig = {}): RuntimeModule 
       const state = stateBySession.get(ctx.sessionId) ?? createInitialPolicySessionState();
       state.completedTurns += 1;
 
-      const rawReadTokens = result.usage?.cacheReadTokens ?? result.usage?.cachedTokens;
+      const rawReadTokens = readCacheReadTokens(result.usage);
       const hasReadSignal = typeof rawReadTokens === "number" && Number.isFinite(rawReadTokens);
       const readTokens = hasReadSignal ? Number(rawReadTokens) : 0;
       state.cumulativeInputTokens += readInputTokens(result.usage);

@@ -17,6 +17,17 @@ function readCachedTokens(...details: Array<Record<string, unknown> | undefined>
   return undefined;
 }
 
+function normalizeCacheWriteTokens(usage: any): number {
+  const direct = Number(
+    usage?.cache_write_tokens
+      ?? usage?.cache_creation_input_tokens
+      ?? usage?.cacheWriteTokens
+      ?? usage?.cacheWrite
+      ?? 0,
+  );
+  return Number.isFinite(direct) && direct >= 0 ? direct : 0;
+}
+
 function normalizeInputTextContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -182,6 +193,7 @@ export function chatCompletionsToResponsesText(raw: string): string {
   const inputTokens = Number(parsed?.usage?.input_tokens ?? parsed?.usage?.prompt_tokens ?? 0);
   const outputTokens = Number(parsed?.usage?.output_tokens ?? parsed?.usage?.completion_tokens ?? 0);
   const totalTokens = Number(parsed?.usage?.total_tokens ?? (inputTokens + outputTokens));
+  const cacheWriteTokens = normalizeCacheWriteTokens(parsed?.usage);
   const response = {
     id: parsed?.id ?? `resp_${Date.now()}`,
     object: "response",
@@ -212,14 +224,24 @@ export function chatCompletionsToResponsesText(raw: string): string {
     ],
     usage: {
       input_tokens: Number.isFinite(inputTokens) ? inputTokens : 0,
+      inputTokens: Number.isFinite(inputTokens) ? inputTokens : 0,
       cache_read_input_tokens: cachedInputTokens,
+      cacheReadTokens: cachedInputTokens,
+      cacheRead: cachedInputTokens,
       cached_tokens: cachedInputTokens,
+      cachedTokens: cachedInputTokens,
       input_tokens_details: inputTokensDetails,
       output_tokens: Number.isFinite(outputTokens) ? outputTokens : 0,
+      outputTokens: Number.isFinite(outputTokens) ? outputTokens : 0,
       output_tokens_details: outputTokensDetails,
       total_tokens: Number.isFinite(totalTokens) ? totalTokens : 0,
+      totalTokens: Number.isFinite(totalTokens) ? totalTokens : 0,
+      cache_write_tokens: cacheWriteTokens,
+      cacheWriteTokens: cacheWriteTokens,
+      cacheWrite: cacheWriteTokens,
       prompt_tokens_details: promptTokensDetails,
       completion_tokens_details: completionTokensDetails,
+      providerRaw: parsed?.usage && typeof parsed.usage === "object" ? parsed.usage : undefined,
     },
     output_text: text,
   };
