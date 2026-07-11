@@ -67,6 +67,7 @@ LightMem2 is intended to host multiple long-running-agent components over time.
 * <a href='#citation'>📄 Citation</a>
 * <a href='#contributing'>🤝 Contributing</a>
 * <a href='#contributors'>🎉 Contributors</a>
+* <a href='#related-works'>📚 Related Works</a>
 * <a href='#community'>💬 Community</a>
 
 <span id='news'/>
@@ -634,6 +635,7 @@ Please cite our paper if you use LightMem2 in your work.
 
 We welcome bug fixes, host adapter improvements, onboarding fixes, tests, and documentation updates, see [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
 
+<span id='contributors'/>
 
 ## 🎉Contributors
 
@@ -643,13 +645,17 @@ We welcome bug fixes, host adapter improvements, onboarding fixes, tests, and do
 
 We thank all the contributors to this project, more contributors are welcome!
 
-### 📚 Our LightMem Series
-This repository belongs to ZJU NLP LightMem lightweight agent memory series, focusing on solving context bloat, excessive token consumption and low cache utilization for long-running LLM agents:
-- [LightMem](https://github.com/zjunlp/LightMem.git) — ICLR 2026 lightweight memory-augmented generation baseline, core hierarchical memory paradigm
-- [LightMem2](https://github.com/zjunlp/LightMem2) — This repo, multi-host runtime framework with TokenPilot for code agents
-- [LightMem-Ego](https://github.com/zjunlp/LightMem-Ego) — Temporal memory extension for embodied & ego-centric autonomous agents
+<span id='related-works'/>
 
-#### Other Related Projects
+## 📚 Related Works
+
+### LightMem Series
+This repository belongs to ZJUNLP LightMem series, focusing on solving context bloat, excessive token consumption and low cache utilization for long-running LLM agents:
+- [LightMem](https://github.com/zjunlp/LightMem) — Lightweight memory-augmented generation
+- [LightMem2](https://github.com/zjunlp/LightMem2) — This repo, multi-host runtime modular framework for agents
+- [LightMem-Ego](https://github.com/zjunlp/LightMem-Ego) — Temporal memory extension for ego-centric autonomous agents
+
+### Other Related Projects
 
 - [LLMLingua-2](https://github.com/microsoft/LLMLingua) — Token-level prompt compression
 - [SelectiveContext](https://github.com/liyucheng09/Selective_Context) — Self-information-based context reduction
@@ -657,7 +663,6 @@ This repository belongs to ZJU NLP LightMem lightweight agent memory series, foc
 - [MemoBrain](https://github.com/qhjqhj00/MemoBrain) — Executive memory for long-horizon reasoning agents
 - [AgentSwing](https://github.com/Alibaba-NLP/DeepResearch) — Adaptive parallel context management routing for web agents
 - [MemOS](https://github.com/MemTensor/MemOS) — Memory operating system for LLM agents
-- [LightMem](https://github.com/zjunlp/LightMem) — Lightweight memory-augmented generation
 - [Headroom](https://github.com/chopratejas/headroom) — Compresses everything when AI agent reads
 
 <span id='community'/>
