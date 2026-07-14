@@ -218,14 +218,13 @@ ensure_plugin_runtime_config() {
   local config_path="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
   local proxy_base_url="${TOKENPILOT_BASE_URL:-}"
   local proxy_api_key="${TOKENPILOT_API_KEY:-}"
-  local proxy_provider_id="${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}"
   local proxy_port="${TOKENPILOT_PROXY_PORT:-17668}"
   local plugin_load_path="${TOKENPILOT_PLUGIN_LOAD_PATH:-${HOME}/.openclaw/extensions/tokenpilot}"
   local proxy_pure_forward="${TOKENPILOT_PROXY_PURE_FORWARD:-false}"
   local enable_reduction="${TOKENPILOT_ENABLE_REDUCTION:-true}"
   local reduction_trigger_min_chars="${TOKENPILOT_REDUCTION_TRIGGER_MIN_CHARS:-2200}"
   local reduction_max_tool_chars="${TOKENPILOT_REDUCTION_MAX_TOOL_CHARS:-1200}"
-  local reduction_pass_repeated_read_dedup="${TOKENPILOT_REDUCTION_PASS_REPEATED_READ_DEDUP:-true}"
+  local reduction_pass_read_state_compaction="${TOKENPILOT_REDUCTION_PASS_READ_STATE_COMPACTION:-${TOKENPILOT_REDUCTION_PASS_REPEATED_READ_DEDUP:-true}}"
   local reduction_pass_tool_payload_trim="${TOKENPILOT_REDUCTION_PASS_TOOL_PAYLOAD_TRIM:-true}"
   local reduction_pass_html_slimming="${TOKENPILOT_REDUCTION_PASS_HTML_SLIMMING:-true}"
   local reduction_pass_exec_output_truncation="${TOKENPILOT_REDUCTION_PASS_EXEC_OUTPUT_TRUNCATION:-true}"
@@ -275,7 +274,7 @@ ensure_plugin_runtime_config() {
     return 0
   fi
 
-  python3 - "${config_path}" "${proxy_base_url}" "${proxy_api_key}" "${proxy_port}" "${plugin_load_path}" "${proxy_pure_forward}" "${enable_reduction}" "${reduction_trigger_min_chars}" "${reduction_max_tool_chars}" "${reduction_pass_repeated_read_dedup}" "${reduction_pass_tool_payload_trim}" "${reduction_pass_html_slimming}" "${reduction_pass_exec_output_truncation}" "${reduction_pass_agents_startup_optimization}" "${reduction_pass_format_slimming}" "${reduction_pass_format_cleaning}" "${reduction_pass_path_truncation}" "${reduction_pass_image_downsample}" "${reduction_pass_line_number_strip}" "${dynamic_context_target}" "${default_model}" "${exec_host}" "${exec_security}" "${exec_ask}" "${elevated_enabled}" "${elevated_allow_from}" "${enable_eviction}" "${eviction_policy}" "${eviction_min_block_chars}" "${eviction_replacement_mode}" "${task_state_estimator_enabled}" "${task_state_estimator_base_url}" "${task_state_estimator_api_key}" "${task_state_estimator_model}" "${task_state_estimator_request_timeout_ms}" "${task_state_estimator_batch_turns}" "${task_state_estimator_eviction_lookahead_turns}" "${task_state_estimator_completed_summary_max_raw_turns}" "${task_state_estimator_input_mode}" "${task_state_estimator_lifecycle_mode}" "${task_state_estimator_evidence_mode}" "${task_state_estimator_eviction_promotion_policy}" "${task_state_estimator_eviction_promotion_hot_tail_size}" "${memory_enabled}" "${memory_auto_distill}" "${memory_distiller_type}" "${memory_batch_size}" "${memory_top_k}" "${memory_inject_as_system_hint}" "${memory_distill_base_url}" "${memory_distill_api_key}" "${memory_distill_model}" "${memory_distill_timeout_ms}" "${memory_fault_recovery_enabled}" <<'PATCH_PY'
+  python3 - "${config_path}" "${proxy_base_url}" "${proxy_api_key}" "${proxy_port}" "${plugin_load_path}" "${proxy_pure_forward}" "${enable_reduction}" "${reduction_trigger_min_chars}" "${reduction_max_tool_chars}" "${reduction_pass_read_state_compaction}" "${reduction_pass_tool_payload_trim}" "${reduction_pass_html_slimming}" "${reduction_pass_exec_output_truncation}" "${reduction_pass_agents_startup_optimization}" "${reduction_pass_format_slimming}" "${reduction_pass_format_cleaning}" "${reduction_pass_path_truncation}" "${reduction_pass_image_downsample}" "${reduction_pass_line_number_strip}" "${dynamic_context_target}" "${default_model}" "${exec_host}" "${exec_security}" "${exec_ask}" "${elevated_enabled}" "${elevated_allow_from}" "${enable_eviction}" "${eviction_policy}" "${eviction_min_block_chars}" "${eviction_replacement_mode}" "${task_state_estimator_enabled}" "${task_state_estimator_base_url}" "${task_state_estimator_api_key}" "${task_state_estimator_model}" "${task_state_estimator_request_timeout_ms}" "${task_state_estimator_batch_turns}" "${task_state_estimator_eviction_lookahead_turns}" "${task_state_estimator_completed_summary_max_raw_turns}" "${task_state_estimator_input_mode}" "${task_state_estimator_lifecycle_mode}" "${task_state_estimator_evidence_mode}" "${task_state_estimator_eviction_promotion_policy}" "${task_state_estimator_eviction_promotion_hot_tail_size}" "${memory_enabled}" "${memory_auto_distill}" "${memory_distiller_type}" "${memory_batch_size}" "${memory_top_k}" "${memory_inject_as_system_hint}" "${memory_distill_base_url}" "${memory_distill_api_key}" "${memory_distill_model}" "${memory_distill_timeout_ms}" "${memory_fault_recovery_enabled}" <<'PATCH_PY'
 import json
 import os
 import sys
@@ -290,7 +289,7 @@ import sys
     enable_reduction_raw,
     trigger_min_chars_raw,
     max_tool_chars_raw,
-    pass_repeated_read_dedup_raw,
+    pass_read_state_compaction_raw,
     pass_tool_payload_trim_raw,
     pass_html_slimming_raw,
     pass_exec_output_truncation_raw,
@@ -343,7 +342,7 @@ enable_reduction = str(enable_reduction_raw).strip().lower() in ("1", "true", "y
 trigger_min_chars = int(trigger_min_chars_raw)
 max_tool_chars = int(max_tool_chars_raw)
 parse_bool = lambda x: str(x).strip().lower() in ("1", "true", "yes", "on")
-pass_repeated_read_dedup = parse_bool(pass_repeated_read_dedup_raw)
+pass_read_state_compaction = parse_bool(pass_read_state_compaction_raw)
 pass_tool_payload_trim = parse_bool(pass_tool_payload_trim_raw)
 pass_html_slimming = parse_bool(pass_html_slimming_raw)
 pass_exec_output_truncation = parse_bool(pass_exec_output_truncation_raw)
@@ -406,6 +405,7 @@ with open(config_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
 plugins = cfg.setdefault("plugins", {})
+plugins["enabled"] = True
 load_cfg = plugins.setdefault("load", {})
 existing_paths = load_cfg.get("paths")
 preserved_paths = []
@@ -445,10 +445,6 @@ slots["contextEngine"] = "layered-context"
 tokenpilot_cfg = tokenpilot.setdefault("config", {})
 tokenpilot_cfg["enabled"] = True
 tokenpilot_cfg["proxyAutostart"] = True
-if proxy_provider_id.strip():
-    tokenpilot_cfg["proxyProviderId"] = proxy_provider_id.strip()
-else:
-    tokenpilot_cfg.pop("proxyProviderId", None)
 if proxy_port:
     tokenpilot_cfg["proxyPort"] = proxy_port
 if proxy_base_url:
@@ -489,7 +485,7 @@ reduction["maxToolChars"] = max(256, max_tool_chars)
 proxy_mode = tokenpilot_cfg.setdefault("proxyMode", {})
 proxy_mode["pureForward"] = proxy_pure_forward
 passes = reduction.setdefault("passes", {})
-passes["repeatedReadDedup"] = pass_repeated_read_dedup
+passes["readStateCompaction"] = pass_read_state_compaction
 passes["toolPayloadTrim"] = pass_tool_payload_trim
 passes["htmlSlimming"] = pass_html_slimming
 passes["execOutputTruncation"] = pass_exec_output_truncation
@@ -513,7 +509,11 @@ def maybe_apply_json_env(env_name: str, key: str) -> None:
         raise SystemExit(f"{env_name} must decode to a JSON object")
     pass_options[key] = parsed
 
-maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_REPEATED_READ_DEDUP_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_REPEATED_READ_DEDUP_JSON"), "repeatedReadDedup")
+maybe_apply_json_env(
+    os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_READ_STATE_COMPACTION_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_READ_STATE_COMPACTION_JSON"),
+    "readStateCompaction",
+)
+maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_REPEATED_READ_DEDUP_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_REPEATED_READ_DEDUP_JSON"), "readStateCompaction")
 maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_TOOL_PAYLOAD_TRIM_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_TOOL_PAYLOAD_TRIM_JSON"), "toolPayloadTrim")
 maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_HTML_SLIMMING_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_HTML_SLIMMING_JSON"), "htmlSlimming")
 maybe_apply_json_env(os.environ.get("TOKENPILOT_REDUCTION_PASS_OPTIONS_EXEC_OUTPUT_TRUNCATION_ENV", "TOKENPILOT_REDUCTION_PASS_OPTIONS_EXEC_OUTPUT_TRUNCATION_JSON"), "execOutputTruncation")
@@ -633,6 +633,7 @@ print(
     f"evictionReplacementMode={eviction.get('replacementMode')}",
     f"taskStateEstimatorEnabled={task_state_estimator.get('enabled')}",
     f"taskStateEstimatorModel={task_state_estimator.get('model')}",
+    f"taskStateEstimatorBatchTurns={task_state_estimator.get('batchTurns')}",
     f"taskStateEstimatorInputMode={task_state_estimator.get('inputMode')}",
     f"taskStateEstimatorLifecycleMode={task_state_estimator.get('lifecycleMode')}",
     f"taskStateEstimatorEvidenceMode={task_state_estimator.get('evidenceMode')}",
@@ -654,30 +655,39 @@ sanitize_plugin_runtime_config() {
   local config_path="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
   local enable_eviction="${TOKENPILOT_ENABLE_EVICTION:-false}"
   local enable_reduction="${TOKENPILOT_ENABLE_REDUCTION:-true}"
+  local proxy_pure_forward="${TOKENPILOT_PROXY_PURE_FORWARD:-false}"
   if [[ ! -f "${config_path}" ]]; then
     echo "WARN: openclaw config not found, skip plugin runtime config sanitize: ${config_path}" >&2
     return 0
   fi
 
-  python3 - "${config_path}" "${enable_eviction}" "${enable_reduction}" <<'SANITIZE_PY'
+  python3 - "${config_path}" "${enable_eviction}" "${enable_reduction}" "${proxy_pure_forward}" <<'SANITIZE_PY'
 import json
 import os
 import sys
 
-config_path, enable_eviction_raw, enable_reduction_raw = sys.argv[1:4]
+config_path, enable_eviction_raw, enable_reduction_raw, proxy_pure_forward_raw = sys.argv[1:5]
 enable_eviction = str(enable_eviction_raw).strip().lower() in ("1", "true", "yes", "on")
 enable_reduction = str(enable_reduction_raw).strip().lower() in ("1", "true", "yes", "on")
+proxy_pure_forward = str(proxy_pure_forward_raw).strip().lower() in ("1", "true", "yes", "on")
 
 with open(config_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
 plugins = cfg.setdefault("plugins", {})
+plugins["enabled"] = True
 plugins.setdefault("slots", {}).setdefault("contextEngine", "layered-context")
 entries = plugins.setdefault("entries", {})
+existing_tokenpilot_entry = entries.get("tokenpilot")
+existing_tokenpilot_cfg = {}
+if isinstance(existing_tokenpilot_entry, dict):
+    maybe_cfg = existing_tokenpilot_entry.get("config")
+    if isinstance(maybe_cfg, dict):
+        existing_tokenpilot_cfg = maybe_cfg
 entries.pop("tokenpilot", None)
 tokenpilot_entry = entries.setdefault("tokenpilot", {})
 tokenpilot_entry["enabled"] = True
-tokenpilot_cfg = tokenpilot_entry.setdefault("config", {})
+tokenpilot_cfg = tokenpilot_entry.setdefault("config", dict(existing_tokenpilot_cfg))
 
 allowed_top_level = {
     "enabled",
@@ -685,6 +695,7 @@ allowed_top_level = {
     "proxyPort",
     "proxyBaseUrl",
     "proxyApiKey",
+    "proxyMode",
     "contextEngine",
     "modules",
     "eviction",
@@ -698,6 +709,11 @@ for key in list(tokenpilot_cfg.keys()):
 
 tokenpilot_cfg["enabled"] = True
 tokenpilot_cfg["proxyAutostart"] = True
+proxy_mode = tokenpilot_cfg.get("proxyMode")
+if not isinstance(proxy_mode, dict):
+    proxy_mode = {}
+proxy_mode["pureForward"] = proxy_pure_forward
+tokenpilot_cfg["proxyMode"] = proxy_mode
 context_engine = tokenpilot_cfg.get("contextEngine")
 if not isinstance(context_engine, dict):
     context_engine = {}
@@ -725,7 +741,7 @@ passes = reduction.get("passes")
 if not isinstance(passes, dict):
     passes = {}
 allowed_passes = {
-    "repeatedReadDedup",
+    "readStateCompaction",
     "toolPayloadTrim",
     "htmlSlimming",
     "execOutputTruncation",
@@ -741,7 +757,7 @@ pass_options = reduction.get("passOptions")
 if not isinstance(pass_options, dict):
     pass_options = {}
 allowed_pass_options = {
-    "repeatedReadDedup",
+    "readStateCompaction",
     "toolPayloadTrim",
     "htmlSlimming",
     "execOutputTruncation",
@@ -791,6 +807,17 @@ tokenpilot_cfg = tokenpilot.get("config")
 def compact(section):
     if not isinstance(section, dict):
         return section
+    compacted = {
+        "enabled": section.get("enabled"),
+        "proxyAutostart": section.get("proxyAutostart"),
+        "proxyPort": section.get("proxyPort"),
+        "proxyBaseUrl": section.get("proxyBaseUrl"),
+        "proxyApiKey": "***REDACTED***" if section.get("proxyApiKey") else "",
+        "proxyMode": section.get("proxyMode"),
+        "modules": section.get("modules"),
+        "eviction": section.get("eviction"),
+        "reduction": section.get("reduction"),
+    }
     task_state_estimator = section.get("taskStateEstimator")
     if isinstance(task_state_estimator, dict) and "apiKey" in task_state_estimator:
         task_state_estimator = dict(task_state_estimator)
@@ -803,10 +830,9 @@ def compact(section):
             distill_provider = dict(distill_provider)
             distill_provider["apiKey"] = "***REDACTED***" if distill_provider.get("apiKey") else ""
             memory["distillProvider"] = distill_provider
-    return {
-        "taskStateEstimator": task_state_estimator,
-        "memory": memory,
-    }
+    compacted["taskStateEstimator"] = task_state_estimator
+    compacted["memory"] = memory
+    return compacted
 
 print(
     "[tokenpilot-config:%s] %s"
@@ -826,15 +852,17 @@ DUMP_CFG_PY
 
 ensure_pinchbench_exec_approvals() {
   local approvals_path="${TOKENPILOT_EXEC_APPROVALS_PATH:-${HOME}/.openclaw/exec-approvals.json}"
+  local gh_bin_dir="${PINCHBENCH_GH_BIN_DIR:-}"
   mkdir -p "$(dirname "${approvals_path}")"
 
-  python3 - "${approvals_path}" <<'PINCHBENCH_APPROVALS_PY'
+  python3 - "${approvals_path}" "${gh_bin_dir}" <<'PINCHBENCH_APPROVALS_PY'
 import json
 import secrets
 import sys
 from pathlib import Path
 
 approvals_path = Path(sys.argv[1])
+gh_bin_dir = Path(sys.argv[2]).expanduser() if sys.argv[2].strip() else None
 home = str(Path.home())
 
 allowlist = [
@@ -863,6 +891,10 @@ allowlist = [
     {"id": "home_local_bin_fws", "pattern": home + "/.local/bin/fws"},
     {"id": "home_nvm_bin_fws", "pattern": home + "/.nvm/versions/node/v22.16.0/bin/fws"},
 ]
+if gh_bin_dir is not None:
+    gh_path = gh_bin_dir / "gh"
+    if gh_path.is_file():
+        allowlist.append({"id": "pinchbench_gh", "pattern": str(gh_path)})
 
 if approvals_path.exists():
     try:
@@ -880,6 +912,14 @@ data["defaults"] = data.get("defaults") or {}
 agents = data.setdefault("agents", {})
 wildcard = agents.setdefault("*", {})
 wildcard["allowlist"] = allowlist
+# Empty stale per-agent policies override the wildcard policy and block a
+# newly created benchmark agent from executing otherwise approved tools.
+for agent_id in list(agents):
+    if agent_id == "*":
+        continue
+    agent_policy = agents.get(agent_id)
+    if isinstance(agent_policy, dict) and agent_policy.get("allowlist") == []:
+        agents.pop(agent_id, None)
 
 approvals_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 print(f"Ensured PinchBench exec approvals: {approvals_path}")
@@ -891,26 +931,79 @@ validate_openclaw_runtime_config() {
   OPENCLAW_CONFIG_PATH="${config_path}" openclaw_cmd config validate >/dev/null
 }
 
+reapply_method_runtime_config_if_needed() {
+  local skip_method_runtime_patch="${PINCHBENCH_SKIP_METHOD_RUNTIME_PATCH:-false}"
+  if [[ "${skip_method_runtime_patch}" =~ ^(true|1|yes)$ ]]; then
+    return 0
+  fi
+  if [[ -z "${TOKENPILOT_BASE_URL:-}" && -z "${LIGHTMEM2_BASE_URL:-}" ]]; then
+    return 0
+  fi
+  ensure_plugin_runtime_config
+  sanitize_plugin_runtime_config
+  validate_openclaw_runtime_config
+  assert_method_runtime_config
+}
+
 assert_method_runtime_config() {
   local config_path="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
-  python3 - "${config_path}" <<'ASSERT_METHOD_CFG_PY'
+  python3 - "${config_path}" "${TOKENPILOT_BASE_URL:-${LIGHTMEM2_BASE_URL:-}}" "${TOKENPILOT_PROXY_PORT:-17668}" "${TOKENPILOT_API_KEY:-${LIGHTMEM2_API_KEY:-}}" <<'ASSERT_METHOD_CFG_PY'
 import json
+import os
 import sys
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
+expected_proxy_base_url = (sys.argv[2] or "").strip()
+expected_proxy_port_raw = (sys.argv[3] or "").strip()
+expected_proxy_api_key = (sys.argv[4] or "").strip()
 obj = json.loads(config_path.read_text(encoding="utf-8"))
 plugins = obj.get("plugins", {})
 entries = plugins.get("entries", {})
 tokenpilot = entries.get("tokenpilot", {})
 slot = plugins.get("slots", {}).get("contextEngine")
 enabled = tokenpilot.get("enabled")
+tokenpilot_cfg = tokenpilot.get("config") or {}
 
 errors = []
 if enabled is not True:
     errors.append(f"plugins.entries.tokenpilot.enabled={enabled!r} (expected true)")
 if slot != "layered-context":
     errors.append(f"plugins.slots.contextEngine={slot!r} (expected 'layered-context')")
+if expected_proxy_base_url and tokenpilot_cfg.get("proxyBaseUrl") != expected_proxy_base_url:
+    errors.append(
+        f"plugins.entries.tokenpilot.config.proxyBaseUrl={tokenpilot_cfg.get('proxyBaseUrl')!r} "
+        f"(expected {expected_proxy_base_url!r})"
+    )
+if expected_proxy_port_raw:
+    try:
+        expected_proxy_port = int(expected_proxy_port_raw)
+    except ValueError:
+        expected_proxy_port = None
+    if expected_proxy_port is not None and tokenpilot_cfg.get("proxyPort") != expected_proxy_port:
+        errors.append(
+            f"plugins.entries.tokenpilot.config.proxyPort={tokenpilot_cfg.get('proxyPort')!r} "
+            f"(expected {expected_proxy_port!r})"
+        )
+if expected_proxy_api_key and not tokenpilot_cfg.get("proxyApiKey"):
+    errors.append("plugins.entries.tokenpilot.config.proxyApiKey is missing (expected non-empty value)")
+
+expected_batch_turns_raw = os.environ.get("TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS", "").strip()
+if expected_batch_turns_raw:
+    try:
+        expected_batch_turns = max(1, int(expected_batch_turns_raw))
+    except ValueError:
+        errors.append(
+            "TOKENPILOT_TASK_STATE_ESTIMATOR_BATCH_TURNS must be an integer "
+            f"(got {expected_batch_turns_raw!r})"
+        )
+    else:
+        actual_batch_turns = (tokenpilot_cfg.get("taskStateEstimator") or {}).get("batchTurns")
+        if actual_batch_turns != expected_batch_turns:
+            errors.append(
+                "plugins.entries.tokenpilot.config.taskStateEstimator.batchTurns="
+                f"{actual_batch_turns!r} (expected {expected_batch_turns!r})"
+            )
 
 if errors:
     print("Method runtime config is not active:", file=sys.stderr)
@@ -1145,6 +1238,7 @@ restore_openclaw_config() {
   cp "${OPENCLAW_CONFIG_BACKUP}" "${OPENCLAW_CONFIG_PATH}"
   rm -f "${OPENCLAW_CONFIG_BACKUP}"
   echo "Restored openclaw.json from backup"
+  reapply_method_runtime_config_if_needed
 }
 
 recover_stale_openclaw_config_backup() {
@@ -1154,6 +1248,7 @@ recover_stale_openclaw_config_backup() {
   echo "Found stale benchmark backup at ${OPENCLAW_CONFIG_BACKUP}; restoring it before starting a new run."
   cp "${OPENCLAW_CONFIG_BACKUP}" "${OPENCLAW_CONFIG_PATH}"
   rm -f "${OPENCLAW_CONFIG_BACKUP}"
+  reapply_method_runtime_config_if_needed
 }
 
 ensure_openclaw_gateway_running() {
@@ -1167,6 +1262,15 @@ ensure_openclaw_gateway_running() {
   local config_path="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
   local force_restart="${TOKENPILOT_FORCE_GATEWAY_RESTART:-false}"
   local gateway_port="${TOKENPILOT_GATEWAY_PORT:-}"
+  local runtime_upstream_provider="${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}"
+  local gateway_node_options="${NODE_OPTIONS:-}"
+  local gateway_log_file="${PINCHBENCH_GATEWAY_LOG_FILE:-/tmp/openclaw_gateway.log}"
+  if [[ -n "${TOKENPILOT_UPSTREAM_DNS_OVERRIDE:-}" ]]; then
+    gateway_node_options="${gateway_node_options} --require ${SCRIPT_DIR}/upstream-dns-override.cjs"
+  fi
+  if [[ "${runtime_upstream_provider}" == "tokenpilot" || "${runtime_upstream_provider}" == "lightmem2" ]]; then
+    runtime_upstream_provider=""
+  fi
   if [[ -z "${gateway_port}" ]]; then
     gateway_port="$(python3 - "${config_path}" <<'PY'
 import json
@@ -1183,7 +1287,8 @@ PY
   fi
   if [[ "${force_restart}" =~ ^(true|1|yes)$ ]]; then
     echo "Forcing OpenClaw gateway restart on port ${gateway_port}..."
-    rm -f /tmp/openclaw_gateway.log
+    mkdir -p "$(dirname "${gateway_log_file}")"
+    rm -f "${gateway_log_file}"
     local -a gateway_cmd=()
     mapfile -d '' -t gateway_cmd < <(openclaw_cmd_array gateway run --force --port "${gateway_port}")
     nohup env \
@@ -1192,8 +1297,14 @@ PY
       OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR}" \
       XDG_CACHE_HOME="${XDG_CACHE_HOME}" \
       XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
-      TOKENPILOT_UPSTREAM_PROVIDER="${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}" \
-      LIGHTMEM2_UPSTREAM_PROVIDER="${LIGHTMEM2_UPSTREAM_PROVIDER:-${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}}" \
+      TOKENPILOT_BASE_URL="${TOKENPILOT_BASE_URL:-}" \
+      TOKENPILOT_API_KEY="${TOKENPILOT_API_KEY:-}" \
+      LIGHTMEM2_BASE_URL="${LIGHTMEM2_BASE_URL:-${TOKENPILOT_BASE_URL:-}}" \
+      LIGHTMEM2_API_KEY="${LIGHTMEM2_API_KEY:-${TOKENPILOT_API_KEY:-}}" \
+      TOKENPILOT_UPSTREAM_PROVIDER="${runtime_upstream_provider}" \
+      LIGHTMEM2_UPSTREAM_PROVIDER="${LIGHTMEM2_UPSTREAM_PROVIDER:-${runtime_upstream_provider}}" \
+      TOKENPILOT_UPSTREAM_DNS_OVERRIDE="${TOKENPILOT_UPSTREAM_DNS_OVERRIDE:-}" \
+      NODE_OPTIONS="${gateway_node_options# }" \
       GOOGLE_WORKSPACE_CLI_CONFIG_DIR="${GOOGLE_WORKSPACE_CLI_CONFIG_DIR:-}" \
       GOOGLE_WORKSPACE_CLI_TOKEN="${GOOGLE_WORKSPACE_CLI_TOKEN:-}" \
       HTTPS_PROXY="${HTTPS_PROXY:-}" \
@@ -1203,7 +1314,7 @@ PY
       TOKENPILOT_UPSTREAM_HTTP_PROXY="${TOKENPILOT_UPSTREAM_HTTP_PROXY:-}" \
       TOKENPILOT_UPSTREAM_HTTPS_PROXY="${TOKENPILOT_UPSTREAM_HTTPS_PROXY:-}" \
       TOKENPILOT_UPSTREAM_NO_PROXY="${TOKENPILOT_UPSTREAM_NO_PROXY:-}" \
-      "${gateway_cmd[@]}" >/tmp/openclaw_gateway.log 2>&1 &
+      "${gateway_cmd[@]}" >"${gateway_log_file}" 2>&1 &
     local gateway_pid=$!
     local attempts=0
     while [[ ${attempts} -lt 30 ]]; do
@@ -1217,12 +1328,13 @@ PY
       attempts=$((attempts + 1))
       sleep 1
     done
-    echo "ERROR: forced OpenClaw gateway restart failed. See /tmp/openclaw_gateway.log" >&2
+    echo "ERROR: forced OpenClaw gateway restart failed. See ${gateway_log_file}" >&2
     return 1
   fi
   if ! openclaw_cmd gateway health >/dev/null 2>&1; then
     echo "OpenClaw gateway is unreachable; starting a local gateway..."
-    rm -f /tmp/openclaw_gateway.log
+    mkdir -p "$(dirname "${gateway_log_file}")"
+    rm -f "${gateway_log_file}"
     local -a gateway_cmd=()
     mapfile -d '' -t gateway_cmd < <(openclaw_cmd_array gateway run --force --port "${gateway_port}")
     nohup env \
@@ -1231,8 +1343,14 @@ PY
       OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR}" \
       XDG_CACHE_HOME="${XDG_CACHE_HOME}" \
       XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
-      TOKENPILOT_UPSTREAM_PROVIDER="${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}" \
-      LIGHTMEM2_UPSTREAM_PROVIDER="${LIGHTMEM2_UPSTREAM_PROVIDER:-${TOKENPILOT_UPSTREAM_PROVIDER:-${PINCHBENCH_MODEL_PROVIDER_PREFIX:-}}}" \
+      TOKENPILOT_BASE_URL="${TOKENPILOT_BASE_URL:-}" \
+      TOKENPILOT_API_KEY="${TOKENPILOT_API_KEY:-}" \
+      LIGHTMEM2_BASE_URL="${LIGHTMEM2_BASE_URL:-${TOKENPILOT_BASE_URL:-}}" \
+      LIGHTMEM2_API_KEY="${LIGHTMEM2_API_KEY:-${TOKENPILOT_API_KEY:-}}" \
+      TOKENPILOT_UPSTREAM_PROVIDER="${runtime_upstream_provider}" \
+      LIGHTMEM2_UPSTREAM_PROVIDER="${LIGHTMEM2_UPSTREAM_PROVIDER:-${runtime_upstream_provider}}" \
+      TOKENPILOT_UPSTREAM_DNS_OVERRIDE="${TOKENPILOT_UPSTREAM_DNS_OVERRIDE:-}" \
+      NODE_OPTIONS="${gateway_node_options# }" \
       GOOGLE_WORKSPACE_CLI_CONFIG_DIR="${GOOGLE_WORKSPACE_CLI_CONFIG_DIR:-}" \
       GOOGLE_WORKSPACE_CLI_TOKEN="${GOOGLE_WORKSPACE_CLI_TOKEN:-}" \
       HTTPS_PROXY="${HTTPS_PROXY:-}" \
@@ -1242,7 +1360,7 @@ PY
       TOKENPILOT_UPSTREAM_HTTP_PROXY="${TOKENPILOT_UPSTREAM_HTTP_PROXY:-}" \
       TOKENPILOT_UPSTREAM_HTTPS_PROXY="${TOKENPILOT_UPSTREAM_HTTPS_PROXY:-}" \
       TOKENPILOT_UPSTREAM_NO_PROXY="${TOKENPILOT_UPSTREAM_NO_PROXY:-}" \
-      "${gateway_cmd[@]}" >/tmp/openclaw_gateway.log 2>&1 &
+      "${gateway_cmd[@]}" >"${gateway_log_file}" 2>&1 &
     local gateway_pid=$!
     local attempts=0
     while [[ ${attempts} -lt 20 ]]; do
@@ -1263,7 +1381,7 @@ PY
       echo "OpenClaw gateway became reachable after startup race."
       return 0
     fi
-    echo "ERROR: OpenClaw gateway failed to become reachable. See /tmp/openclaw_gateway.log" >&2
+    echo "ERROR: OpenClaw gateway failed to become reachable. See ${gateway_log_file}" >&2
     return 1
   fi
   if [[ ! "${skip_method_runtime_patch}" =~ ^(true|1|yes)$ ]]; then
