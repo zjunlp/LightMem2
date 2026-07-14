@@ -57,10 +57,25 @@ Preferred variables are:
 - `TOKENPILOT_SESSION_MODE`
 - `TOKENPILOT_FORCE_GATEWAY_RESTART`
 
+Judge routes can be separated from method routes by provider prefix. For
+`--judge kuaipao/gpt-5.4-mini`, set:
+
+- `PINCHBENCH_JUDGE_KUAIPAO_BASE_URL`
+- `PINCHBENCH_JUDGE_KUAIPAO_API_KEY`
+
 Active runtime variables are:
 
 - `TOKENPILOT_BASE_URL`
 - `TOKENPILOT_API_KEY`
+
+Reliability controls for isolated or parallel workers include:
+
+- `PINCHBENCH_GATEWAY_LOG_FILE`: keep each worker's gateway log outside shared `/tmp`
+- `PINCHBENCH_FWS_PORT`: assign the worker's FWS API port; its proxy uses the next port
+- `PINCHBENCH_CLEANUP_ISOLATED_SERVICES=true`: release worker-owned gateway/FWS ports on exit
+- `PINCHBENCH_TRANSIENT_PROVIDER_RETRY_ATTEMPTS`: retry provider-only failures, default `3`
+- `PINCHBENCH_TRANSIENT_PROVIDER_RETRY_BASE_DELAY_S`: exponential retry base delay, default `2.0`
+- `TOKENPILOT_UPSTREAM_DNS_OVERRIDE=host=address`: optional explicit DNS mapping for a broken upstream resolver path
 
 If you want to use unprefixed model aliases such as `gpt-5.4-mini`, also set:
 
