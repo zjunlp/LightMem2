@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import ssl
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,45 @@ logger = logging.getLogger(__name__)
 DEFAULT_JUDGE_MODEL = "tokenpilot/gpt-5.4-mini"
 DEFAULT_JUDGE_AGENT_PREFIX = "bench-judge"
 DEFAULT_JUDGE_TIMEOUT_SECONDS = 180
+
+
+def _resolve_ssl_cafile() -> Optional[str]:
+    env_path = os.environ.get("SSL_CERT_FILE")
+    if env_path:
+        path = Path(env_path).expanduser()
+        if path.is_file():
+            return str(path)
+        logger.warning("SSL_CERT_FILE is set but missing: %s", env_path)
+
+    try:
+        import certifi  # type: ignore
+
+        certifi_path = Path(certifi.where())
+        if certifi_path.is_file():
+            return str(certifi_path)
+    except Exception:
+        pass
+
+    defaults = ssl.get_default_verify_paths()
+    for candidate in (defaults.cafile, defaults.openssl_cafile):
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser()
+        if path.is_file():
+            return str(path)
+    return None
+
+
+def _urlopen_with_ssl(req: request.Request, timeout_seconds: float):
+    # FWS injects HTTPS_PROXY for mock task services. The judge is an external
+    # model endpoint, so inheriting that short-lived local proxy makes grading
+    # fail after FWS starts or stops. Use a proxy-free opener deliberately.
+    cafile = _resolve_ssl_cafile()
+    handlers = [request.ProxyHandler({})]
+    if cafile:
+        context = ssl.create_default_context(cafile=cafile)
+        handlers.append(request.HTTPSHandler(context=context))
+    return request.build_opener(*handlers).open(req, timeout=timeout_seconds)
 
 
 @dataclass
@@ -555,7 +595,7 @@ def _judge_via_openai_compat(
         headers.update(extra_headers)
     req = request.Request(endpoint, data=payload, headers=headers, method="POST")
     try:
-        with request.urlopen(req, timeout=timeout_seconds) as resp:
+        with _urlopen_with_ssl(req, timeout_seconds) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except error.HTTPError as exc:
         body = ""
@@ -580,12 +620,22 @@ def _judge_via_openai_compat(
 
 def _judge_via_runtime_compat(prompt: str, model: str, timeout_seconds: float) -> Dict[str, Any]:
     model_key = _model_env_key(model)
+    provider = model.split("/", 1)[0] if "/" in model else ""
+    provider_key = re.sub(r"[^A-Z0-9]", "_", provider.upper())
     base_url = (
+        os.environ.get(f"PINCHBENCH_JUDGE_{provider_key}_BASE_URL")
+        if provider_key
+        else None
+    ) or (
         os.environ.get(f"PINCHBENCH_MODEL_{model_key}_BASE_URL")
         or os.environ.get("TOKENPILOT_BASE_URL")
         or os.environ.get("OPENAI_BASE_URL")
     )
     api_key = (
+        os.environ.get(f"PINCHBENCH_JUDGE_{provider_key}_API_KEY")
+        if provider_key
+        else None
+    ) or (
         os.environ.get(f"PINCHBENCH_MODEL_{model_key}_API_KEY")
         or os.environ.get("TOKENPILOT_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
@@ -651,7 +701,7 @@ def _judge_via_anthropic(prompt: str, model: str, timeout_seconds: float) -> Dic
         method="POST",
     )
     try:
-        with request.urlopen(req, timeout=timeout_seconds) as resp:
+        with _urlopen_with_ssl(req, timeout_seconds) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except error.HTTPError as exc:
         body = ""
