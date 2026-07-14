@@ -23,6 +23,26 @@ from lib_tasks import Task
 
 
 logger = logging.getLogger(__name__)
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    """Read a non-negative retry count without making the harness brittle."""
+    try:
+        return max(0, int(os.environ.get(name, str(default))))
+    except ValueError:
+        logger.warning("Invalid %s value; using %s", name, default)
+        return default
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    """Read a non-negative retry delay without making the harness brittle."""
+    try:
+        return max(0.0, float(os.environ.get(name, str(default))))
+    except ValueError:
+        logger.warning("Invalid %s value; using %s", name, default)
+        return default
+
+
 MAX_OPENCLAW_MESSAGE_CHARS = int(os.environ.get("PINCHBENCH_MAX_MSG_CHARS", "32000"))
 CONTEXT_HASH_PREFIX_CHARS = int(os.environ.get("PINCHBENCH_CONTEXT_HASH_PREFIX_CHARS", "1024"))
 CONTEXT_RECENT_MESSAGES = int(os.environ.get("PINCHBENCH_CONTEXT_RECENT_MESSAGES", "4"))
@@ -96,6 +116,12 @@ DISABLE_CANONICAL_STATE_FALLBACK = os.environ.get(
     "yes",
     "on",
 }
+TRANSIENT_PROVIDER_RETRY_ATTEMPTS = _positive_int_env(
+    "PINCHBENCH_TRANSIENT_PROVIDER_RETRY_ATTEMPTS", 3
+)
+TRANSIENT_PROVIDER_RETRY_BASE_DELAY_S = _positive_float_env(
+    "PINCHBENCH_TRANSIENT_PROVIDER_RETRY_BASE_DELAY_S", 2.0
+)
 
 
 def _openclaw_cmd(*args: str) -> List[str]:
@@ -137,6 +163,16 @@ def _wait_for_gateway_stability() -> bool:
 
 
 def _restart_gateway_after_agent_rewrite() -> bool:
+    # Benchmark workers own an isolated gateway port. Always restart that
+    # process directly: `openclaw gateway restart` may return success without
+    # replacing the foreground gateway that still has the pre-agent config.
+    if (
+        os.environ.get("PINCHBENCH_GATEWAY_PORT", "").strip()
+        or os.environ.get("TOKENPILOT_GATEWAY_PORT", "").strip()
+    ) and os.environ.get(
+        "PINCHBENCH_GATEWAY_LOG_FILE", ""
+    ).strip():
+        return _restart_isolated_gateway_directly()
     try:
         result = subprocess.run(
             _openclaw_cmd("gateway", "restart"),
@@ -160,9 +196,107 @@ def _restart_gateway_after_agent_rewrite() -> bool:
             result.stdout.strip(),
             result.stderr.strip(),
         )
+        # Isolated benchmark workers own a dedicated port. The normal CLI
+        # restart path relies on systemd, which is unavailable in this batch
+        # environment. Restart that worker's gateway directly instead of
+        # continuing with a process that has not loaded the new agent config.
+        if _restart_isolated_gateway_directly():
+            return True
         return False
 
     logger.info("Restarted OpenClaw gateway after agent config rewrite")
+    return True
+
+
+def _restart_isolated_gateway_directly() -> bool:
+    port_raw = (
+        os.environ.get("PINCHBENCH_GATEWAY_PORT", "").strip()
+        or os.environ.get("TOKENPILOT_GATEWAY_PORT", "").strip()
+    )
+    log_path_raw = os.environ.get("PINCHBENCH_GATEWAY_LOG_FILE", "").strip()
+    if not port_raw or not log_path_raw:
+        return False
+    try:
+        port = int(port_raw)
+    except ValueError:
+        logger.warning("Invalid PINCHBENCH_GATEWAY_PORT=%r", port_raw)
+        return False
+
+    # Do not delegate process selection to OpenClaw's `--force`: concurrent
+    # benchmark workers have independent HOME directories, but --force can
+    # still terminate a gateway belonging to another worker. Only stop the
+    # gateway that belongs to this worker and listens on this worker's port.
+    marker = f"gateway run --port {port}"
+    worker_home = str(Path(os.environ.get("HOME", "")).resolve())
+
+    def is_this_workers_gateway(proc_path: Path) -> bool:
+        try:
+            cmdline = (proc_path / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "ignore")
+            environ = (proc_path / "environ").read_bytes().split(b"\0")
+        except OSError:
+            return False
+        if marker not in cmdline:
+            return False
+        proc_home = next(
+            (entry[5:].decode("utf-8", "ignore") for entry in environ if entry.startswith(b"HOME=")),
+            "",
+        )
+        try:
+            return str(Path(proc_home).resolve()) == worker_home
+        except OSError:
+            return False
+
+    current_pid = os.getpid()
+    for proc_path in Path("/proc").iterdir():
+        if not proc_path.name.isdigit():
+            continue
+        pid = int(proc_path.name)
+        if pid == current_pid:
+            continue
+        if not is_this_workers_gateway(proc_path):
+            continue
+        try:
+            os.kill(pid, 15)
+        except ProcessLookupError:
+            continue
+
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        still_running = False
+        for proc_path in Path("/proc").iterdir():
+            if not proc_path.name.isdigit():
+                continue
+            if is_this_workers_gateway(proc_path):
+                still_running = True
+                break
+        if not still_running:
+            break
+        time.sleep(0.2)
+
+    log_path = Path(log_path_raw)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    gateway_env = _build_openclaw_subprocess_env()
+    if gateway_env.get("TOKENPILOT_UPSTREAM_DNS_OVERRIDE", "").strip():
+        preload = Path(__file__).resolve().parents[2] / "scripts" / "upstream-dns-override.cjs"
+        existing_node_options = gateway_env.get("NODE_OPTIONS", "").strip()
+        gateway_env["NODE_OPTIONS"] = f"{existing_node_options} --require {preload}".strip()
+    try:
+        with log_path.open("a", encoding="utf-8") as log_file:
+            subprocess.Popen(
+                _openclaw_cmd("gateway", "run", "--port", str(port)),
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                env=gateway_env,
+                start_new_session=True,
+            )
+    except Exception as exc:
+        logger.warning("Direct isolated gateway restart failed on port %s: %s", port, exc)
+        return False
+
+    if not _wait_for_gateway_stability():
+        logger.warning("Direct isolated gateway restart did not stabilize on port %s", port)
+        return False
+    logger.info("Directly restarted isolated OpenClaw gateway on port %s", port)
     return True
 
 
@@ -1270,6 +1404,130 @@ def _parse_jsonl_file(path: Path) -> List[Dict[str, Any]]:
     return entries
 
 
+def _read_cache_audit_records_for_session(session_id: str) -> List[Dict[str, Any]]:
+    if not session_id:
+        return []
+    state_dir = Path(os.environ.get("OPENCLAW_STATE_DIR", str(DEFAULT_BENCH_OPENCLAW_STATE_DIR)))
+    candidates = [
+        state_dir / "tokenpilot-state" / "cache-audit-sessions" / f"{session_id}.jsonl",
+        state_dir / "tokenpilot-plugin-state" / "cache-audit-sessions" / f"{session_id}.jsonl",
+        state_dir / "cache-audit-sessions" / f"{session_id}.jsonl",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            records: List[Dict[str, Any]] = []
+            for line in path.read_text(encoding="utf-8").splitlines():
+                text = line.strip()
+                if not text:
+                    continue
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    records.append(parsed)
+            return records
+        except Exception as exc:
+            logger.warning("Failed to read cache-audit records from %s: %s", path, exc)
+            return []
+    return []
+
+
+def _backfill_transcript_cache_usage_from_audit(
+    transcript: List[Dict[str, Any]],
+    session_ids: List[str],
+) -> None:
+    if not transcript or not session_ids:
+        return
+    assistant_entries: List[Dict[str, Any]] = []
+    for entry in transcript:
+        if entry.get("type") != "message":
+            continue
+        msg = entry.get("message", {})
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        if not isinstance(msg.get("usage"), dict):
+            msg["usage"] = {}
+        assistant_entries.append(entry)
+    if not assistant_entries:
+        return
+
+    audit_records: List[Dict[str, Any]] = []
+    seen_paths: set[str] = set()
+    for session_id in session_ids:
+        if not session_id:
+            continue
+        state_dir = Path(os.environ.get("OPENCLAW_STATE_DIR", str(DEFAULT_BENCH_OPENCLAW_STATE_DIR)))
+        for path in (
+            state_dir / "tokenpilot-state" / "cache-audit-sessions" / f"{session_id}.jsonl",
+            state_dir / "tokenpilot-plugin-state" / "cache-audit-sessions" / f"{session_id}.jsonl",
+            state_dir / "cache-audit-sessions" / f"{session_id}.jsonl",
+        ):
+            path_key = str(path)
+            if path_key in seen_paths:
+                continue
+            seen_paths.add(path_key)
+            if path.exists():
+                audit_records.extend(_read_cache_audit_records_for_session(session_id))
+                break
+
+    if not audit_records:
+        return
+
+    audit_index = 0
+    for entry in assistant_entries:
+        if audit_index >= len(audit_records):
+            break
+        msg = entry["message"]
+        usage = msg.get("usage", {})
+        if not isinstance(usage, dict):
+            usage = {}
+            msg["usage"] = usage
+
+        # Preserve existing non-zero cache stats; only fill missing/zero ones.
+        existing_cache_read = 0
+        try:
+            existing_cache_read = int(usage.get("cacheRead") or usage.get("cache_read_tokens") or usage.get("cache_read_input_tokens") or 0)
+        except (TypeError, ValueError):
+            existing_cache_read = 0
+        if existing_cache_read > 0:
+            audit_index += 1
+            continue
+
+        record = audit_records[audit_index]
+        audit_index += 1
+        cached_input_tokens = 0
+        try:
+            cached_input_tokens = int(record.get("cachedInputTokens") or 0)
+        except (TypeError, ValueError):
+            cached_input_tokens = 0
+        if cached_input_tokens <= 0:
+            continue
+
+        usage["cacheRead"] = cached_input_tokens
+        usage["cache_read_tokens"] = cached_input_tokens
+        usage["cache_read_input_tokens"] = cached_input_tokens
+        usage["cached_tokens"] = cached_input_tokens
+        details = usage.get("prompt_tokens_details")
+        if not isinstance(details, dict):
+            details = {}
+            usage["prompt_tokens_details"] = details
+        details["cached_tokens"] = cached_input_tokens
+        input_details = usage.get("input_tokens_details")
+        if not isinstance(input_details, dict):
+            input_details = {}
+            usage["input_tokens_details"] = input_details
+        input_details["cached_tokens"] = cached_input_tokens
+        provider_raw = usage.get("providerRaw")
+        if not isinstance(provider_raw, dict):
+            provider_raw = {}
+            usage["providerRaw"] = provider_raw
+        provider_prompt_details = provider_raw.get("prompt_tokens_details")
+        if not isinstance(provider_prompt_details, dict):
+            provider_prompt_details = {}
+            provider_raw["prompt_tokens_details"] = provider_prompt_details
+        provider_prompt_details["cached_tokens"] = cached_input_tokens
+
+
 def _dedupe_transcript_entries(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Deduplicate transcript entries while preserving order.
 
@@ -1462,9 +1720,19 @@ def _is_transient_provider_error(transcript: List[Dict[str, Any]]) -> tuple[bool
     error_message = _ensure_text(assistant_message.get("errorMessage")).lower()
     signatures = [
         "bad gateway",
+        "gateway timeout",
+        "gateway time-out",
+        "service unavailable",
+        "internal server error",
+        "stream_read_error",
+        "unexpected end of json input",
+        "unexpected end of json",
         "502",
+        "503",
+        "504",
         "connection error",
         "temporarily unavailable",
+        "upstream unavailable",
         "help.openai.com",
         "rate limit",
         "timeout",
@@ -1472,6 +1740,43 @@ def _is_transient_provider_error(transcript: List[Dict[str, Any]]) -> tuple[bool
     if any(signature in error_message for signature in signatures):
         return True, error_message[:200]
     return False, ""
+
+
+def _has_only_failed_assistant_turns(transcript: List[Dict[str, Any]]) -> tuple[bool, str]:
+    assistant_messages: List[Dict[str, Any]] = []
+    for entry in transcript:
+        if entry.get("type") != "message":
+            continue
+        message = entry.get("message", {})
+        if isinstance(message, dict) and message.get("role") == "assistant":
+            assistant_messages.append(message)
+
+    if not assistant_messages:
+        return False, ""
+
+    saw_non_error = False
+    saw_non_empty_content = False
+    error_messages: List[str] = []
+    for message in assistant_messages:
+        if message.get("stopReason") != "error":
+            saw_non_error = True
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            saw_non_empty_content = True
+        elif isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and str(item.get("text", "")).strip():
+                    saw_non_empty_content = True
+                    break
+        error_message = _ensure_text(message.get("errorMessage")).strip()
+        if error_message:
+            error_messages.append(error_message)
+
+    if saw_non_error or saw_non_empty_content:
+        return False, ""
+    if not error_messages:
+        return False, ""
+    return True, error_messages[-1][:200]
 
 
 def execute_openclaw_task(
@@ -1628,23 +1933,33 @@ def execute_openclaw_task(
             timed_out = retry_timed_out
             transcript = _load_transcript(agent_id, retry_session_id, retry_started_at)
 
-        should_retry_error, retry_reason = _is_transient_provider_error(transcript)
-        if (
-            not defer_transcript_load
-            and should_retry_error
-            and not timed_out
-            and exit_code in (0, -1)
-            and "openclaw command not found" not in str(stderr)
-        ):
+        for retry_index in range(TRANSIENT_PROVIDER_RETRY_ATTEMPTS):
+            should_retry_error, retry_reason = _is_transient_provider_error(transcript)
+            can_retry = (
+                not defer_transcript_load
+                and should_retry_error
+                and not timed_out
+                and exit_code in (0, -1)
+                and "openclaw command not found" not in str(stderr)
+            )
+            if not can_retry:
+                break
+
+            delay_seconds = TRANSIENT_PROVIDER_RETRY_BASE_DELAY_S * (2**retry_index)
             logger.warning(
-                "Transient provider error for %s; retrying task execution once. reason=%s",
+                "Transient provider error for %s; retrying task execution (%s/%s) after %.1fs. reason=%s",
                 task.task_id,
+                retry_index + 1,
+                TRANSIENT_PROVIDER_RETRY_ATTEMPTS,
+                delay_seconds,
                 retry_reason,
             )
-            time.sleep(1.5)
+            time.sleep(delay_seconds)
             if cleanup_sessions:
                 cleanup_agent_sessions(agent_id)
-            retry_session_id = f"{session_id}_provider_retry"
+            retry_session_id = f"{session_id}_provider_retry_{retry_index + 1}"
+            if retry_session_id not in executed_session_ids:
+                executed_session_ids.append(retry_session_id)
             retry_started_at = time.time()
             retry_stdout, retry_stderr, retry_exit_code, retry_timed_out = _run_once(
                 retry_session_id, timeout_seconds, task.prompt
@@ -1655,6 +1970,7 @@ def execute_openclaw_task(
             timed_out = retry_timed_out
             transcript = _load_transcript(agent_id, retry_session_id, retry_started_at)
 
+        _backfill_transcript_cache_usage_from_audit(transcript, executed_session_ids)
         usage = _extract_usage_from_transcript(transcript)
         llm_calls = _extract_llm_calls_from_transcript(transcript)
         execution_time = time.time() - start_time
@@ -1663,6 +1979,9 @@ def execute_openclaw_task(
         if timed_out:
             status = "timeout"
         if not transcript:
+            status = "error"
+        fatal_provider_failure, fatal_provider_reason = _has_only_failed_assistant_turns(transcript)
+        if fatal_provider_failure:
             status = "error"
         if exit_code not in (0, -1) and not timed_out:
             status = "error"
@@ -1716,6 +2035,12 @@ def execute_openclaw_task(
                 (stdout[:500] if stdout else ""),
                 (stderr[:500] if stderr else ""),
                 dir_contents,
+            )
+        elif fatal_provider_failure:
+            logger.warning(
+                "Task %s ended with assistant provider failures only; marking run as error. reason=%s",
+                task.task_id,
+                fatal_provider_reason,
             )
 
         return {
