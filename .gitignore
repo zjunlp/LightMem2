@@ -237,3 +237,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Website (VitePress)
+website/.vitepress/cache/
+website/.vitepress/dist/
