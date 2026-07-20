@@ -346,6 +346,7 @@ export async function installCodexTokenPilot(params?: {
   probeMcp?: boolean;
   platform?: NodeJS.Platform;
   cliBinDir?: string;
+  cliContextPath?: string;
 }): Promise<{
   codexConfigPath: string;
   tokenPilotConfigPath: string;
@@ -400,6 +401,7 @@ export async function installCodexTokenPilot(params?: {
   const upstreamProvider = providerAlreadyRouted || installedProviderLooksFresh
     ? tokenPilotConfig.upstream
     : interceptedProvider;
+  tokenPilotConfig.enabled = true;
   tokenPilotConfig.providerName = providerName;
   tokenPilotConfig.upstreamProvider = providerName;
   if (
@@ -465,7 +467,7 @@ export async function installCodexTokenPilot(params?: {
     tokenPilotConfigPath,
     hostConfigPath: codexConfigPath,
     hostAuxConfigPath: hooksConfigPath,
-  });
+  }, params?.cliContextPath);
   const expectedHookCommand = await resolveCodexHookCommandForInstall(params?.platform);
   const mcpProbeResult = params?.probeMcp === false
     ? {

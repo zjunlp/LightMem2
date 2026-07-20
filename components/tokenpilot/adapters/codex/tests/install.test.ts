@@ -13,7 +13,24 @@ import {
 } from "../src/config.js";
 import { daemonPaths, readDaemonStatus } from "../src/daemon.js";
 import { inspectCodexDoctor } from "../src/doctor.js";
-import { installCodexTokenPilot, resolveCodexHookCommandForInstall } from "../src/install.js";
+import {
+  installCodexTokenPilot as installCodexTokenPilotBase,
+  resolveCodexHookCommandForInstall,
+} from "../src/install.js";
+
+function installCodexTokenPilot(
+  params: NonNullable<Parameters<typeof installCodexTokenPilotBase>[0]>,
+) {
+  return installCodexTokenPilotBase({
+    ...params,
+    cliContextPath: join(
+      dirname(params.codexConfigPath ?? params.tokenPilotConfigPath ?? tmpdir()),
+      ".lightmem2",
+      "state",
+      "cli-context.json",
+    ),
+  });
+}
 
 test("installCodexTokenPilot writes provider, MCP, and hooks with expected commands", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-"));
@@ -34,6 +51,7 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
       "requires_openai_auth = true",
       "",
     ].join("\n"), "utf8");
+    await writeFile(tokenPilotConfigPath, JSON.stringify({ enabled: false }, null, 2), "utf8");
 
     const result = await installCodexTokenPilot({
       codexConfigPath,
@@ -76,6 +94,7 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
     assert.equal((await lstat(result.hostCliBinPath!)).isSymbolicLink(), true);
     assert.match(await readlink(result.hostCliBinPath!), /adapters[\/\\]codex[\/\\]dist[\/\\]cli\.js$/);
     const tokenPilotConfig = await loadTokenPilotCodexConfig(tokenPilotConfigPath);
+    assert.equal(tokenPilotConfig.enabled, true);
     assert.equal(tokenPilotConfig.upstreamProvider, "OPENAI");
     assert.equal(tokenPilotConfig.upstream?.baseUrl, "https://api.openai.com/v1");
     const cliContext = await readCliContextState(join(dir, ".lightmem2", "state", "cli-context.json"));
