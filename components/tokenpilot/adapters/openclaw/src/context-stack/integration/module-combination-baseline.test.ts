@@ -1,0 +1,115 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { __testHooks } from "../../plugin-test-support.js";
+import {
+  MODULE_COMBINATIONS,
+  buildModuleCombinationConfig,
+  diffPayload,
+  diffStateDirectories,
+  snapshotStateDirectory,
+} from "./module-combination-test-support.js";
+
+test("all-enabled request behavior remains stable before module decoupling", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-all-enabled-baseline-"));
+  try {
+    const allEnabled = MODULE_COMBINATIONS.find(({ id }) => id === "all")!;
+    const cfg = __testHooks.normalizeConfig({
+      stateDir,
+      ...buildModuleCombinationConfig(allEnabled.enablement),
+      reduction: {
+        triggerMinChars: 256,
+        maxToolChars: 256,
+        passes: {
+          toolPayloadTrim: true,
+        },
+      },
+    });
+    const payload: any = {
+      model: "tokenpilot/gpt-5.4-mini",
+      prompt_cache_key: "inbound-cache-key",
+      instructions: "Keep the implementation precise.",
+      input: [
+        {
+          role: "developer",
+          content: "Runtime: agent=baseline-agent | host=demo\nYour working directory is: /tmp/baseline\n\nDeveloper prompt",
+        },
+        {
+          role: "user",
+          content: "[2026-07-20 10:00:00] Continue the task.",
+        },
+        {
+          role: "tool",
+          toolName: "search",
+          content: "T".repeat(3000),
+        },
+      ],
+    };
+    const beforePayload = structuredClone(payload);
+    const beforeState = await snapshotStateDirectory(stateDir);
+    const traceStages: string[] = [];
+    const reductionTracePasses: string[] = [];
+    let policyCalls = 0;
+
+    const prepared = await __testHooks.prepareProxyRequest({
+      cfg,
+      payload,
+      resolveSessionIdForPayload: () => "session-all-enabled-baseline",
+      policyModule: {
+        async beforeBuild(turnCtx: any) {
+          policyCalls += 1;
+          return turnCtx;
+        },
+      },
+      helpers: {
+        appendTaskStateTrace: async (_stateDir: string, record: any) => {
+          traceStages.push(String(record.stage ?? ""));
+        },
+        appendReductionPassTrace: async (_stateDir: string, record: any) => {
+          for (const entry of record.report ?? []) {
+            reductionTracePasses.push(String(entry.id ?? ""));
+          }
+        },
+      },
+      logger: {
+        info: () => undefined,
+        warn: () => undefined,
+        error: () => undefined,
+        debug: () => undefined,
+      },
+    });
+    const afterState = await snapshotStateDirectory(stateDir);
+    const payloadChanges = diffPayload(beforePayload, prepared.payload);
+    const stateChanges = diffStateDirectories(beforeState, afterState);
+    const reducedTool = prepared.payload.input.find((item: any) => item?.role === "tool");
+
+    assert.equal(policyCalls, 1);
+    assert.match(String(prepared.payload.prompt_cache_key), /^runtime-pfx-/);
+    assert.notEqual(prepared.payload.prompt_cache_key, "inbound-cache-key");
+    assert.equal(prepared.payload.prompt_cache_retention, "24h");
+    assert.equal(prepared.requestEnvelope.metadata?.promptCacheRetention, "24h");
+    assert.ok(prepared.reductionApplied.changedBlocks > 0);
+    assert.ok(prepared.reductionApplied.savedChars > 0);
+    assert.match(String(prepared.payload.input[0].content), /Your working directory is: \/tmp\/baseline/);
+    assert.match(String(prepared.payload.input[1].content), /WORKDIR: \/tmp\/baseline/);
+    assert.ok(String(reducedTool?.content ?? "").length < 3000);
+    assert.ok(payloadChanges.some(({ path }) => path === "prompt_cache_key"));
+    assert.ok(payloadChanges.some(({ path }) => path === "input[1].content"));
+    assert.ok(payloadChanges.some(({ path }) => path.startsWith("input")));
+    assert.deepEqual(traceStages, [
+      "procedural_memory_retrieval",
+      "stable_prefix_rewrite",
+      "proxy_reduction_session_resolved",
+      "proxy_before_call_rewrite",
+    ]);
+    assert.ok(reductionTracePasses.includes("tool_payload_trim"));
+    assert.ok(stateChanges.some(({ path }) => path === "tokenpilot/proxy-requests.jsonl"));
+    assert.ok(stateChanges.some(({ path }) => path === "tokenpilot/visual/stability/session-all-enabled-baseline.jsonl"));
+    assert.ok(stateChanges.some(({ path }) => path === "tokenpilot/visual/reduction/session-all-enabled-baseline.jsonl"));
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
