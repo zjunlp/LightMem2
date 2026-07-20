@@ -1,4 +1,8 @@
 import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-adapter";
+import {
+  TOKENPILOT_FEATURE_MODULE_IDS,
+  type SessionModuleObservationSummary,
+} from "./module-observability.js";
 import { readRecentReductionMetrics, summarizeRecentReductionMetrics } from "./metrics.js";
 import {
   RUNTIME_MODE_PRESETS,
@@ -75,6 +79,7 @@ export type ProductSurfaceSessionReportData = {
     topDriftKeys: Array<{ key: string; count: number }>;
   } | null;
   latestNonWarmCacheDiagnosis?: ProductSurfaceLatestNonWarmCacheDiagnosis | null;
+  moduleSummary?: SessionModuleObservationSummary | null;
 };
 
 export type ProductSurfaceCacheAuditSummary = NonNullable<ProductSurfaceSessionReportData["cacheAuditSummary"]>;
@@ -331,6 +336,7 @@ export function formatSessionReport(params: {
   overview?: ProductSurfaceSessionOverviewItem[];
   cacheAuditSummary?: ProductSurfaceSessionReportData["cacheAuditSummary"];
   latestNonWarmCacheDiagnosis?: ProductSurfaceSessionReportData["latestNonWarmCacheDiagnosis"];
+  moduleSummary?: ProductSurfaceSessionReportData["moduleSummary"];
 }): string {
   const {
     title,
@@ -342,6 +348,7 @@ export function formatSessionReport(params: {
     overview,
     cacheAuditSummary,
     latestNonWarmCacheDiagnosis,
+    moduleSummary,
   } = params;
   const latestCountMode = latest?.countMode ?? aggregate.latestCountMode ?? "openai_tokens";
   const unitLabel = countModeLabel(latestCountMode);
@@ -354,6 +361,7 @@ export function formatSessionReport(params: {
     ...(overview ?? []).map((item) => `${item.label}: ${item.value}`),
     title ?? "TokenPilot report:",
     `- session: ${sessionId}`,
+    ...(moduleSummary ? [`- module mode: ${moduleSummary.mode}`] : []),
     `- count mode: ${countModeDescription(latestCountMode)}`,
     `- saved ${unitLabel}: ${formatInt(savedCount)}`,
     `- recorded turns: ${formatInt(aggregate.turns)}`,
@@ -362,6 +370,17 @@ export function formatSessionReport(params: {
   ];
 
   if (detailsEnabled) {
+    if (moduleSummary) {
+      for (const moduleId of TOKENPILOT_FEATURE_MODULE_IDS) {
+        const module = moduleSummary.modules[moduleId];
+        const cost = typeof module.apiCostUsd === "number"
+          ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
+          : "";
+        lines.push(
+          `- ${moduleId}: enabled=${module.enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
+        );
+      }
+    }
     if (latest?.details?.requestSavedCount !== undefined) {
       lines.push(`- latest request savings: ${formatInt(latest.details.requestSavedCount)} ${unitLabel}`);
     }
@@ -448,6 +467,7 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
     emptyMessage,
     cacheAuditSummary,
     latestNonWarmCacheDiagnosis,
+    moduleSummary,
   } = params;
 
   if (!aggregate) {
@@ -455,9 +475,21 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
       ...(overview ?? []).map((item) => `${item.label}: ${item.value}`),
       title ?? "TokenPilot report:",
       `- session: ${sessionId}`,
+      ...(moduleSummary ? [`- module mode: ${moduleSummary.mode}`] : []),
       emptyMessage ?? "- no savings recorded yet",
     ];
     if (detailsEnabled) {
+      if (moduleSummary) {
+        for (const moduleId of TOKENPILOT_FEATURE_MODULE_IDS) {
+          const module = moduleSummary.modules[moduleId];
+          const cost = typeof module.apiCostUsd === "number"
+            ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
+            : "";
+          lines.push(
+            `- ${moduleId}: enabled=${module.enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
+          );
+        }
+      }
       if (cacheAuditSummary && cacheAuditSummary.warmCandidates > 0) {
         lines.push(`- cache warm hits: ${formatInt(cacheAuditSummary.warmHits)}/${formatInt(cacheAuditSummary.warmCandidates)} (${formatPercent(cacheAuditSummary.hitRatePercent)})`);
       }
@@ -476,6 +508,7 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
     overview,
     cacheAuditSummary,
     latestNonWarmCacheDiagnosis,
+    moduleSummary,
   });
 }
 
@@ -490,6 +523,7 @@ export async function loadSessionReportData(params: {
   emptyMessage?: string;
   cacheAuditSummary?: ProductSurfaceSessionReportData["cacheAuditSummary"];
   latestNonWarmCacheDiagnosis?: ProductSurfaceSessionReportData["latestNonWarmCacheDiagnosis"];
+  moduleSummary?: ProductSurfaceSessionReportData["moduleSummary"];
 }): Promise<ProductSurfaceSessionReportData> {
   const {
     stateDir,
@@ -502,6 +536,7 @@ export async function loadSessionReportData(params: {
     emptyMessage,
     cacheAuditSummary,
     latestNonWarmCacheDiagnosis,
+    moduleSummary,
   } = params;
   const [aggregate, latest, loadedRecentMetrics] = await Promise.all([
     readers.readAggregate(stateDir, sessionId),
@@ -524,6 +559,7 @@ export async function loadSessionReportData(params: {
     emptyMessage,
     cacheAuditSummary,
     latestNonWarmCacheDiagnosis,
+    moduleSummary,
   };
 }
 
@@ -538,6 +574,7 @@ export async function renderSessionReport(params: {
   emptyMessage?: string;
   cacheAuditSummary?: ProductSurfaceSessionReportData["cacheAuditSummary"];
   latestNonWarmCacheDiagnosis?: ProductSurfaceSessionReportData["latestNonWarmCacheDiagnosis"];
+  moduleSummary?: ProductSurfaceSessionReportData["moduleSummary"];
 }): Promise<string> {
   return buildSessionReportText(await loadSessionReportData(params));
 }

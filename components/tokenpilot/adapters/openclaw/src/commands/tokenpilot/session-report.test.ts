@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 
 import { handleReport } from "./session-report.js";
 import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
+import { appendModuleObservation } from "@tokenpilot/product-surface";
 
 test("openclaw handleReport includes recent metrics and recovery aggregates when details are enabled", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tokenpilot-openclaw-report-"));
@@ -161,6 +162,83 @@ test("openclaw handleReport includes recent metrics and recovery aggregates when
     assert.match(result.text, /response cache key rewrites: 1/i);
     assert.match(result.text, /cache entropy hotspots: abs_path=1/i);
     assert.doesNotMatch(result.text, /uuid=1/i);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("openclaw handleReport renders eviction-only diagnostics without reduction aggregates", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tokenpilot-openclaw-report-eviction-only-"));
+  const sessionId = "123e4567-e89b-12d3-a456-426614174001";
+  try {
+    await appendModuleObservation(dir, {
+      sessionId,
+      phase: "request",
+      moduleId: "stabilizer",
+      enabled: false,
+      executed: false,
+      changed: false,
+      skippedReason: "module_disabled",
+      savedChars: 0,
+      savedTokens: 0,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+    await appendModuleObservation(dir, {
+      sessionId,
+      phase: "request",
+      moduleId: "reduction",
+      enabled: false,
+      executed: false,
+      changed: false,
+      skippedReason: "module_disabled",
+      savedChars: 0,
+      savedTokens: 0,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+    await appendModuleObservation(dir, {
+      sessionId,
+      phase: "request",
+      moduleId: "eviction",
+      enabled: true,
+      executed: true,
+      changed: true,
+      savedChars: 0,
+      savedTokens: 0,
+      api: { inputTokens: 120, outputTokens: 24, costUsd: 0.002 },
+    });
+    await appendModuleObservation(dir, {
+      sessionId,
+      phase: "history",
+      moduleId: "eviction",
+      enabled: true,
+      executed: true,
+      changed: true,
+      savedChars: 1600,
+      savedTokens: 400,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+
+    const result = await handleReport(
+      { sessionId },
+      {
+        plugins: {
+          entries: {
+            tokenpilot: {
+              config: {
+                stateDir: dir,
+                ux: { details: true },
+              },
+            },
+          },
+        },
+      },
+    );
+
+    assert.match(result.text, /module mode: eviction-only/);
+    assert.match(result.text, /no reduction savings recorded/);
+    assert.match(result.text, /eviction: enabled=true, executions=2, changes=2/);
+    assert.match(result.text, /saved=400 tokens\/1,600 chars/);
+    assert.match(result.text, /estimator api=120 input \+ 24 output tokens, api cost=\$0\.002000/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

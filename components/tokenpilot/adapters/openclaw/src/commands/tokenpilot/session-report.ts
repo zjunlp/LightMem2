@@ -4,7 +4,12 @@ import { resolveSessionIdFromCommandScope } from "../../session/command-scope-ma
 import { loadRecentTurnBindingsFromState } from "../../session/turn-bindings.js";
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { getNestedValue, renderSessionReport, toRecord } from "@tokenpilot/product-surface";
+import {
+  getNestedValue,
+  readSessionModuleObservationSummary,
+  renderSessionReport,
+  toRecord,
+} from "@tokenpilot/product-surface";
 import {
   pluginConfigRecord,
   resolveStateDir,
@@ -152,8 +157,11 @@ export async function handleReport(ctx: any, currentConfig: Record<string, unkno
     return { text: scopedSessionKey ? "No TokenPilot savings recorded yet for current session." : "No TokenPilot session stats yet." };
   }
 
-  const aggregate = await readSessionUxAggregate(stateDir, sessionId);
-  if (!aggregate) {
+  const [aggregate, moduleSummary] = await Promise.all([
+    readSessionUxAggregate(stateDir, sessionId),
+    readSessionModuleObservationSummary(stateDir, sessionId),
+  ]);
+  if (!aggregate && !moduleSummary) {
     return { text: `No TokenPilot savings recorded yet for session ${sessionId}.` };
   }
 
@@ -170,6 +178,10 @@ export async function handleReport(ctx: any, currentConfig: Record<string, unkno
       sessionId,
       detailsEnabled,
       cacheAuditSummary,
+      moduleSummary,
+      emptyMessage: moduleSummary
+        ? "- no reduction savings recorded; module diagnostics are available below"
+        : undefined,
       overview: buildOpenClawSessionOverview(sessionId, summary),
       readers: {
         readLatest: readLatestUxEffect,
