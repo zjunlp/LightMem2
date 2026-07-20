@@ -288,3 +288,59 @@ for (const combination of MODULE_COMBINATIONS.filter(({ enablement }) => !enable
     }
   });
 }
+
+test("reduction-only mutates tool payload without prefix or eviction effects", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-reduction-only-contract-"));
+  try {
+    const reductionOnly = MODULE_COMBINATIONS.find(({ id }) => id === "reduction-only")!;
+    const cfg = __testHooks.normalizeConfig({
+      stateDir,
+      ...buildModuleCombinationConfig(reductionOnly.enablement),
+      memory: { enabled: false },
+      reduction: {
+        triggerMinChars: 256,
+        maxToolChars: 256,
+        passes: { toolPayloadTrim: true },
+      },
+    });
+    const payload: any = createRequestPayload();
+    const originalDeveloper = structuredClone(payload.input[0]);
+    const originalUser = structuredClone(payload.input[1]);
+    let policyCalls = 0;
+
+    const prepared = await __testHooks.prepareProxyRequest({
+      cfg,
+      payload,
+      resolveSessionIdForPayload: () => "session-reduction-only-contract",
+      policyModule: {
+        async beforeBuild(turnCtx: any) {
+          policyCalls += 1;
+          return turnCtx;
+        },
+      },
+      logger: {
+        info: () => undefined,
+        warn: () => undefined,
+        error: () => undefined,
+        debug: () => undefined,
+      },
+    });
+    const toolMessage = prepared.payload.input.find((item: any) => item?.role === "tool");
+
+    assert.equal(policyCalls, 0);
+    assert.deepEqual(prepared.payload.input[0], originalDeveloper);
+    assert.deepEqual(prepared.payload.input[1], originalUser);
+    assert.equal(prepared.payload.prompt_cache_key, "inbound-cache-key");
+    assert.equal("prompt_cache_retention" in prepared.payload, false);
+    assert.equal("__tokenpilot_reduction_applied" in prepared.payload, false);
+    assert.ok(String(toolMessage?.content ?? "").length < 3000);
+    assert.ok(prepared.reductionApplied.savedChars > 0);
+    assert.deepEqual(prepared.evictionRun, {
+      enabled: false,
+      executed: false,
+      skippedReason: "module_disabled",
+    });
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
