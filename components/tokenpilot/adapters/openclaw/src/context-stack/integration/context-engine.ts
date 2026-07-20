@@ -3,23 +3,88 @@ import { rewriteCanonicalState, syncCanonicalStateFromTranscript } from "../page
 import { estimateMessagesChars, saveCanonicalState } from "@tokenpilot/history";
 import { enqueueEvictedTasksForProceduralMemory } from "./procedural-memory.js";
 import { runHistoryEvictionIfEnabled } from "./history-eviction-runner.js";
+import { runHistoryModules } from "./module-orchestrator.js";
 
 export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
   const canonicalMessageTaskIdsBound = (message: Record<string, unknown>): string[] =>
     deps.canonicalMessageTaskIds(message, deps.asRecord);
 
   async function syncAndEvict(sessionId: string) {
-    const synced = await syncCanonicalStateFromTranscript({
-      stateDir: cfg.stateDir,
-      sessionId,
-      getMessage: (entry: any) => entry.message,
-      helpers: {
-        appendTaskStateTrace: deps.appendTaskStateTrace,
-        readTranscriptEntriesForSession: deps.readTranscriptEntriesForSession,
-        stableIdForEntry: deps.transcriptMessageStableId,
-      },
+    const context: {
+      synced?: Awaited<ReturnType<typeof syncCanonicalStateFromTranscript>>;
+      eviction?: Awaited<ReturnType<typeof runHistoryEvictionIfEnabled>>;
+    } = {};
+    const historyModuleExecutions = await runHistoryModules({
+      context,
+      modules: [
+        {
+          id: "canonical-sync",
+          enabled: () => true,
+          run: async () => {
+            context.synced = await syncCanonicalStateFromTranscript({
+              stateDir: cfg.stateDir,
+              sessionId,
+              getMessage: (entry: any) => entry.message,
+              helpers: {
+                appendTaskStateTrace: deps.appendTaskStateTrace,
+                readTranscriptEntriesForSession: deps.readTranscriptEntriesForSession,
+                stableIdForEntry: deps.transcriptMessageStableId,
+              },
+            });
+            return context.synced;
+          },
+        },
+        {
+          id: "eviction",
+          enabled: () => cfg.moduleEnablement.eviction,
+          run: async () => {
+            context.eviction = await runHistoryEvictionIfEnabled({
+              cfg,
+              sessionId,
+              state: context.synced!.state,
+              helpers: {
+                ...deps,
+                canonicalMessageTaskIds: canonicalMessageTaskIdsBound,
+              },
+              logger,
+              rewriteCanonicalState,
+              estimateMessagesChars,
+            });
+            await deps.appendTaskStateTrace(cfg.stateDir, {
+              stage: "history_eviction_completed",
+              sessionId,
+              changed: context.eviction.changed,
+              appliedTaskIds: context.eviction.appliedTaskIds,
+              savedChars: context.eviction.savedChars,
+              diagnostics: context.eviction.diagnostics,
+            });
+            return context.eviction;
+          },
+        },
+        {
+          id: "memory-consumer",
+          enabled: () => Boolean(context.eviction?.appliedTaskIds.length),
+          run: async () => enqueueEvictedTasksForProceduralMemory({
+            cfg,
+            sessionId,
+            state: context.eviction!.state,
+            appliedTaskIds: context.eviction!.appliedTaskIds,
+            helpers: deps,
+            logger,
+          }),
+        },
+        {
+          id: "canonical-persistence",
+          enabled: () => Boolean(context.synced?.changed || context.eviction?.changed),
+          run: async () => saveCanonicalState(
+            cfg.stateDir,
+            context.eviction?.state ?? context.synced!.state,
+          ),
+        },
+      ],
     });
-    const eviction = await runHistoryEvictionIfEnabled({
+    const synced = context.synced!;
+    const eviction = context.eviction ?? await runHistoryEvictionIfEnabled({
       cfg,
       sessionId,
       state: synced.state,
@@ -31,34 +96,12 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
       rewriteCanonicalState,
       estimateMessagesChars,
     });
-    if (eviction.enabled) {
-      await deps.appendTaskStateTrace(cfg.stateDir, {
-        stage: "history_eviction_completed",
-        sessionId,
-        changed: eviction.changed,
-        appliedTaskIds: eviction.appliedTaskIds,
-        savedChars: eviction.savedChars,
-        diagnostics: eviction.diagnostics,
-      });
-    }
-    if (eviction.appliedTaskIds.length > 0) {
-      await enqueueEvictedTasksForProceduralMemory({
-        cfg,
-        sessionId,
-        state: eviction.state,
-        appliedTaskIds: eviction.appliedTaskIds,
-        helpers: deps,
-        logger,
-      });
-    }
-    if (synced.changed || eviction.changed) {
-      await saveCanonicalState(cfg.stateDir, eviction.state);
-    }
     return {
       state: eviction.state,
       changed: synced.changed || eviction.changed,
       synced,
       eviction,
+      historyModuleExecutions,
     };
   }
 
