@@ -249,7 +249,7 @@ function applyObservationsToSummary(
     if (typeof observation.api?.costUsd === "number") {
       aggregate.apiCostUsd = (aggregate.apiCostUsd ?? 0) + Math.max(0, observation.api.costUsd);
     }
-    if (!aggregate.latestAt || observation.at >= aggregate.latestAt) {
+    if (observation.phase !== "response" && (!aggregate.latestAt || observation.at >= aggregate.latestAt)) {
       aggregate.enabled = observation.enabled;
       aggregate.latestAt = observation.at;
       aggregate.latestSkippedReason = observation.skippedReason;

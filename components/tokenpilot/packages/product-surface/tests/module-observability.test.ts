@@ -104,6 +104,19 @@ test("accounting observations add savings without creating executions or skips",
     await appendModuleObservation(stateDir, {
       at: "2026-07-20T00:00:01.000Z",
       sessionId,
+      phase: "request",
+      moduleId: "reduction",
+      enabled: false,
+      executed: false,
+      changed: false,
+      skippedReason: "module_disabled",
+      savedChars: 0,
+      savedTokens: 0,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+    await appendModuleObservation(stateDir, {
+      at: "2026-07-20T00:00:02.000Z",
+      sessionId,
       phase: "response",
       moduleId: "reduction",
       enabled: true,
@@ -117,9 +130,13 @@ test("accounting observations add savings without creating executions or skips",
     const summary = await readSessionModuleObservationSummary(stateDir, sessionId);
     assert.equal(summary?.modules.reduction.executions, 1);
     assert.equal(summary?.modules.reduction.changes, 1);
-    assert.equal(summary?.modules.reduction.skips, 0);
+    assert.equal(summary?.modules.reduction.skips, 1);
     assert.equal(summary?.modules.reduction.savedChars, 400);
     assert.equal(summary?.modules.reduction.savedTokens, 100);
+    assert.equal(summary?.modules.reduction.enabled, false);
+    assert.equal(summary?.modules.reduction.latestSkippedReason, "module_disabled");
+    assert.equal(summary?.modules.reduction.latestAt, "2026-07-20T00:00:01.000Z");
+    assert.equal(summary?.latestAt, "2026-07-20T00:00:02.000Z");
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }
