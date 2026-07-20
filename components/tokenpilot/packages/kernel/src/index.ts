@@ -4,5 +4,6 @@ export * from "./interfaces.js";
 export * from "./events.js";
 export * from "./segments.js";
 export * from "./runtime-contracts.js";
+export * from "./module-contracts.js";
 export type { RuntimeModule, RuntimeModuleRuntime } from "./interfaces.js";
 export type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "./types.js";
