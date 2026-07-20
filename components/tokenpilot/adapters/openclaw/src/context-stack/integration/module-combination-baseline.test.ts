@@ -151,6 +151,21 @@ for (const combination of MODULE_COMBINATIONS) {
           },
         },
         helpers: {
+          buildLayeredReductionContext: combination.enablement.reduction
+            ? undefined
+            : () => {
+              throw new Error("disabled reduction must not build layered context");
+            },
+          loadOrderedTurnAnchors: combination.enablement.reduction
+            ? undefined
+            : async () => {
+              throw new Error("disabled reduction must not load turn anchors");
+            },
+          loadSegmentAnchorByCallId: combination.enablement.reduction
+            ? undefined
+            : async () => {
+              throw new Error("disabled reduction must not load segment anchors");
+            },
           appendTaskStateTrace: async (_stateDir: string, record: any) => {
             const stage = String(record.stage ?? "");
             const module = stage.includes("reduction") || stage === "proxy_before_call_rewrite"

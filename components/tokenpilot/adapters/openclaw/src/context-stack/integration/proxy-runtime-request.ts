@@ -15,6 +15,7 @@ import type { UpstreamConfig } from "./upstream.js";
 import { normalizeResponsesInputForUpstream } from "./proxy-runtime-shared.js";
 import { recordProxyInbound } from "./proxy-runtime-logging.js";
 import { buildOpenClawCacheAuditSnapshot } from "../../cache-audit.js";
+import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
 
 type ProxyRequestPreparation = {
   payload: any;
@@ -185,57 +186,14 @@ async function runPolicyBeforeReduction(
   helpers: any,
   payload: any,
   resolvedSessionId: string,
-  reductionPassOptions: any,
   policyModule: any,
-  reductionTriggerMinChars: number,
 ): Promise<void> {
   if (!cfg.modules.policy || !policyModule) return;
-  const segmentAnchorByCallId =
-    cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
-      ? await helpers.loadSegmentAnchorByCallId(cfg.stateDir, resolvedSessionId, {
-        dedupeStrings: helpers.dedupeStrings,
-        syncRawSemanticTurnsFromTranscript: async (dir: string, sid: string) => {
-          await helpers.syncRawSemanticTurnsFromTranscript(dir, sid, {
-            contentToText: helpers.contentToText,
-            contextSafeRecovery: helpers.contextSafeRecovery,
-            memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
-          });
-        },
-      }).catch(() => new Map())
-      : undefined;
-  const orderedTurnAnchors =
-    cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
-      ? await helpers.loadOrderedTurnAnchors(
-        cfg.stateDir,
-        resolvedSessionId,
-        helpers.dedupeStrings,
-      ).catch(() => [])
-      : undefined;
-  const { turnCtx } = helpers.buildLayeredReductionContext(
-    payload,
-    reductionTriggerMinChars,
-    resolvedSessionId,
-    {
-      memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
-      hasRecoveryMarker: helpers.hasRecoveryMarker,
-      inferObservationPayloadKind: helpers.inferObservationPayloadKind,
-    },
-    cfg.reduction.passes,
-    {
-      read_state_compaction: reductionPassOptions.readStateCompaction ?? {},
-      tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
-      html_slimming: reductionPassOptions.htmlSlimming ?? {},
-      exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
-      agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
-      format_slimming: reductionPassOptions.formatSlimming ?? {},
-      format_cleaning: reductionPassOptions.formatCleaning ?? {},
-      path_truncation: reductionPassOptions.pathTruncation ?? {},
-      image_downsample: reductionPassOptions.imageDownsample ?? {},
-      line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
-    },
-    segmentAnchorByCallId,
-    orderedTurnAnchors,
-  );
+  const turnCtx = buildLifecyclePolicyContext({
+    sessionId: resolvedSessionId,
+    model: String(payload?.model ?? "unknown"),
+    prompt: helpers.extractInputText(payload?.input),
+  });
   await helpers.applyPolicyBeforeCall(turnCtx, cfg, logger, {
     policy: policyModule,
   });
@@ -403,9 +361,7 @@ export async function prepareProxyRequest(args: {
     helpers,
     payload,
     resolvedSessionId,
-    reductionPassOptions,
     policyModule,
-    reductionTriggerMinChars,
   );
   const reductionApplied = await applyProxyReduction(
     cfg,
