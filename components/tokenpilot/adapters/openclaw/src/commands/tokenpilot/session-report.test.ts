@@ -237,7 +237,7 @@ test("openclaw handleReport renders eviction-only diagnostics without reduction 
     assert.match(result.text, /module mode: eviction-only/);
     assert.match(result.text, /no reduction savings recorded/);
     assert.match(result.text, /eviction: enabled=true, executions=2, changes=2/);
-    assert.match(result.text, /saved=400 tokens\/1,600 chars/);
+    assert.match(result.text, /estimated saved=400 tokens\/1,600 chars/);
     assert.match(result.text, /estimator api=120 input \+ 24 output tokens, api cost=\$0\.002000/);
   } finally {
     await rm(dir, { recursive: true, force: true });

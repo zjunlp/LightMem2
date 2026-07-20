@@ -376,8 +376,9 @@ export function formatSessionReport(params: {
         const cost = typeof module.apiCostUsd === "number"
           ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
           : "";
+        const enabled = module.observed === false ? "unknown" : String(module.enabled);
         lines.push(
-          `- ${moduleId}: enabled=${module.enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
+          `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, estimated saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
         );
       }
     }
@@ -485,8 +486,9 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
           const cost = typeof module.apiCostUsd === "number"
             ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
             : "";
+          const enabled = module.observed === false ? "unknown" : String(module.enabled);
           lines.push(
-            `- ${moduleId}: enabled=${module.enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
+            `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, estimated saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
           );
         }
       }

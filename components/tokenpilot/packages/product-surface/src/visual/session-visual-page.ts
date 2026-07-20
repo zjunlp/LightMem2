@@ -1166,7 +1166,7 @@ function emptyTabMessage(data, tab) {
   const module = data && data.moduleSummary && data.moduleSummary.modules
     ? data.moduleSummary.modules[moduleId]
     : null;
-  if (module && module.enabled === false) {
+  if (module && module.observed === true && module.enabled === false) {
     const label = moduleId === "stabilizer"
       ? "Prefix stabilization"
       : moduleId.charAt(0).toUpperCase() + moduleId.slice(1);

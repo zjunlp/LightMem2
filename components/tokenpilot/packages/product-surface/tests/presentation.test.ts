@@ -197,6 +197,7 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
       latestAt: "2026-07-20T00:00:00.000Z",
       modules: {
         stabilizer: {
+          observed: true,
           enabled: false,
           executions: 0,
           changes: 0,
@@ -208,6 +209,7 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
           latestAt: "2026-07-20T00:00:00.000Z",
         },
         reduction: {
+          observed: true,
           enabled: false,
           executions: 0,
           changes: 0,
@@ -219,6 +221,7 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
           latestAt: "2026-07-20T00:00:00.000Z",
         },
         eviction: {
+          observed: true,
           enabled: true,
           executions: 2,
           changes: 1,
@@ -236,8 +239,49 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
 
   assert.match(text, /module mode: eviction-only/);
   assert.match(text, /reduction: enabled=false/);
-  assert.match(text, /eviction: enabled=true, executions=2, changes=1, saved=400 tokens\/1,600 chars/);
+  assert.match(text, /eviction: enabled=true, executions=2, changes=1, estimated saved=400 tokens\/1,600 chars/);
   assert.match(text, /estimator api=120 input \+ 24 output tokens/);
+});
+
+test("buildSessionReportText does not label unobserved modules as disabled", () => {
+  const baseModule = {
+    observed: false,
+    enabled: false,
+    executions: 0,
+    changes: 0,
+    skips: 0,
+    savedChars: 0,
+    savedTokens: 0,
+    apiInputTokens: 0,
+    apiOutputTokens: 0,
+    latestAt: "",
+  };
+  const text = buildSessionReportText({
+    sessionId: "session-partial",
+    aggregate: null,
+    latest: null,
+    detailsEnabled: true,
+    moduleSummary: {
+      sessionId: "session-partial",
+      mode: "partial",
+      latestAt: "2026-07-20T00:00:00.000Z",
+      modules: {
+        stabilizer: { ...baseModule },
+        reduction: { ...baseModule },
+        eviction: {
+          ...baseModule,
+          observed: true,
+          enabled: true,
+          executions: 1,
+          latestAt: "2026-07-20T00:00:00.000Z",
+        },
+      },
+    },
+  });
+
+  assert.match(text, /stabilizer: enabled=unknown/);
+  assert.match(text, /reduction: enabled=unknown/);
+  assert.match(text, /eviction: enabled=true/);
 });
 
 test("loadSessionReportData only keeps latest effect when session ids match", async () => {
