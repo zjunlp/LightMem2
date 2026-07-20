@@ -46,6 +46,7 @@ export type CodexDoctorReport = {
   mcpArgsMatch: boolean;
   mcpStartupTimeoutSecMatches: boolean;
   expectedMcpStartupTimeoutSec: number;
+  adapterEnabled: boolean;
   coreRuntimeHealthy: boolean;
   recoveryMcpHealthy: boolean;
   degradedMode: boolean;
@@ -88,6 +89,7 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- expected MCP command: ${report.expectedMcpCommand}`,
     `- expected MCP args: ${report.expectedMcpArgs.length > 0 ? report.expectedMcpArgs.join(" ") : "(none)"}`,
     `- expected MCP startup timeout: ${report.expectedMcpStartupTimeoutSec}s`,
+    `- adapter enabled: ${report.adapterEnabled ? "yes" : "no"}`,
     `- core runtime healthy: ${report.coreRuntimeHealthy ? "yes" : "no"}`,
     `- recovery MCP healthy: ${report.recoveryMcpHealthy ? "yes" : "no"}`,
     `- degraded mode: ${report.degradedMode ? "yes" : "no"}`,
@@ -112,6 +114,9 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- upstream loops into local proxy: ${report.upstreamLoopDetected ? "yes" : "no"}`,
   ];
   const fixes: string[] = [];
+  if (!report.adapterEnabled) {
+    fixes.push("- rerun the Codex install command to set `enabled: true` in `tokenpilot.json`");
+  }
   if (!report.providerInstalled) {
     fixes.push("- rerun the Codex install command to refresh the intercepted provider entry in `config.toml`");
   }
@@ -134,7 +139,7 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
   if (report.mcpInstalled && !report.mcpStartupTimeoutSecMatches) {
     fixes.push("- rerun the Codex install command or set `startup_timeout_sec` on `tokenpilot_memory_fault_recover` to the expected value");
   }
-  if (!report.daemonRunning || !report.proxyHealthy) {
+  if (report.adapterEnabled && (!report.daemonRunning || !report.proxyHealthy)) {
     fixes.push("- trust the TokenPilot hooks in Codex, then start a new session so SessionStart can boot the local proxy");
     fixes.push("- if the proxy is still unhealthy after a new session starts, run `tokenpilot-codex start` or `tokenpilot-codex restart`");
   }
@@ -199,7 +204,11 @@ export async function inspectCodexDoctor(params: {
     expectedStateDir: params.config.stateDir,
     expectedStartupTimeoutSec: DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
   });
-  const coreRuntimeHealthy = Boolean(tokenpilotProvider) && providerIntercepted && daemon.running && proxyHealthy;
+  const coreRuntimeHealthy = params.config.enabled
+    && Boolean(tokenpilotProvider)
+    && providerIntercepted
+    && daemon.running
+    && proxyHealthy;
   const recoveryMcpHealthy = mcpHealth.healthy;
   return {
     configPath: params.configPath,
@@ -209,6 +218,7 @@ export async function inspectCodexDoctor(params: {
     expectedHookCommand,
     expectedMcpCommand: expectedMcpSpec.command,
     expectedMcpArgs: expectedMcpSpec.args,
+    adapterEnabled: params.config.enabled,
     providerInstalled: Boolean(tokenpilotProvider),
     providerActive: rootProvider === providerName,
     providerIntercepted,
