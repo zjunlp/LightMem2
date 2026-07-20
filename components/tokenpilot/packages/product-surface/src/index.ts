@@ -11,6 +11,7 @@ export * from "./commands/runtime-stabilizer.js";
 export * from "./commands/runtime-reduction.js";
 export * from "./commands/runtime-eviction.js";
 export * from "./metrics.js";
+export * from "./module-observability.js";
 export * from "./session-topology.js";
 export * from "./visual/session-visual.js";
 export * from "./visual/session-visual-data.js";
