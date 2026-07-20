@@ -1172,6 +1172,19 @@ function emptyTabMessage(data, tab) {
       : moduleId.charAt(0).toUpperCase() + moduleId.slice(1);
     return label + " is disabled for this session. No snapshots are expected.";
   }
+  if (
+    tab === "eviction"
+    && module
+    && module.executionsByPhase
+    && module.phaseBreakdownComplete !== false
+  ) {
+    if (Number(module.executionsByPhase.history || 0) > 0) {
+      return "History eviction ran but produced no changed snapshots yet.";
+    }
+    if (Number(module.executionsByPhase.request || 0) > 0) {
+      return "Lifecycle planning ran, but no history eviction has been applied yet.";
+    }
+  }
   if (module && module.enabled === true && Number(module.executions || 0) > 0) {
     return "This session ran " + moduleId + " but produced no changed snapshots yet.";
   }

@@ -70,6 +70,12 @@ test("module observations aggregate eviction savings and estimator usage", async
     const summary = await readSessionModuleObservationSummary(stateDir, sessionId);
     assert.equal(summary?.mode, "eviction-only");
     assert.equal(summary?.modules.eviction.executions, 2);
+    assert.deepEqual(summary?.modules.eviction.executionsByPhase, {
+      request: 1,
+      response: 0,
+      history: 1,
+    });
+    assert.equal(summary?.modules.eviction.changes, 1);
     assert.equal(summary?.modules.eviction.savedTokens, 400);
     assert.equal(summary?.modules.eviction.apiInputTokens, 120);
     assert.equal(summary?.modules.eviction.apiCostUsd, 0.002);
@@ -178,6 +184,64 @@ test("session summary listing falls back to legacy observation files", async () 
   }
 });
 
+test("appending to a legacy summary does not claim a complete phase breakdown", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-module-observability-legacy-summary-"));
+  const sessionId = "legacy-summary";
+  try {
+    const summaryDir = join(stateDir, "tokenpilot", "module-observability", "sessions");
+    await mkdir(summaryDir, { recursive: true });
+    const emptyLegacyModule = {
+      observed: false,
+      enabled: false,
+      executions: 0,
+      changes: 0,
+      skips: 0,
+      savedChars: 0,
+      savedTokens: 0,
+      apiInputTokens: 0,
+      apiOutputTokens: 0,
+      latestAt: "",
+    };
+    await writeFile(join(summaryDir, `${sessionId}.json`), JSON.stringify({
+      sessionId,
+      mode: "eviction-only",
+      latestAt: "2026-07-20T00:00:00.000Z",
+      modules: {
+        stabilizer: { ...emptyLegacyModule, observed: true },
+        reduction: { ...emptyLegacyModule, observed: true },
+        eviction: {
+          ...emptyLegacyModule,
+          observed: true,
+          enabled: true,
+          executions: 4,
+          changes: 1,
+          latestAt: "2026-07-20T00:00:00.000Z",
+        },
+      },
+    }), "utf8");
+
+    await appendModuleObservation(stateDir, {
+      at: "2026-07-20T00:00:01.000Z",
+      sessionId,
+      phase: "history",
+      moduleId: "eviction",
+      enabled: true,
+      executed: true,
+      changed: true,
+      savedChars: 400,
+      savedTokens: 100,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+
+    const summary = await readSessionModuleObservationSummary(stateDir, sessionId);
+    assert.equal(summary?.modules.eviction.executions, 5);
+    assert.equal(summary?.modules.eviction.executionsByPhase?.history, 1);
+    assert.equal(summary?.modules.eviction.phaseBreakdownComplete, false);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
 test("concurrent module observations preserve every aggregate update", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-module-observability-concurrent-"));
   const sessionId = "session-concurrent";
@@ -186,7 +250,7 @@ test("concurrent module observations preserve every aggregate update", async () 
       at: `2026-07-20T00:00:${String(index).padStart(2, "0")}.000Z`,
       sessionId,
       phase: "request",
-      moduleId: "eviction",
+      moduleId: "reduction",
       enabled: true,
       executed: true,
       changed: index % 2 === 0,
@@ -197,10 +261,10 @@ test("concurrent module observations preserve every aggregate update", async () 
 
     const summary = await readSessionModuleObservationSummary(stateDir, sessionId);
     assert.equal(summary?.mode, "partial");
-    assert.equal(summary?.modules.eviction.executions, 20);
-    assert.equal(summary?.modules.eviction.changes, 10);
-    assert.equal(summary?.modules.eviction.savedTokens, 20);
-    assert.equal(summary?.modules.eviction.apiInputTokens, 40);
+    assert.equal(summary?.modules.reduction.executions, 20);
+    assert.equal(summary?.modules.reduction.changes, 10);
+    assert.equal(summary?.modules.reduction.savedTokens, 20);
+    assert.equal(summary?.modules.reduction.apiInputTokens, 40);
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }

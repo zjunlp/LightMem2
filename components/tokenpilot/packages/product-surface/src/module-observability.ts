@@ -8,6 +8,7 @@ import {
 
 export const TOKENPILOT_FEATURE_MODULE_IDS = ["stabilizer", "reduction", "eviction"] as const;
 export type TokenPilotFeatureModuleId = (typeof TOKENPILOT_FEATURE_MODULE_IDS)[number];
+export type ModuleObservationPhase = "request" | "response" | "history";
 
 export type ModuleApiAccounting = {
   inputTokens: number;
@@ -18,7 +19,7 @@ export type ModuleApiAccounting = {
 export type ModuleObservation = {
   at: string;
   sessionId: string;
-  phase: "request" | "response" | "history";
+  phase: ModuleObservationPhase;
   moduleId: TokenPilotFeatureModuleId;
   enabled: boolean;
   executed: boolean;
@@ -33,6 +34,8 @@ export type ModuleObservationAggregate = {
   observed: boolean;
   enabled: boolean;
   executions: number;
+  executionsByPhase?: Record<ModuleObservationPhase, number>;
+  phaseBreakdownComplete?: boolean;
   changes: number;
   skips: number;
   savedChars: number;
@@ -195,6 +198,8 @@ function emptyAggregate(): ModuleObservationAggregate {
     observed: false,
     enabled: false,
     executions: 0,
+    executionsByPhase: { request: 0, response: 0, history: 0 },
+    phaseBreakdownComplete: true,
     changes: 0,
     skips: 0,
     savedChars: 0,
@@ -239,8 +244,16 @@ function applyObservationsToSummary(
   for (const observation of observations) {
     const aggregate = next.modules[observation.moduleId];
     aggregate.observed = true;
+    if (!aggregate.executionsByPhase) {
+      aggregate.executionsByPhase = { request: 0, response: 0, history: 0 };
+      aggregate.phaseBreakdownComplete = aggregate.executions === 0;
+    }
     aggregate.executions += observation.executed ? 1 : 0;
-    aggregate.changes += observation.changed ? 1 : 0;
+    aggregate.executionsByPhase[observation.phase] += observation.executed ? 1 : 0;
+    const appliedChange = observation.moduleId === "eviction"
+      ? observation.phase === "history" && observation.changed
+      : observation.changed;
+    aggregate.changes += appliedChange ? 1 : 0;
     aggregate.skips += observation.skippedReason && observation.skippedReason !== "none" ? 1 : 0;
     aggregate.savedChars += Math.max(0, Number(observation.savedChars ?? 0));
     aggregate.savedTokens += Math.max(0, Number(observation.savedTokens ?? 0));

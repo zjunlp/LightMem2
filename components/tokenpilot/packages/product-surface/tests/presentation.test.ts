@@ -157,6 +157,8 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   assert.match(script, /Suggested Stable Shape -> Dynamic Tail Extraction/);
   assert.match(script, /Prefix stabilization/);
   assert.match(script, /is disabled for this session\. No snapshots are expected/);
+  assert.match(script, /Lifecycle planning ran, but no history eviction has been applied yet/);
+  assert.match(script, /History eviction ran but produced no changed snapshots yet/);
   assert.match(script, /produced no changed snapshots yet/);
 });
 
@@ -224,6 +226,7 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
           observed: true,
           enabled: true,
           executions: 2,
+          executionsByPhase: { request: 1, response: 0, history: 1 },
           changes: 1,
           skips: 0,
           savedChars: 1600,
@@ -239,7 +242,7 @@ test("buildSessionReportText identifies eviction-only without reduction savings"
 
   assert.match(text, /module mode: eviction-only/);
   assert.match(text, /reduction: enabled=false/);
-  assert.match(text, /eviction: enabled=true, executions=2, changes=1, estimated saved=400 tokens\/1,600 chars/);
+  assert.match(text, /eviction: enabled=true, planning runs=1, history runs=1, applications=1, estimated saved=400 tokens\/1,600 chars/);
   assert.match(text, /estimator api=120 input \+ 24 output tokens/);
 });
 

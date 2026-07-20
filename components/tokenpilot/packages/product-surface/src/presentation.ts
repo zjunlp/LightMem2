@@ -2,6 +2,7 @@ import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-ada
 import {
   TOKENPILOT_FEATURE_MODULE_IDS,
   type SessionModuleObservationSummary,
+  type TokenPilotFeatureModuleId,
 } from "./module-observability.js";
 import { readRecentReductionMetrics, summarizeRecentReductionMetrics } from "./metrics.js";
 import {
@@ -129,6 +130,25 @@ function buildLatestNonWarmDiagnosisLines(
     lines.push(`- ${diagnosisLabel} hint: ${latestNonWarmCacheDiagnosis.optimizationHint}`);
   }
   return lines;
+}
+
+function formatModuleObservationLine(
+  moduleId: TokenPilotFeatureModuleId,
+  module: SessionModuleObservationSummary["modules"][TokenPilotFeatureModuleId],
+): string {
+  const cost = typeof module.apiCostUsd === "number"
+    ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
+    : "";
+  const enabled = module.observed === false ? "unknown" : String(module.enabled);
+  const accounting = `estimated saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`;
+  if (
+    moduleId === "eviction"
+    && module.executionsByPhase
+    && module.phaseBreakdownComplete !== false
+  ) {
+    return `- eviction: enabled=${enabled}, planning runs=${formatInt(module.executionsByPhase.request)}, history runs=${formatInt(module.executionsByPhase.history)}, applications=${formatInt(module.changes)}, ${accounting}`;
+  }
+  return `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, ${accounting}`;
 }
 
 export function formatTokenPilotHelp(section?: string): string {
@@ -373,13 +393,7 @@ export function formatSessionReport(params: {
     if (moduleSummary) {
       for (const moduleId of TOKENPILOT_FEATURE_MODULE_IDS) {
         const module = moduleSummary.modules[moduleId];
-        const cost = typeof module.apiCostUsd === "number"
-          ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
-          : "";
-        const enabled = module.observed === false ? "unknown" : String(module.enabled);
-        lines.push(
-          `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, estimated saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
-        );
+        lines.push(formatModuleObservationLine(moduleId, module));
       }
     }
     if (latest?.details?.requestSavedCount !== undefined) {
@@ -483,13 +497,7 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
       if (moduleSummary) {
         for (const moduleId of TOKENPILOT_FEATURE_MODULE_IDS) {
           const module = moduleSummary.modules[moduleId];
-          const cost = typeof module.apiCostUsd === "number"
-            ? `, api cost=$${module.apiCostUsd.toFixed(6)}`
-            : "";
-          const enabled = module.observed === false ? "unknown" : String(module.enabled);
-          lines.push(
-            `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, estimated saved=${formatInt(module.savedTokens)} tokens/${formatInt(module.savedChars)} chars, estimator api=${formatInt(module.apiInputTokens)} input + ${formatInt(module.apiOutputTokens)} output tokens${cost}`,
-          );
+          lines.push(formatModuleObservationLine(moduleId, module));
         }
       }
       if (cacheAuditSummary && cacheAuditSummary.warmCandidates > 0) {
