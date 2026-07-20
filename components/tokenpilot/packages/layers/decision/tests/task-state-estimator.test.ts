@@ -104,3 +104,36 @@ test("task-state estimator preserves Chat Completions usage after Responses fall
     globalThis.fetch = originalFetch;
   }
 });
+
+test("task-state estimator leaves null provider cost unknown", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        output_text: JSON.stringify({ baseVersion: 1, taskUpdates: [] }),
+        usage: {
+          input_tokens: 10,
+          output_tokens: 2,
+          total_tokens: 12,
+          cost_usd: null,
+        },
+      };
+    },
+  } as Response);
+  try {
+    const estimator = createApiTaskStateEstimator({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      model: "test-model",
+    });
+    const output = await estimator.estimate(estimatorInput);
+    assert.deepEqual(output.usage, {
+      inputTokens: 10,
+      outputTokens: 2,
+      totalTokens: 12,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -328,6 +328,7 @@ function parseEstimatorOutput(
 }
 
 function numberFrom(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : undefined;
 }
