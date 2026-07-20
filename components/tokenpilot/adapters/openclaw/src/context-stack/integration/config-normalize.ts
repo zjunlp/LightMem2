@@ -1,4 +1,4 @@
-import { defaultPluginStateDir, pluginStateSubdir } from "@tokenpilot/runtime-core";
+import { defaultPluginStateDir, pluginStateSubdir } from "@tokenpilot/artifact-store";
 import type {
   NormalizedPluginHostConfig,
   NormalizedPluginRuntimeConfig,

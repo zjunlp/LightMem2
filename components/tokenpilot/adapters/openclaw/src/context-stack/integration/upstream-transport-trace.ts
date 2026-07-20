@@ -1,6 +1,6 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { pluginStateSubdir } from "@tokenpilot/runtime-core";
+import { pluginStateSubdir } from "@tokenpilot/artifact-store";
 
 export async function appendUpstreamTransportTrace(
   stateDir: string,

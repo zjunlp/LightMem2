@@ -1,6 +1,6 @@
 import {
   planToolResultPersistence,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/artifact-store";
 
 type PersistHelpers = {
   appendTaskStateTrace: (stateDir: string, payload: Record<string, unknown>) => Promise<void>;

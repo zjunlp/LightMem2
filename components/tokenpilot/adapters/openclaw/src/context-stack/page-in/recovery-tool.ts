@@ -6,7 +6,7 @@ import {
   renderRecoveredArchive,
   resolveArchivePathFromLookup,
   resolveRecoveryStateDir,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/artifact-store";
 
 export function registerMemoryFaultRecoverTool(
   api: any,

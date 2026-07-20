@@ -1,7 +1,7 @@
 import { dirname } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { countTextWithPreciseTokens } from "@tokenpilot/host-adapter";
-import { pluginStateSubdirCandidates, pluginStateSubdirWriteTargets } from "@tokenpilot/runtime-core";
+import { pluginStateSubdirCandidates, pluginStateSubdirWriteTargets } from "@tokenpilot/artifact-store";
 import { appendJsonl } from "../../trace/io.js";
 
 export type CountMode = "openai_tokens" | "chars";

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { join, dirname } from "node:path";
 import { mkdir, appendFile } from "node:fs/promises";
-import { pluginStateDirWriteTargets, pluginStateSubdirWriteTargets } from "@tokenpilot/runtime-core";
+import { pluginStateDirWriteTargets, pluginStateSubdirWriteTargets } from "@tokenpilot/artifact-store";
 
 function toJsonSafe(value: unknown, seen = new WeakSet<object>()): unknown {
   if (value == null) return value;

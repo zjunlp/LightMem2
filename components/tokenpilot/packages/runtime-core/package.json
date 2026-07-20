@@ -14,8 +14,8 @@
     "test": "pnpm exec node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/decision": "workspace:*",
-    "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/kernel": "workspace:*"
   }
 }

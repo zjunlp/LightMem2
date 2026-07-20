@@ -13,7 +13,7 @@ import {
   startHostGatewayRuntimeServer,
   setForwardResponseHeaders,
 } from "@tokenpilot/host-adapter";
-import { configureStatePathResolver } from "@tokenpilot/runtime-core";
+import { configureStatePathResolver } from "@tokenpilot/artifact-store";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   defaultCodexConfigPath,

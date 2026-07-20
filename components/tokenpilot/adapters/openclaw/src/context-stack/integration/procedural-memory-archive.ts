@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadSessionTaskRegistry } from "@tokenpilot/history";
-import { hashText, pluginStateSubdirCandidates } from "@tokenpilot/runtime-core";
+import { hashText, pluginStateSubdirCandidates } from "@tokenpilot/artifact-store";
 
 function extractTaskObjective(registry: Awaited<ReturnType<typeof loadSessionTaskRegistry>>, taskId: string): string {
   return String(registry.tasks[taskId]?.objective ?? "").trim();

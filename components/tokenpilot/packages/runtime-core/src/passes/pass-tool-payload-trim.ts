@@ -4,7 +4,7 @@ import {
   archiveContent,
   buildArchiveLocation,
   buildRecoveryHint,
-} from "../archive-recovery/index.js";
+} from "@tokenpilot/artifact-store";
 import {
   reduceToolPayloadText,
   type PayloadBlockConfig,
@@ -16,7 +16,7 @@ import {
   hasRecoverySkipReductionFlag,
   isRecoveryText,
   MEMORY_FAULT_RECOVER_TOOL_NAME,
-} from "../page-in/recovery-common.js";
+} from "@tokenpilot/artifact-store";
 import { classifyReadStates, isReadOutputSegment } from "../reduction/read-state-compaction.js";
 
 const DEFAULT_MAX_CHARS = 1200;

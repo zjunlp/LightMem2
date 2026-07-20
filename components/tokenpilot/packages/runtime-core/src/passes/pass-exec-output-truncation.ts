@@ -3,7 +3,7 @@ import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,
   buildRecoveryHint,
-} from "../archive-recovery/index.js";
+} from "@tokenpilot/artifact-store";
 
 // =============================================================================
 // Per-Tool Threshold Configuration

@@ -16,7 +16,7 @@ import {
 import {
   prepareObservedBeforeCall,
 } from "@tokenpilot/product-surface";
-import { configureStatePathResolver } from "@tokenpilot/runtime-core";
+import { configureStatePathResolver } from "@tokenpilot/artifact-store";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 import { proxyBaseUrlForPort } from "./config.js";
 import type { TokenPilotClaudeCodeLogger } from "./logger.js";

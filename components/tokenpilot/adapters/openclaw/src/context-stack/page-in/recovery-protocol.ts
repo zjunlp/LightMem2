@@ -2,7 +2,7 @@ import {
   appendRecoveryProtocolText,
   stripInternalPayloadFields,
 } from "@tokenpilot/host-adapter";
-import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@tokenpilot/runtime-core";
+import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@tokenpilot/artifact-store";
 
 export const MEMORY_FAULT_PROTOCOL_INSTRUCTIONS = [
   "[Recovery Protocol]",

@@ -13,7 +13,7 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/runtime-core": "workspace:*"
+    "@tokenpilot/artifact-store": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.25.10",

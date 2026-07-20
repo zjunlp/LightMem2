@@ -6,7 +6,7 @@ import {
   pluginStateSubdir,
   pluginStateSubdirCandidates,
   pluginStateSubdirWriteTargets,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/artifact-store";
 
 export type RecentTurnBinding = {
   userMessage: string;

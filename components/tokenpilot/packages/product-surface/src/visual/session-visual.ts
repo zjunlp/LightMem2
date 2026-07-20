@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { defaultPluginStateDir } from "@tokenpilot/runtime-core";
+import { defaultPluginStateDir } from "@tokenpilot/artifact-store";
 import {
   readVisualSessionData,
   readVisualSessionDataWithOptions,

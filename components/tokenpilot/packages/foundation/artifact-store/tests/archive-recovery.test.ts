@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildRecoveryHint, renderRecoveredArchive } from "../src/archive-recovery/index.js";
+import { buildRecoveryHint, renderRecoveredArchive } from "../src/index.js";
 
 test("buildRecoveryHint advertises focused line-window recovery", () => {
   const hint = buildRecoveryHint({

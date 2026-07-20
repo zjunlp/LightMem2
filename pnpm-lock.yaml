@@ -20,6 +20,9 @@ importers:
 
   components/tokenpilot/adapters/claude-code:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../packages/layers/decision
@@ -54,6 +57,9 @@ importers:
 
   components/tokenpilot/adapters/codex:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../packages/layers/decision
@@ -88,6 +94,9 @@ importers:
 
   components/tokenpilot/adapters/openclaw:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../packages/layers/decision
@@ -129,6 +138,12 @@ importers:
         specifier: workspace:*
         version: link:../../kernel
 
+  components/tokenpilot/packages/foundation/artifact-store:
+    dependencies:
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../../host-adapter
+
   components/tokenpilot/packages/host-adapter:
     dependencies:
       '@tokenpilot/kernel':
@@ -154,12 +169,12 @@ importers:
 
   components/tokenpilot/packages/layers/history:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../foundation/artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../kernel
-      '@tokenpilot/runtime-core':
-        specifier: workspace:*
-        version: link:../../runtime-core
 
   components/tokenpilot/packages/layers/memory:
     dependencies:
@@ -169,24 +184,24 @@ importers:
 
   components/tokenpilot/packages/product-surface:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../foundation/artifact-store
       '@tokenpilot/host-adapter':
         specifier: workspace:*
         version: link:../host-adapter
-      '@tokenpilot/runtime-core':
-        specifier: workspace:*
-        version: link:../runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../features/stabilizer
 
   components/tokenpilot/packages/runtime-core:
     dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../foundation/artifact-store
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../layers/decision
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -215,9 +230,9 @@ importers:
 
   components/tokenpilot/products/mcp:
     dependencies:
-      '@tokenpilot/runtime-core':
+      '@tokenpilot/artifact-store':
         specifier: workspace:*
-        version: link:../../packages/runtime-core
+        version: link:../../packages/foundation/artifact-store
     devDependencies:
       esbuild:
         specifier: ^0.25.10

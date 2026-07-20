@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  configureStatePathResolver,
   runReductionAfterCall as runLayerReductionAfterCall,
   runReductionBeforeCall as runLayerReductionBeforeCall,
   resolveReductionPasses as resolveLayerReductionPasses,
 } from "@tokenpilot/runtime-core";
+import { configureStatePathResolver } from "@tokenpilot/artifact-store";
 import {
   extractInputText,
   normalizeTurnBindingMessage,

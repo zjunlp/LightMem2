@@ -3,8 +3,8 @@ import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,
   buildRecoveryHint,
-} from "../archive-recovery/index.js";
-import { buildRecoveryContextSafePatch } from "../page-in/recovery-common.js";
+  buildRecoveryContextSafePatch,
+} from "@tokenpilot/artifact-store";
 import {
   analyzeReadStateCompaction,
   isReadOutputSegment,

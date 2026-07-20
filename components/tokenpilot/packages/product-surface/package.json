@@ -9,8 +9,8 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/runtime-core": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"
   },
   "scripts": {

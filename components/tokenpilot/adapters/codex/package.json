@@ -19,6 +19,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",

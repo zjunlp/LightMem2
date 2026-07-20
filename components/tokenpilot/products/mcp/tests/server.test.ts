@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { archiveContent } from "@tokenpilot/runtime-core";
+import { archiveContent } from "@tokenpilot/artifact-store";
 import {
   encodeMcpMessage,
   handleMcpRequest,

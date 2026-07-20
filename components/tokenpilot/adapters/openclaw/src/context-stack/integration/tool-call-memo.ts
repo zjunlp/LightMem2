@@ -3,7 +3,7 @@ import {
   MEMORY_FAULT_RECOVER_TOOL_NAME,
   archiveContent,
   pluginStateSubdir,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/artifact-store";
 import { buildMemoKey, extractTextFromToolResult, extractTranscriptFullText } from "./tool-call-memo-keys.js";
 import {
   buildDataKey,

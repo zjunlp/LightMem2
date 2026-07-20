@@ -6,7 +6,7 @@ import {
   findFirstMessageText,
   recordBeforeCallVisualState,
 } from "@tokenpilot/product-surface";
-import { pluginStateSubdir } from "@tokenpilot/runtime-core";
+import { pluginStateSubdir } from "@tokenpilot/artifact-store";
 import { summarizeResponseFunctionCalls } from "./proxy-runtime-shared.js";
 
 export async function recordProxyInbound(params: {
