@@ -34,7 +34,6 @@ export async function runBeforeCallReductionOrchestrator(
   context: HostBeforeCallReductionContext,
 ): Promise<HostBeforeCallReductionResult> {
   if (context.proxyPureForward || !context.reductionEnabled) {
-    await orchestrator.runPolicyWithoutReduction?.(context);
     const skippedReason = context.proxyPureForward ? "proxy_pure_forward" : "module_disabled";
     return (
       orchestrator.buildSkippedResult?.(context, skippedReason) ??

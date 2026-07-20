@@ -91,58 +91,6 @@ async function applyProxyReduction(
 
   return runBeforeCallReductionOrchestrator(
     {
-      runPolicyWithoutReduction: async () => {
-        if (!cfg.modules.policy || !policyModule) return;
-        const segmentAnchorByCallId =
-          cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
-            ? await helpers.loadSegmentAnchorByCallId(cfg.stateDir, resolvedSessionId, {
-              dedupeStrings: helpers.dedupeStrings,
-              syncRawSemanticTurnsFromTranscript: async (dir: string, sid: string) => {
-                await helpers.syncRawSemanticTurnsFromTranscript(dir, sid, {
-                  contentToText: helpers.contentToText,
-                  contextSafeRecovery: helpers.contextSafeRecovery,
-                  memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
-                });
-              },
-            }).catch(() => new Map())
-            : undefined;
-        const orderedTurnAnchors =
-          cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
-            ? await helpers.loadOrderedTurnAnchors(
-              cfg.stateDir,
-              resolvedSessionId,
-              helpers.dedupeStrings,
-            ).catch(() => [])
-            : undefined;
-        const { turnCtx } = helpers.buildLayeredReductionContext(
-          payload,
-          reductionTriggerMinChars,
-          resolvedSessionId,
-          {
-            memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
-            hasRecoveryMarker: helpers.hasRecoveryMarker,
-            inferObservationPayloadKind: helpers.inferObservationPayloadKind,
-          },
-          cfg.reduction.passes,
-          {
-            read_state_compaction: reductionPassOptions.readStateCompaction ?? {},
-            tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
-            html_slimming: reductionPassOptions.htmlSlimming ?? {},
-            exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
-            agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
-            format_slimming: reductionPassOptions.formatSlimming ?? {},
-            format_cleaning: reductionPassOptions.formatCleaning ?? {},
-            path_truncation: reductionPassOptions.pathTruncation ?? {},
-            image_downsample: reductionPassOptions.imageDownsample ?? {},
-            line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
-          },
-          segmentAnchorByCallId,
-          orderedTurnAnchors,
-        );
-        await helpers.applyPolicyBeforeCall(turnCtx, cfg, logger, {
-          policy: policyModule,
-        });
-      },
       buildSkippedResult: (context, skippedReason) =>
         buildReductionSkippedResult(
           context.rawPayload,
@@ -180,7 +128,7 @@ async function applyProxyReduction(
               line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
             },
             beforeCallModules: {
-              policy: policyModule,
+              policy: undefined,
             },
             cfg,
           },
@@ -229,6 +177,68 @@ async function applyProxyReduction(
     },
     reductionContext,
   );
+}
+
+async function runPolicyBeforeReduction(
+  cfg: any,
+  logger: any,
+  helpers: any,
+  payload: any,
+  resolvedSessionId: string,
+  reductionPassOptions: any,
+  policyModule: any,
+  reductionTriggerMinChars: number,
+): Promise<void> {
+  if (!cfg.modules.policy || !policyModule) return;
+  const segmentAnchorByCallId =
+    cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
+      ? await helpers.loadSegmentAnchorByCallId(cfg.stateDir, resolvedSessionId, {
+        dedupeStrings: helpers.dedupeStrings,
+        syncRawSemanticTurnsFromTranscript: async (dir: string, sid: string) => {
+          await helpers.syncRawSemanticTurnsFromTranscript(dir, sid, {
+            contentToText: helpers.contentToText,
+            contextSafeRecovery: helpers.contextSafeRecovery,
+            memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
+          });
+        },
+      }).catch(() => new Map())
+      : undefined;
+  const orderedTurnAnchors =
+    cfg?.stateDir && resolvedSessionId && resolvedSessionId !== "proxy-session"
+      ? await helpers.loadOrderedTurnAnchors(
+        cfg.stateDir,
+        resolvedSessionId,
+        helpers.dedupeStrings,
+      ).catch(() => [])
+      : undefined;
+  const { turnCtx } = helpers.buildLayeredReductionContext(
+    payload,
+    reductionTriggerMinChars,
+    resolvedSessionId,
+    {
+      memoryFaultRecoverToolName: helpers.MEMORY_FAULT_RECOVER_TOOL_NAME,
+      hasRecoveryMarker: helpers.hasRecoveryMarker,
+      inferObservationPayloadKind: helpers.inferObservationPayloadKind,
+    },
+    cfg.reduction.passes,
+    {
+      read_state_compaction: reductionPassOptions.readStateCompaction ?? {},
+      tool_payload_trim: reductionPassOptions.toolPayloadTrim ?? {},
+      html_slimming: reductionPassOptions.htmlSlimming ?? {},
+      exec_output_truncation: reductionPassOptions.execOutputTruncation ?? {},
+      agents_startup_optimization: reductionPassOptions.agentsStartupOptimization ?? {},
+      format_slimming: reductionPassOptions.formatSlimming ?? {},
+      format_cleaning: reductionPassOptions.formatCleaning ?? {},
+      path_truncation: reductionPassOptions.pathTruncation ?? {},
+      image_downsample: reductionPassOptions.imageDownsample ?? {},
+      line_number_strip: reductionPassOptions.lineNumberStrip ?? {},
+    },
+    segmentAnchorByCallId,
+    orderedTurnAnchors,
+  );
+  await helpers.applyPolicyBeforeCall(turnCtx, cfg, logger, {
+    policy: policyModule,
+  });
 }
 
 export async function prepareProxyRequest(args: {
@@ -387,6 +397,16 @@ export async function prepareProxyRequest(args: {
   const beforeReductionInputCount = Array.isArray(payload?.input) ? payload.input.length : 0;
   const beforeReductionInputChars = helpers.estimatePayloadInputChars(payload?.input);
   const beforeReductionCanonicalInput = helpers.serializeCanonicalInputForUx(payload?.input);
+  await runPolicyBeforeReduction(
+    cfg,
+    logger,
+    helpers,
+    payload,
+    resolvedSessionId,
+    reductionPassOptions,
+    policyModule,
+    reductionTriggerMinChars,
+  );
   const reductionApplied = await applyProxyReduction(
     cfg,
     logger,

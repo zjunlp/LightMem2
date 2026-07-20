@@ -53,9 +53,6 @@ export type HostBeforeCallReductionResult = {
 };
 
 export type HostBeforeCallReductionOrchestrator = {
-  runPolicyWithoutReduction?(
-    context: HostBeforeCallReductionContext,
-  ): Promise<void> | void;
   runReduction(
     context: HostBeforeCallReductionContext,
   ): Promise<HostBeforeCallReductionResult> | HostBeforeCallReductionResult;

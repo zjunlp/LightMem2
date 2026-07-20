@@ -170,14 +170,10 @@ test("stripInternalPayloadFields removes internal transport markers in-place", (
 });
 
 test("runBeforeCallReductionOrchestrator returns skipped result in pure-forward mode", async () => {
-  let policyOnlyCalls = 0;
   let reductionCalls = 0;
 
   const result = await runBeforeCallReductionOrchestrator(
     {
-      async runPolicyWithoutReduction() {
-        policyOnlyCalls += 1;
-      },
       async runReduction() {
         reductionCalls += 1;
         return {
@@ -197,21 +193,16 @@ test("runBeforeCallReductionOrchestrator returns skipped result in pure-forward 
     },
   );
 
-  assert.equal(policyOnlyCalls, 1);
   assert.equal(reductionCalls, 0);
   assert.equal(result.changedItems, 0);
   assert.equal(String(result.diagnostics?.skippedReason), "proxy_pure_forward");
 });
 
 test("runBeforeCallReductionOrchestrator executes reduction when enabled", async () => {
-  let policyOnlyCalls = 0;
   let reductionCalls = 0;
 
   const result = await runBeforeCallReductionOrchestrator(
     {
-      async runPolicyWithoutReduction() {
-        policyOnlyCalls += 1;
-      },
       async runReduction() {
         reductionCalls += 1;
         return {
@@ -234,7 +225,6 @@ test("runBeforeCallReductionOrchestrator executes reduction when enabled", async
     },
   );
 
-  assert.equal(policyOnlyCalls, 0);
   assert.equal(reductionCalls, 1);
   assert.equal(result.changedItems, 2);
   assert.equal(result.changedBlocks, 3);
