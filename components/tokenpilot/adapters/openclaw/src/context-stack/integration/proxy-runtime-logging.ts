@@ -196,6 +196,7 @@ export async function recordProxyResponse(params: {
   upstreamModel: string;
   upstreamRespFinal: any;
   afterCallReduction: any;
+  shouldRecordReduction: boolean;
   memoryFaultAutoReplayCount: number;
 }): Promise<void> {
   const {
@@ -208,6 +209,7 @@ export async function recordProxyResponse(params: {
     upstreamModel,
     upstreamRespFinal,
     afterCallReduction,
+    shouldRecordReduction,
     memoryFaultAutoReplayCount,
   } = params;
   let parsedResponseSent: any = null;
@@ -248,23 +250,25 @@ export async function recordProxyResponse(params: {
   };
   await mkdir(dirname(proxyRespLogPath), { recursive: true });
   await appendFile(proxyRespLogPath, `${JSON.stringify(respRecord)}\n`, "utf8");
-  await helpers.appendReductionPassTrace(cfg.stateDir, {
-    at: responseAt,
-    stage: "proxy_response",
-    model,
-    upstreamModel,
-    promptCacheKey: String(activePayload?.prompt_cache_key ?? ""),
-    requestId: responseRequestId,
-    report: afterCallReduction?.report ?? [],
-    extra: {
-      status: upstreamRespFinal.status,
-      transport: upstreamRespFinal.transport,
-      responseId: parsedResponseSent?.id ?? "",
-      responseReductionChanged: Boolean(afterCallReduction?.changed),
-      responseReductionSavedChars: Number(afterCallReduction?.savedChars ?? 0),
-      memoryFaultAutoReplayCount,
-    },
-  });
+  if (shouldRecordReduction) {
+    await helpers.appendReductionPassTrace(cfg.stateDir, {
+      at: responseAt,
+      stage: "proxy_response",
+      model,
+      upstreamModel,
+      promptCacheKey: String(activePayload?.prompt_cache_key ?? ""),
+      requestId: responseRequestId,
+      report: afterCallReduction?.report ?? [],
+      extra: {
+        status: upstreamRespFinal.status,
+        transport: upstreamRespFinal.transport,
+        responseId: parsedResponseSent?.id ?? "",
+        responseReductionChanged: Boolean(afterCallReduction?.changed),
+        responseReductionSavedChars: Number(afterCallReduction?.savedChars ?? 0),
+        memoryFaultAutoReplayCount,
+      },
+    });
+  }
 }
 
 export async function recordProxyForwarding(params: {

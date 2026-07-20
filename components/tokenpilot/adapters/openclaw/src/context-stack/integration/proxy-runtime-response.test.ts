@@ -165,6 +165,81 @@ test("handleNonStreamingProxyResponse forwards reduced JSON response and records
   assert.equal(forwardingLogs.length, 0);
 });
 
+test("handleNonStreamingProxyResponse skips reduction effects when module is disabled", async () => {
+  const traces: any[] = [];
+  let reductionCalls = 0;
+  let reductionTraceCalls = 0;
+  let uxCalls = 0;
+  const res = createMockResponse();
+
+  await handleNonStreamingProxyResponse({
+    cfg: {
+      stateDir: "/tmp/tokenpilot-proxy-runtime-response-disabled-test",
+      modules: { reduction: false },
+      reduction: { engine: "layered", passes: {} },
+      debugTapPath: "/tmp/tokenpilot-proxy-runtime-response-disabled-debug.jsonl",
+      debugTapProviderTraffic: false,
+    },
+    res,
+    helpers: {
+      requestUpstreamResponses: async () => ({
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        text: JSON.stringify({ id: "resp-disabled", output: [], output_text: "unchanged" }),
+        transport: "fetch",
+      }),
+      applyLayeredReductionAfterCall: async () => {
+        reductionCalls += 1;
+        throw new Error("disabled reduction must not run after-call passes");
+      },
+      isSseContentType: () => false,
+      extractInputText: () => "hello",
+      extractProviderResponseText: () => "",
+      contentToText: (value: unknown) => String(value ?? ""),
+      appendTaskStateTrace: async (_stateDir: string, payload: any) => traces.push(payload),
+      countTokensWithFallback: async () => ({ count: 1, mode: "chars" as const }),
+      recordUxEffect: async () => {
+        uxCalls += 1;
+      },
+      appendJsonl: async () => undefined,
+      appendForwardedInputDump: async () => undefined,
+      appendReductionPassTrace: async () => {
+        reductionTraceCalls += 1;
+      },
+    },
+    logger: {
+      info: () => undefined,
+      warn: () => undefined,
+      error: () => undefined,
+      debug: () => undefined,
+    },
+    upstream: {
+      baseUrl: "https://example.com/v1",
+      apiKey: "test-key",
+      apiFamily: "openai-responses",
+    },
+    activePayload: { input: [{ role: "user", content: "hello" }] },
+    resolvedSessionId: "session-disabled",
+    model: "tokenpilot/gpt-5.4-mini",
+    upstreamModel: "gpt-5.4-mini",
+    proxyPureForward: false,
+    originalInputText: "hello",
+    afterReductionInputText: "hello",
+    beforeReductionCanonicalInput: "hello",
+    afterReductionCanonicalInput: "hello",
+    reductionApplied: { changedItems: 0, changedBlocks: 0, savedChars: 0 },
+    reductionPassOptions: {},
+    reductionMaxToolChars: 1200,
+    reductionTriggerMinChars: 2200,
+  } as any);
+
+  assert.equal(reductionCalls, 0);
+  assert.equal(reductionTraceCalls, 0);
+  assert.equal(uxCalls, 0);
+  assert.equal(traces.some((item) => item.stage === "proxy_after_call_rewrite"), false);
+  assert.match(res.body(), /unchanged/);
+});
+
 test("handleStreamingProxyResponse forwards stream and records stream ux after finish", async () => {
   const recordedUx: any[] = [];
   const traces: any[] = [];
@@ -181,6 +256,7 @@ test("handleStreamingProxyResponse forwards stream and records stream ux after f
   await handleStreamingProxyResponse({
     cfg: {
       stateDir: "/tmp/tokenpilot-proxy-runtime-stream-test",
+      modules: { reduction: true },
     },
     res,
     helpers: {

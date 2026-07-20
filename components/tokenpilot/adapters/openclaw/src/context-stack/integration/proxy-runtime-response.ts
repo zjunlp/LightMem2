@@ -44,6 +44,7 @@ export async function handleStreamingProxyResponse(args: {
     reductionApplied,
     cacheAuditSnapshot,
   } = args;
+  const reductionEnabled = !proxyPureForward && Boolean(cfg.modules?.reduction);
   const upstreamStreamResp = await helpers.requestUpstreamResponsesStream(upstream, activePayload, logger, cfg.stateDir);
   if (cfg.stateDir) {
     await helpers.appendTaskStateTrace(cfg.stateDir, {
@@ -88,20 +89,22 @@ export async function handleStreamingProxyResponse(args: {
     upstreamStreamResp.stream.pipe(res);
   });
   if (cfg.stateDir && (responseFinished || streamEnded) && streamChunks.length > 0) {
-    await recordStreamingUxEffect({
-      cfg,
-      helpers,
-      logger,
-      model,
-      upstreamModel,
-      resolvedSessionId,
-      originalInputText,
-      afterReductionInputText,
-      beforeReductionCanonicalInput,
-      afterReductionCanonicalInput,
-      streamChunks,
-      reductionApplied,
-    });
+    if (reductionEnabled) {
+      await recordStreamingUxEffect({
+        cfg,
+        helpers,
+        logger,
+        model,
+        upstreamModel,
+        resolvedSessionId,
+        originalInputText,
+        afterReductionInputText,
+        beforeReductionCanonicalInput,
+        afterReductionCanonicalInput,
+        streamChunks,
+        reductionApplied,
+      });
+    }
     const streamSnapshot = createOpenClawHostBridge(helpers).snapshotStream(Buffer.concat(streamChunks).toString("utf8"));
     if (cfg.stateDir && cacheAuditSnapshot) {
       await appendOpenClawCacheAuditRecord({
@@ -171,6 +174,7 @@ export async function handleNonStreamingProxyResponse(args: {
     reductionTriggerMinChars,
     cacheAuditSnapshot,
   } = args;
+  const reductionEnabled = !proxyPureForward && Boolean(cfg.modules?.reduction);
   const hostBridge = createOpenClawHostBridge(helpers);
   const responseCodec = payloadCodec ?? hostBridge.payloadCodec;
   let upstreamResp: UpstreamHttpResponse | null = null;
@@ -209,7 +213,7 @@ export async function handleNonStreamingProxyResponse(args: {
   });
   txt = postprocessResult.txt;
   const afterCallReduction = postprocessResult.afterCallReduction;
-  if (cfg.stateDir) {
+  if (cfg.stateDir && reductionEnabled) {
     await helpers.appendTaskStateTrace(cfg.stateDir, {
       stage: "proxy_after_call_rewrite",
       sessionId: resolvedSessionId,
@@ -236,6 +240,7 @@ export async function handleNonStreamingProxyResponse(args: {
     upstreamModel,
     upstreamRespFinal,
     afterCallReduction,
+    shouldRecordReduction: reductionEnabled,
     memoryFaultAutoReplayCount,
   });
   if (cfg.stateDir && cacheAuditSnapshot) {
@@ -257,7 +262,7 @@ export async function handleNonStreamingProxyResponse(args: {
       status: upstreamRespFinal.status,
     });
   }
-  if (cfg.stateDir) {
+  if (cfg.stateDir && reductionEnabled) {
     await recordNonStreamingUxEffect({
       cfg,
       helpers,
