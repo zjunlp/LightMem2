@@ -229,6 +229,7 @@ export async function prepareProxyRequest(args: {
   const stabilizerEnabled = !proxyPureForward && Boolean(cfg.modules.stabilizer);
   const reductionTriggerMinChars = Math.max(256, cfg.reduction.triggerMinChars ?? 2200);
   const reductionMaxToolChars = Math.max(256, cfg.reduction.maxToolChars ?? 1200);
+  const reductionEnabled = !proxyPureForward && Boolean(cfg.modules.reduction);
   const resolvedSessionId = String(requestEnvelope.session.sessionId ?? "proxy-session").trim() || "proxy-session";
   if (!proxyPureForward && cfg.modules.reduction) {
     const recoveryResult = injectMemoryFaultProtocolInstructionsText(requestEnvelope.instructions);
@@ -364,25 +365,27 @@ export async function prepareProxyRequest(args: {
     await upsertOpenClawSessionSummary(cfg.stateDir, resolvedSessionId, {
       latestModel: model || upstreamModel || "unknown",
       workspaceHint,
-      reductionSavedChars: reductionApplied.savedChars,
+      ...(reductionEnabled ? { reductionSavedChars: reductionApplied.savedChars } : {}),
       updatedAt: new Date().toISOString(),
     });
-    await helpers.appendTaskStateTrace(cfg.stateDir, {
-      stage: "proxy_before_call_rewrite",
-      sessionId: resolvedSessionId,
-      model,
-      proxyPureForward,
-      inputItemCountBefore: beforeReductionInputCount,
-      inputItemCountAfter: Array.isArray(payload?.input) ? payload.input.length : 0,
-      inputCharsBefore: beforeReductionInputChars,
-      inputCharsAfter: helpers.estimatePayloadInputChars(payload?.input),
-      reductionChangedItems: reductionApplied.changedItems,
-      reductionChangedBlocks: reductionApplied.changedBlocks,
-      reductionSavedChars: reductionApplied.savedChars,
-      reductionSkippedReason: reductionApplied.diagnostics?.skippedReason ?? null,
-      reductionCandidates: reductionApplied.diagnostics?.candidateBlocks ?? 0,
-      reductionOverThreshold: reductionApplied.diagnostics?.overThresholdBlocks ?? 0,
-    });
+    if (reductionEnabled) {
+      await helpers.appendTaskStateTrace(cfg.stateDir, {
+        stage: "proxy_before_call_rewrite",
+        sessionId: resolvedSessionId,
+        model,
+        proxyPureForward,
+        inputItemCountBefore: beforeReductionInputCount,
+        inputItemCountAfter: Array.isArray(payload?.input) ? payload.input.length : 0,
+        inputCharsBefore: beforeReductionInputChars,
+        inputCharsAfter: helpers.estimatePayloadInputChars(payload?.input),
+        reductionChangedItems: reductionApplied.changedItems,
+        reductionChangedBlocks: reductionApplied.changedBlocks,
+        reductionSavedChars: reductionApplied.savedChars,
+        reductionSkippedReason: reductionApplied.diagnostics?.skippedReason ?? null,
+        reductionCandidates: reductionApplied.diagnostics?.candidateBlocks ?? 0,
+        reductionOverThreshold: reductionApplied.diagnostics?.overThresholdBlocks ?? 0,
+      });
+    }
   }
   const afterReductionInputText = helpers.extractInputText(payload?.input);
   const afterReductionCanonicalInput = helpers.serializeCanonicalInputForUx(payload?.input);
@@ -429,6 +432,7 @@ export async function prepareProxyRequest(args: {
     originalPromptCacheKey,
     dynamicContextTarget,
     shouldRecordStability: stabilizerEnabled && Boolean(cfg.stateDir) && Boolean(devAndUser),
+    shouldRecordReduction: reductionEnabled,
   });
   if (stabilizerEnabled) payload.prompt_cache_retention = "24h";
   const cacheAuditSnapshot = buildOpenClawCacheAuditSnapshot({

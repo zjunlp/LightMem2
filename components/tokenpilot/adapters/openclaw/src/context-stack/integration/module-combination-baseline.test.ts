@@ -207,7 +207,7 @@ for (const combination of MODULE_COMBINATIONS) {
         stateChanges.some(({ path }) => path === `tokenpilot/visual/stability/session-${combination.id}.jsonl`),
         combination.enablement.stabilizer,
       );
-      assert.ok(effects.reduction.traces.length > 0);
+      assert.equal(effects.reduction.traces.length > 0, combination.enablement.reduction);
     } finally {
       await rm(stateDir, { recursive: true, force: true });
     }

@@ -29,6 +29,7 @@ export async function recordProxyInbound(params: {
   originalPromptCacheKey: string;
   dynamicContextTarget: "user" | "developer";
   shouldRecordStability: boolean;
+  shouldRecordReduction: boolean;
 }): Promise<void> {
   const {
     cfg,
@@ -50,6 +51,7 @@ export async function recordProxyInbound(params: {
     originalPromptCacheKey,
     dynamicContextTarget,
     shouldRecordStability,
+    shouldRecordReduction,
   } = params;
   const activePayload = requestEnvelope?.rawPayload && typeof requestEnvelope.rawPayload === "object"
     ? requestEnvelope.rawPayload
@@ -101,7 +103,10 @@ export async function recordProxyInbound(params: {
         firstTurnCandidate,
       }
       : undefined,
-    reductionSegments: Array.isArray(reductionApplied.visualSegments) ? reductionApplied.visualSegments : [],
+    reductionSegments:
+      shouldRecordReduction && Array.isArray(reductionApplied.visualSegments)
+        ? reductionApplied.visualSegments
+        : [],
   });
   const requestId = visualResult.reductionRequestId ?? "";
   const logRecord = {
@@ -130,20 +135,22 @@ export async function recordProxyInbound(params: {
   };
   await mkdir(dirname(proxyLogPath), { recursive: true });
   await appendFile(proxyLogPath, `${JSON.stringify(logRecord)}\n`, "utf8");
-  await helpers.appendReductionPassTrace(cfg.stateDir, {
-    at: requestAt,
-    stage: "proxy_inbound",
-    model,
-    upstreamModel,
-    promptCacheKey: stableRewrite.promptCacheKey,
-    requestId,
-    report: reductionApplied.report ?? [],
-    extra: {
-      reductionSavedChars: reductionApplied.savedChars,
-      reductionChangedItems: reductionApplied.changedItems,
-      reductionChangedBlocks: reductionApplied.changedBlocks,
-    },
-  });
+  if (shouldRecordReduction) {
+    await helpers.appendReductionPassTrace(cfg.stateDir, {
+      at: requestAt,
+      stage: "proxy_inbound",
+      model,
+      upstreamModel,
+      promptCacheKey: stableRewrite.promptCacheKey,
+      requestId,
+      report: reductionApplied.report ?? [],
+      extra: {
+        reductionSavedChars: reductionApplied.savedChars,
+        reductionChangedItems: reductionApplied.changedItems,
+        reductionChangedBlocks: reductionApplied.changedBlocks,
+      },
+    });
+  }
   if (!cfg.debugTapProviderTraffic) return;
 
   const debugRecord = {
