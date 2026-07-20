@@ -49,6 +49,7 @@ test("module observations aggregate eviction savings and estimator usage", async
       enabled: true,
       executed: true,
       changed: true,
+      skippedReason: "none",
       savedChars: 0,
       savedTokens: 0,
       api: { inputTokens: 120, outputTokens: 24, costUsd: 0.002 },
@@ -79,6 +80,46 @@ test("module observations aggregate eviction savings and estimator usage", async
     assert.equal(data.moduleSummary?.mode, "eviction-only");
     assert.equal(data.stability.length, 0);
     assert.equal(data.reduction.length, 0);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("accounting observations add savings without creating executions or skips", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-module-observability-accounting-"));
+  const sessionId = "session-accounting";
+  try {
+    await appendModuleObservation(stateDir, {
+      at: "2026-07-20T00:00:00.000Z",
+      sessionId,
+      phase: "request",
+      moduleId: "reduction",
+      enabled: true,
+      executed: true,
+      changed: true,
+      savedChars: 0,
+      savedTokens: 0,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+    await appendModuleObservation(stateDir, {
+      at: "2026-07-20T00:00:01.000Z",
+      sessionId,
+      phase: "response",
+      moduleId: "reduction",
+      enabled: true,
+      executed: false,
+      changed: false,
+      savedChars: 400,
+      savedTokens: 100,
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+
+    const summary = await readSessionModuleObservationSummary(stateDir, sessionId);
+    assert.equal(summary?.modules.reduction.executions, 1);
+    assert.equal(summary?.modules.reduction.changes, 1);
+    assert.equal(summary?.modules.reduction.skips, 0);
+    assert.equal(summary?.modules.reduction.savedChars, 400);
+    assert.equal(summary?.modules.reduction.savedTokens, 100);
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }

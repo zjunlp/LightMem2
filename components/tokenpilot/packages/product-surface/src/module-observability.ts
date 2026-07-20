@@ -18,7 +18,7 @@ export type ModuleApiAccounting = {
 export type ModuleObservation = {
   at: string;
   sessionId: string;
-  phase: "request" | "history";
+  phase: "request" | "response" | "history";
   moduleId: TokenPilotFeatureModuleId;
   enabled: boolean;
   executed: boolean;
@@ -241,7 +241,7 @@ function applyObservationsToSummary(
     aggregate.observed = true;
     aggregate.executions += observation.executed ? 1 : 0;
     aggregate.changes += observation.changed ? 1 : 0;
-    aggregate.skips += observation.executed ? 0 : 1;
+    aggregate.skips += observation.skippedReason && observation.skippedReason !== "none" ? 1 : 0;
     aggregate.savedChars += Math.max(0, Number(observation.savedChars ?? 0));
     aggregate.savedTokens += Math.max(0, Number(observation.savedTokens ?? 0));
     aggregate.apiInputTokens += Math.max(0, Number(observation.api?.inputTokens ?? 0));
