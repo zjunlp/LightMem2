@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { runBeforeCallReductionOrchestrator } from "@tokenpilot/host-adapter";
-import {
-  findFirstMessageText,
-  appendModuleObservations,
-} from "@tokenpilot/product-surface";
+import { appendModuleObservations } from "@tokenpilot/product-surface";
 import { injectProceduralMemoryHints } from "./procedural-memory.js";
 import {
   createOpenClawPayloadCodec,
