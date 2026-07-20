@@ -1161,6 +1161,23 @@ function renderEmpty(message) {
   el.passRoot.innerHTML = "";
 }
 
+function emptyTabMessage(data, tab) {
+  const moduleId = tab === "stability" ? "stabilizer" : tab;
+  const module = data && data.moduleSummary && data.moduleSummary.modules
+    ? data.moduleSummary.modules[moduleId]
+    : null;
+  if (module && module.enabled === false) {
+    const label = moduleId === "stabilizer"
+      ? "Prefix stabilization"
+      : moduleId.charAt(0).toUpperCase() + moduleId.slice(1);
+    return label + " is disabled for this session. No snapshots are expected.";
+  }
+  if (module && module.enabled === true && Number(module.executions || 0) > 0) {
+    return "This session ran " + moduleId + " but produced no changed snapshots yet.";
+  }
+  return "This session has no " + tab + " snapshots yet.";
+}
+
 async function setActiveHost(hostId) {
   if (state.activeHost && state.activeSessionId) {
     state.lastSessionByHost[state.activeHost] = state.activeSessionId;
@@ -1425,7 +1442,8 @@ function renderActiveView() {
     return;
   }
   if (items.length === 0) {
-    renderEmpty("This session has no " + state.activeTab + " snapshots yet.");
+    const data = state.sessionData.get(sessionKey()) || {};
+    renderEmpty(emptyTabMessage(data, state.activeTab));
     return;
   }
   const safeIndex = Math.max(0, Math.min(index, items.length - 1));

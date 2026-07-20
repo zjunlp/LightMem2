@@ -155,6 +155,9 @@ test("renderVisualPageScript includes cache audit detail panel labels", () => {
   assert.match(script, /drift hotspots=/);
   assert.match(script, /Current Prompt -> Suggested Stable Shape/);
   assert.match(script, /Suggested Stable Shape -> Dynamic Tail Extraction/);
+  assert.match(script, /Prefix stabilization/);
+  assert.match(script, /is disabled for this session\. No snapshots are expected/);
+  assert.match(script, /produced no changed snapshots yet/);
 });
 
 test("renderVisualPageScript is syntactically valid javascript", () => {
@@ -179,6 +182,62 @@ test("buildSessionReportText renders empty-state reports with overview", () => {
   assert.match(text, /^Model: gpt-5\.4/m);
   assert.match(text, /TokenPilot Codex report:/);
   assert.match(text, /- no savings recorded yet/);
+});
+
+test("buildSessionReportText identifies eviction-only without reduction savings", () => {
+  const text = buildSessionReportText({
+    sessionId: "session-eviction-only",
+    aggregate: null,
+    latest: null,
+    detailsEnabled: true,
+    emptyMessage: "- no reduction savings recorded; module diagnostics are available below",
+    moduleSummary: {
+      sessionId: "session-eviction-only",
+      mode: "eviction-only",
+      latestAt: "2026-07-20T00:00:00.000Z",
+      modules: {
+        stabilizer: {
+          enabled: false,
+          executions: 0,
+          changes: 0,
+          skips: 1,
+          savedChars: 0,
+          savedTokens: 0,
+          apiInputTokens: 0,
+          apiOutputTokens: 0,
+          latestAt: "2026-07-20T00:00:00.000Z",
+        },
+        reduction: {
+          enabled: false,
+          executions: 0,
+          changes: 0,
+          skips: 1,
+          savedChars: 0,
+          savedTokens: 0,
+          apiInputTokens: 0,
+          apiOutputTokens: 0,
+          latestAt: "2026-07-20T00:00:00.000Z",
+        },
+        eviction: {
+          enabled: true,
+          executions: 2,
+          changes: 1,
+          skips: 0,
+          savedChars: 1600,
+          savedTokens: 400,
+          apiInputTokens: 120,
+          apiOutputTokens: 24,
+          apiCostUsd: 0.002,
+          latestAt: "2026-07-20T00:00:00.000Z",
+        },
+      },
+    },
+  });
+
+  assert.match(text, /module mode: eviction-only/);
+  assert.match(text, /reduction: enabled=false/);
+  assert.match(text, /eviction: enabled=true, executions=2, changes=1, saved=400 tokens\/1,600 chars/);
+  assert.match(text, /estimator api=120 input \+ 24 output tokens/);
 });
 
 test("loadSessionReportData only keeps latest effect when session ids match", async () => {

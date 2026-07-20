@@ -9,6 +9,10 @@ import {
   type CacheAuditSummary,
 } from "@tokenpilot/host-adapter";
 import { readRecentReductionMetrics, summarizeRecentReductionMetrics, type RecentReductionMetricsSummary } from "../metrics.js";
+import {
+  readSessionModuleObservationSummary,
+  type SessionModuleObservationSummary,
+} from "../module-observability.js";
 
 async function appendJsonl(path: string, payload: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -125,6 +129,7 @@ export type VisualSessionData = {
   cacheAuditWindow?: VisualCacheAuditEntry[];
   recentCacheAudit?: VisualCacheAuditEntry[];
   recentCacheAuditGroups?: VisualCacheAuditGroup[];
+  moduleSummary?: SessionModuleObservationSummary | null;
   limits?: {
     stabilityTotal: number;
     stabilityReturned: number;
@@ -429,6 +434,10 @@ function snapshotDirCandidates(stateDir: string, kind: "stability" | "reduction"
   return pluginStateSubdirCandidates(stateDir, "visual", kind);
 }
 
+function moduleObservationDirCandidates(stateDir: string): string[] {
+  return pluginStateSubdirCandidates(stateDir, "module-observability");
+}
+
 function parseJsonlLines<T>(raw: string): T[] {
   const out: T[] = [];
   for (const line of raw.split(/\r?\n/)) {
@@ -494,6 +503,21 @@ async function listSnapshotFiles(stateDir: string, kind: "stability" | "reductio
   return [];
 }
 
+async function listModuleObservationFiles(stateDir: string): Promise<string[]> {
+  for (const dir of moduleObservationDirCandidates(stateDir)) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+        .map((entry) => join(dir, entry.name))
+        .sort();
+    } catch {
+      // try next candidate
+    }
+  }
+  return [];
+}
+
 export async function appendReductionVisualSnapshot(stateDir: string, snapshot: ReductionVisualSnapshot): Promise<void> {
   if (!snapshot.sessionId || snapshot.savedChars <= 0) return;
   for (const path of snapshotWriteTargets(stateDir, "reduction", snapshot.sessionId)) {
@@ -533,10 +557,11 @@ export async function readVisualSessionDataWithOptions(
     await readSnapshotFile<ReductionVisualSnapshot>(snapshotCandidates(stateDir, "reduction", sessionId)),
   );
   const allEviction = sortByAtDesc(await readSnapshotFile<EvictionVisualSnapshot>(snapshotCandidates(stateDir, "eviction", sessionId)));
-  const [uxAggregate, recentMetrics, cacheAuditRecords] = await Promise.all([
+  const [uxAggregate, recentMetrics, cacheAuditRecords, moduleSummary] = await Promise.all([
     readJsonFile<VisualUxAggregate>(uxAggregateCandidates(stateDir, sessionId)),
     readRecentReductionMetrics(stateDir, sessionId),
     readRecentCacheAuditRecordsForSession(stateDir, sessionId, 64),
+    readSessionModuleObservationSummary(stateDir, sessionId),
   ]);
   const cacheAuditSummary = cacheAuditRecords.length > 0 ? summarizeCacheAudit(cacheAuditRecords) : null;
   const cacheAuditWindow = sortByAtDesc(cacheAuditRecords).map(toVisualCacheAuditEntry);
@@ -570,6 +595,7 @@ export async function readVisualSessionDataWithOptions(
     cacheAuditWindow,
     recentCacheAudit,
     recentCacheAuditGroups: groupVisualCacheAuditEntries(recentCacheAudit),
+    moduleSummary,
     limits: {
       stabilityTotal: allStability.length,
       stabilityReturned: stability.length,
@@ -598,6 +624,7 @@ export async function readVisualSessionListWithOptions(
   const stabilityFiles = await listSnapshotFiles(stateDir, "stability");
   const reductionFiles = await listSnapshotFiles(stateDir, "reduction");
   const evictionFiles = await listSnapshotFiles(stateDir, "eviction");
+  const moduleObservationFiles = await listModuleObservationFiles(stateDir);
   const summaryBySessionId = new Map<string, VisualSessionSummary>();
 
   const mergeCount = async (kind: "stability" | "reduction" | "eviction", fileName: string) => {
@@ -647,6 +674,30 @@ export async function readVisualSessionListWithOptions(
   }
   for (const fileName of evictionFiles) {
     await mergeCount("eviction", fileName);
+  }
+  for (const filePath of moduleObservationFiles) {
+    const observations = await readSnapshotFile<{
+      at: string;
+      sessionId: string;
+    }>([filePath]);
+    const sessionId = String(observations[0]?.sessionId ?? "").trim();
+    if (!sessionId) continue;
+    const summary = summaryBySessionId.get(sessionId) ?? {
+      sessionId,
+      stabilityCount: 0,
+      reductionCount: 0,
+      evictionCount: 0,
+      lastAt: "",
+      latestCountMode: undefined,
+      tokenOptimizedTurns: 0,
+      tokenSavedCount: 0,
+      charOptimizedTurns: 0,
+      charSavedCount: 0,
+      cacheAuditSummary: null,
+    };
+    const latestAt = latestAtOf(observations);
+    if (latestAt > summary.lastAt) summary.lastAt = latestAt;
+    summaryBySessionId.set(sessionId, summary);
   }
 
   const ordered = [...summaryBySessionId.values()].sort((left, right) => right.lastAt.localeCompare(left.lastAt));
