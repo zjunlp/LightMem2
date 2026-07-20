@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { __testHooks } from "../../plugin-test-support.js";
+import { readSessionModuleObservationSummary } from "@tokenpilot/product-surface";
 import {
   MODULE_COMBINATIONS,
   buildModuleCombinationConfig,
@@ -195,6 +196,10 @@ for (const combination of MODULE_COMBINATIONS) {
       const payloadChanges = diffPayload(beforePayload, prepared.payload);
       const stateChanges = diffStateDirectories(beforeState, afterState);
       const effects = recorder.snapshot();
+      const moduleSummary = await readSessionModuleObservationSummary(
+        stateDir,
+        `session-${combination.id}`,
+      );
 
       assert.equal(reductionCalls, combination.enablement.reduction ? 1 : 0);
       assert.equal(policyCalls, combination.enablement.eviction ? 1 : 0);
@@ -213,6 +218,9 @@ for (const combination of MODULE_COMBINATIONS) {
         combination.enablement.stabilizer,
       );
       assert.equal(effects.reduction.traces.length > 0, combination.enablement.reduction);
+      assert.equal(moduleSummary?.modules.stabilizer.enabled, combination.enablement.stabilizer);
+      assert.equal(moduleSummary?.modules.reduction.enabled, combination.enablement.reduction);
+      assert.equal(moduleSummary?.modules.eviction.enabled, combination.enablement.eviction);
     } finally {
       await rm(stateDir, { recursive: true, force: true });
     }

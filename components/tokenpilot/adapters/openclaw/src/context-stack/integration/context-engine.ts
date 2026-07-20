@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { rewriteCanonicalState, syncCanonicalStateFromTranscript } from "../page-out/canonical-rewrite-adapter.js";
 import { estimateMessagesChars, saveCanonicalState } from "@tokenpilot/history";
+import { appendModuleObservation } from "@tokenpilot/product-surface";
 import { enqueueEvictedTasksForProceduralMemory } from "./procedural-memory.js";
 import { runHistoryEvictionIfEnabled } from "./history-eviction-runner.js";
 import { runHistoryModules } from "./module-orchestrator.js";
@@ -96,6 +97,26 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
       rewriteCanonicalState,
       estimateMessagesChars,
     });
+    try {
+      await appendModuleObservation(cfg.stateDir, {
+        sessionId,
+        phase: "history",
+        moduleId: "eviction",
+        enabled: eviction.enabled,
+        executed: historyModuleExecutions.some(
+          (execution) => execution.id === "eviction" && execution.status === "executed",
+        ),
+        changed: eviction.changed,
+        skippedReason: eviction.diagnostics.skippedReason,
+        savedChars: eviction.savedChars,
+        savedTokens: Math.max(0, Math.round(eviction.savedChars / 4)),
+        api: { inputTokens: 0, outputTokens: 0 },
+      });
+    } catch (error) {
+      logger.warn?.(
+        `[context-engine] module observation write failed module=eviction: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     return {
       state: eviction.state,
       changed: synced.changed || eviction.changed,

@@ -5,6 +5,14 @@ import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
 export type EvictionRunResult = {
   enabled: boolean;
   executed: boolean;
+  changed?: boolean;
+  estimatedSavedChars?: number;
+  estimatorUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUsd?: number;
+  };
   skippedReason?: "module_disabled" | "policy_module_unavailable";
   policyMetadata?: unknown;
 };
@@ -39,9 +47,17 @@ export async function runEvictionIfEnabled(params: {
   const applied = await params.applyPolicyBeforeCall(turnCtx, params.cfg, params.logger, {
     policy: params.policyModule,
   });
+  const policyMetadata = applied.turnCtx.metadata?.policy as any;
+  const evictionDecision = policyMetadata?.decisions?.eviction;
+  const taskStateDecision = policyMetadata?.decisions?.taskState;
   return {
     enabled: true,
     executed: true,
-    policyMetadata: applied.turnCtx.metadata?.policy,
+    changed: Boolean(taskStateDecision?.applied || evictionDecision?.instructions?.length),
+    estimatedSavedChars: Math.max(0, Number(evictionDecision?.estimatedSavedChars ?? 0)),
+    ...(taskStateDecision?.estimatorUsage
+      ? { estimatorUsage: taskStateDecision.estimatorUsage }
+      : {}),
+    policyMetadata,
   };
 }

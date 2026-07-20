@@ -59,6 +59,55 @@ test("eviction runner returns policy metadata after execution", async () => {
   assert.deepEqual(result, {
     enabled: true,
     executed: true,
+    changed: false,
+    estimatedSavedChars: 0,
     policyMetadata: { decisions: { eviction: { enabled: true } } },
+  });
+});
+
+test("eviction runner exposes estimator usage and planned savings", async () => {
+  const result = await runEvictionIfEnabled({
+    cfg: {
+      moduleEnablement: { stabilizer: false, reduction: false, eviction: true },
+      eviction: { enabled: true },
+    },
+    logger: {},
+    payload: { model: "gpt-5.4-mini", input: [] },
+    sessionId: "session-accounting",
+    policyModule: { name: "policy" },
+    extractInputText: () => "",
+    applyPolicyBeforeCall: async (turnCtx) => ({
+      turnCtx: {
+        ...turnCtx,
+        metadata: {
+          policy: {
+            decisions: {
+              taskState: {
+                applied: true,
+                estimatorUsage: {
+                  inputTokens: 120,
+                  outputTokens: 24,
+                  totalTokens: 144,
+                  costUsd: 0.002,
+                },
+              },
+              eviction: {
+                instructions: [{ blockId: "block-1" }],
+                estimatedSavedChars: 800,
+              },
+            },
+          },
+        },
+      },
+    }),
+  });
+
+  assert.equal(result.changed, true);
+  assert.equal(result.estimatedSavedChars, 800);
+  assert.deepEqual(result.estimatorUsage, {
+    inputTokens: 120,
+    outputTokens: 24,
+    totalTokens: 144,
+    costUsd: 0.002,
   });
 });

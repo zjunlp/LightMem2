@@ -2,6 +2,7 @@
 import { runBeforeCallReductionOrchestrator } from "@tokenpilot/host-adapter";
 import {
   findFirstMessageText,
+  appendModuleObservation,
 } from "@tokenpilot/product-surface";
 import { injectProceduralMemoryHints } from "./procedural-memory.js";
 import {
@@ -414,6 +415,72 @@ export async function prepareProxyRequest(args: {
     firstTurnCandidate,
     originalPromptCacheKey,
   } = prefixRun;
+  if (cfg.stateDir) {
+    const executionById = new Map(requestModuleExecutions.map((execution) => [execution.id, execution]));
+    const prefixChanged = Boolean(
+      prefixRun.enabled
+      && (
+        prefixRun.originalPromptCacheKey !== String(prefixRun.stableRewrite.promptCacheKey ?? "")
+        || Number(prefixRun.stableRewrite.userContentRewrites ?? 0) > 0
+        || Number(prefixRun.stableRewrite.senderMetadataBlocksBefore ?? 0)
+          !== Number(prefixRun.stableRewrite.senderMetadataBlocksAfter ?? 0)
+        || prefixRun.developerCanonicalText !== prefixRun.developerForwardedText
+      )
+    );
+    const observations = [
+      {
+        moduleId: "stabilizer" as const,
+        enabled: stabilizerEnabled,
+        executed: executionById.get("stabilizer")?.status === "executed",
+        changed: prefixChanged,
+        skippedReason: executionById.get("stabilizer")?.skippedReason,
+        savedChars: 0,
+        savedTokens: 0,
+        api: { inputTokens: 0, outputTokens: 0 },
+      },
+      {
+        moduleId: "reduction" as const,
+        enabled: reductionEnabled,
+        executed: executionById.get("reduction")?.status === "executed",
+        changed: Number(reductionApplied.savedChars ?? 0) > 0,
+        skippedReason:
+          executionById.get("reduction")?.skippedReason
+          ?? reductionApplied.diagnostics?.skippedReason,
+        savedChars: Math.max(0, Number(reductionApplied.savedChars ?? 0)),
+        savedTokens: Math.max(0, Math.round(Number(reductionApplied.savedChars ?? 0) / 4)),
+        api: { inputTokens: 0, outputTokens: 0 },
+      },
+      {
+        moduleId: "eviction" as const,
+        enabled: evictionRun.enabled,
+        executed: evictionRun.executed,
+        changed: Boolean(evictionRun.changed),
+        skippedReason: evictionRun.skippedReason,
+        savedChars: 0,
+        savedTokens: 0,
+        api: {
+          inputTokens: Math.max(0, Number(evictionRun.estimatorUsage?.inputTokens ?? 0)),
+          outputTokens: Math.max(0, Number(evictionRun.estimatorUsage?.outputTokens ?? 0)),
+          ...(typeof evictionRun.estimatorUsage?.costUsd === "number"
+            ? { costUsd: evictionRun.estimatorUsage.costUsd }
+            : {}),
+        },
+      },
+    ];
+    for (const observation of observations) {
+      try {
+        await appendModuleObservation(cfg.stateDir, {
+          sessionId: resolvedSessionId,
+          phase: "request",
+          ...observation,
+        });
+      } catch (error) {
+        logger.warn?.(
+          `[plugin-runtime] module observation write failed module=${observation.moduleId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
   if (cfg.stateDir) {
     const workspaceHint =
       typeof rootPromptRewrite?.workdir === "string" && rootPromptRewrite.workdir.trim().length > 0
