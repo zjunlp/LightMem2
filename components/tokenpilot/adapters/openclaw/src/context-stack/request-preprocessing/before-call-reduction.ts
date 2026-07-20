@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { resolveReductionPasses, runReductionBeforeCall } from "@tokenpilot/runtime-core";
+import { resolveReductionPasses, runReductionBeforeCall } from "@tokenpilot/reduction";
 import type { ContextSegment, RuntimeModule } from "@tokenpilot/kernel";
 import type { ProxyReductionBinding } from "./reduction-context-types.js";
 

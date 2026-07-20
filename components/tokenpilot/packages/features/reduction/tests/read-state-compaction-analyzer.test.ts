@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ContextSegment } from "@tokenpilot/kernel";
-import { analyzeReadStateCompaction } from "../src/reduction/read-state-compaction-analyzer.js";
+import { analyzeReadStateCompaction } from "../src/analyzers/read-state-compaction-analyzer.js";
 
 function buildSegment(
   id: string,

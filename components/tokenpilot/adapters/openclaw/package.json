@@ -34,6 +34,7 @@
     "@tokenpilot/kernel": "workspace:*",
     "@tokenpilot/memory": "workspace:*",
     "@tokenpilot/product-surface": "workspace:*",
+    "@tokenpilot/reduction": "workspace:*",
     "@tokenpilot/runtime-core": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"
   },

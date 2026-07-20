@@ -4,11 +4,9 @@ import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
 import {
   analyzeExecOutputTruncation,
   analyzeToolPayloadTrim,
-} from "@tokenpilot/decision";
-import {
   resolveReductionPasses,
   runReductionBeforeCall,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/reduction";
 import type { TokenPilotCodexConfig } from "./config.js";
 import { loadCodexSessionSnapshot } from "./session-state.js";
 

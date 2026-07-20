@@ -1,5 +1,5 @@
 import type { ReductionPassHandler } from "../reduction/types.js";
-import { truncatePath } from "@tokenpilot/decision";
+import { truncatePath } from "../analyzers/path-truncation-analyzer.js";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

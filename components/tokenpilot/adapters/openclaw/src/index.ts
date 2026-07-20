@@ -3,7 +3,7 @@ import {
   runReductionAfterCall as runLayerReductionAfterCall,
   runReductionBeforeCall as runLayerReductionBeforeCall,
   resolveReductionPasses as resolveLayerReductionPasses,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/reduction";
 import { configureStatePathResolver } from "@tokenpilot/artifact-store";
 import {
   extractInputText,

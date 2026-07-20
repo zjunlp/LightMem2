@@ -32,7 +32,7 @@ export {
 export {
   isReductionPassEnabled,
   type ReductionPassToggles,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/reduction";
 export { applyToolResultPersistPolicy } from "./request-preprocessing/tool-results-persist-policy.js";
 export {
   applyRootPromptRewriteToChatMessages,

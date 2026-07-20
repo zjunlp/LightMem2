@@ -25,7 +25,7 @@ import {
   analyzePathTruncation,
   analyzeImageDownsample,
   analyzeLineNumberStrip,
-} from "./reduction/index.js";
+} from "@tokenpilot/reduction";
 import {
   analyzeEvictionFromTaskRegistry,
   type EvictionBlock,

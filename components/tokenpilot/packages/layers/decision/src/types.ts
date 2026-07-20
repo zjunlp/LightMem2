@@ -50,57 +50,11 @@ export type TaskRouterConfig = {
   tierRoutes?: Partial<Record<RoutingTier, TierRouteConfig>>;
 };
 
-// ============================================================================
-// Reduction Decision Types
-// ============================================================================
-
-/**
- * Reduction strategy types for different compression approaches
- */
-export type ReductionStrategy =
-  | "read_state_compaction"    // Compact stale or superseded reads of the same path
-  | "exec_output_truncation"   // Truncate large exec/tool outputs
-  | "tool_payload_trim"        // Trim tool payload fields
-  | "html_slimming"            // Compress HTML content
-  | "format_slimming"          // Remove formatting overhead
-  | "semantic_compression"     // Semantic compression (LLMLingua2, etc.)
-  | "format_cleaning"          // Clean whitespace, HTML comments, full-width chars
-  | "path_truncation"          // Truncate long file paths in output
-  | "image_downsample"         // Downsample large base64 images
-  | "line_number_strip"        // Strip line number prefixes from read output
-  | "agents_startup_optimization"  // Rewrite injected agent startup instructions to prevent redundant reads
-  | (string & {});              // Extensible
-
-/**
- * Instruction for a single reduction operation
- */
-export type ReductionInstruction = {
-  /** The strategy to use for this reduction */
-  strategy: ReductionStrategy;
-  /** Target segment IDs to reduce */
-  segmentIds: string[];
-  /** Confidence score 0-1 */
-  confidence: number;
-  /** Priority for ordering (higher = process first) */
-  priority: number;
-  /** Human-readable rationale for the decision */
-  rationale: string;
-  /** Strategy-specific parameters */
-  parameters?: Record<string, unknown>;
-};
-
-/**
- * Decision output from Policy to Reduction module
- */
-export type ReductionDecision = {
-  enabled: boolean;
-  /** Instructions for reduction operations */
-  instructions: ReductionInstruction[];
-  /** Total chars that could be saved by following instructions */
-  estimatedSavedChars: number;
-  /** Notes about the decision */
-  notes?: string[];
-};
+export type {
+  ReductionDecision,
+  ReductionInstruction,
+  ReductionStrategy,
+} from "@tokenpilot/reduction";
 
 // ============================================================================
 // Eviction Decision Types

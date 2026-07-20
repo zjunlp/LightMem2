@@ -4,11 +4,9 @@ import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
 import {
   analyzeExecOutputTruncation,
   analyzeToolPayloadTrim,
-} from "@tokenpilot/decision";
-import {
   resolveReductionPasses,
   runReductionBeforeCall,
-} from "@tokenpilot/runtime-core";
+} from "@tokenpilot/reduction";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 import { loadClaudeCodeSessionSnapshot } from "./session-state.js";
 

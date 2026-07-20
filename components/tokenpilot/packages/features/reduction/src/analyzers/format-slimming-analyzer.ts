@@ -1,5 +1,5 @@
 import type { ContextSegment } from "@tokenpilot/kernel";
-import type { ReductionDecision, ReductionInstruction } from "../types.js";
+import type { ReductionDecision, ReductionInstruction } from "../decision-types.js";
 
 // ============================================================================
 // Types

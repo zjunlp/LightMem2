@@ -1,5 +1,5 @@
 import type { ReductionPassHandler } from "../reduction/types.js";
-import { createImagePlaceholder, createSvgPlaceholder } from "@tokenpilot/decision";
+import { createImagePlaceholder, createSvgPlaceholder } from "../analyzers/image-downsample-analyzer.js";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

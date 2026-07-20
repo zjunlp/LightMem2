@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { runReductionAfterCall, resolveReductionPasses } from "@tokenpilot/runtime-core";
+import { runReductionAfterCall, resolveReductionPasses } from "@tokenpilot/reduction";
 import type { RuntimeTurnResult } from "@tokenpilot/kernel";
 import { extractProxyResponseText, isSseContentType, patchProxyResponseText } from "./after-call-response-text.js";
 import {

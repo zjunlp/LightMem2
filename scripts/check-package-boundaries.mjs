@@ -17,7 +17,7 @@ const allowedDependencies = {
 const knownBoundaryDebt = new Set([
   "@tokenpilot/host-adapter -> @tokenpilot/stabilizer",
   "@tokenpilot/product-surface -> @tokenpilot/stabilizer",
-  "@tokenpilot/runtime-core -> @tokenpilot/decision",
+  "@tokenpilot/runtime-core -> @tokenpilot/reduction",
 ]);
 
 async function findPackageFiles(directory) {

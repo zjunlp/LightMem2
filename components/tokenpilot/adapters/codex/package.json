@@ -20,12 +20,11 @@
   },
   "dependencies": {
     "@tokenpilot/artifact-store": "workspace:*",
-    "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",
     "@tokenpilot/mcp": "workspace:*",
     "@tokenpilot/product-surface": "workspace:*",
-    "@tokenpilot/runtime-core": "workspace:*",
+    "@tokenpilot/reduction": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"
   },
   "scripts": {

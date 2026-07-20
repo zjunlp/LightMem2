@@ -1,5 +1,5 @@
 import type { ReductionPassHandler } from "../reduction/types.js";
-import { stripLineNumbers } from "@tokenpilot/decision";
+import { stripLineNumbers } from "../analyzers/line-number-strip-analyzer.js";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

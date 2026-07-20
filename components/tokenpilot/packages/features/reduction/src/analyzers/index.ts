@@ -13,4 +13,4 @@ export type {
   ReductionStrategy,
   ReductionInstruction,
   ReductionDecision,
-} from "../types.js";
+} from "../decision-types.js";

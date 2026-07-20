@@ -21,7 +21,7 @@ test("calculateJsonInformationScore gives higher score to anomalous records", ()
 });
 
 test("selectJsonArrayAnchorIndices keeps front/back and anomalous middle items", () => {
-  const items = Array.from({ length: 14 }, (_value, index) => ({
+  const items: Array<Record<string, unknown>> = Array.from({ length: 14 }, (_value, index) => ({
     type: "result",
     status: "ok",
     id: index,

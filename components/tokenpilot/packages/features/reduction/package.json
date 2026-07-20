@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/decision",
+  "name": "@tokenpilot/reduction",
   "version": "0.1.0",
   "private": true,
   "lightmem2": {
@@ -14,8 +14,7 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/history": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*"
+    "@tokenpilot/artifact-store": "workspace:*",
+    "@tokenpilot/kernel": "workspace:*"
   }
 }

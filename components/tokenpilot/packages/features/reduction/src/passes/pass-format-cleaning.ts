@@ -5,7 +5,7 @@ import {
   normalizeFullWidthDigits,
   normalizeFullWidthSpace,
   normalizeExcessWhitespace,
-} from "@tokenpilot/decision";
+} from "../analyzers/format-cleaning-analyzer.js";
 
 type AsObject<T> = T extends Record<string, unknown> ? T : Record<string, unknown>;
 

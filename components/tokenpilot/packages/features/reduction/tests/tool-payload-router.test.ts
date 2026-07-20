@@ -148,7 +148,7 @@ test("reduceToolPayloadText summarizes large json arrays with omission summary",
 });
 
 test("reduceToolPayloadText keeps anomalous json items via anchor selection", () => {
-  const items = Array.from({ length: 12 }, (_value, index) => ({
+  const items: Array<Record<string, unknown>> = Array.from({ length: 12 }, (_value, index) => ({
     type: "result",
     status: "ok",
     id: index,

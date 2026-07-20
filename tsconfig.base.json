@@ -30,6 +30,9 @@
             "@tokenpilot/runtime-core": [
                 "components/tokenpilot/packages/runtime-core/src/index.ts"
             ],
+            "@tokenpilot/reduction": [
+                "components/tokenpilot/packages/features/reduction/src/index.ts"
+            ],
             "@tokenpilot/host-adapter": [
                 "components/tokenpilot/packages/host-adapter/src/index.ts"
             ],
