@@ -327,6 +327,33 @@ function parseEstimatorOutput(
   return normalizeEstimatorOutput(parsed, input);
 }
 
+function numberFrom(value: unknown): number | undefined {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function extractUsage(payload: any): TaskStateEstimatorOutput["usage"] {
+  const usage = payload?.usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const inputTokens = numberFrom(
+    usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokens ?? usage.promptTokens,
+  ) ?? 0;
+  const outputTokens = numberFrom(
+    usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokens ?? usage.completionTokens,
+  ) ?? 0;
+  const totalTokens = numberFrom(usage.total_tokens ?? usage.totalTokens)
+    ?? inputTokens + outputTokens;
+  const costUsd = numberFrom(
+    usage.cost_usd ?? usage.costUsd ?? usage.total_cost ?? usage.totalCost ?? payload?.cost_usd,
+  );
+  return {
+    inputTokens: Math.max(0, inputTokens),
+    outputTokens: Math.max(0, outputTokens),
+    totalTokens: Math.max(0, totalTokens),
+    ...(costUsd !== undefined ? { costUsd: Math.max(0, costUsd) } : {}),
+  };
+}
+
 export function createApiTaskStateEstimator(
   cfg: TaskStateEstimatorApiConfig,
 ): TaskStateEstimator {
@@ -374,7 +401,10 @@ export function createApiTaskStateEstimator(
     }
     const payload = await response.json();
     const rawText = extractTextFromResponsePayload(payload);
-    return parseEstimatorOutput(rawText, input);
+    return {
+      ...parseEstimatorOutput(rawText, input),
+      usage: extractUsage(payload),
+    };
   }
 
   async function requestViaChatCompletions(
@@ -412,7 +442,10 @@ export function createApiTaskStateEstimator(
     }
     const payload = await response.json();
     const rawText = extractTextFromChatCompletionPayload(payload);
-    return parseEstimatorOutput(rawText, input);
+    return {
+      ...parseEstimatorOutput(rawText, input),
+      usage: extractUsage(payload),
+    };
   }
 
   return {

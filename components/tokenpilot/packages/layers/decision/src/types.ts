@@ -203,6 +203,12 @@ export type SemanticTaskUpdate = {
 export type TaskStateEstimatorOutput = {
   baseVersion: number;
   taskUpdates: SemanticTaskUpdate[];
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUsd?: number;
+  };
 };
 
 export type TaskStateEstimator = {

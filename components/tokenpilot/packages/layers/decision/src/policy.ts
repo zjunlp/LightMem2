@@ -207,6 +207,12 @@ export type PolicyTaskStateDecision = {
     reason: string;
   }>;
   note?: string;
+  estimatorUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUsd?: number;
+  };
 };
 
 export type PolicyCacheHealthDecision = {
@@ -1567,6 +1573,7 @@ async function maybeRunTaskStateEstimator(
           transitions: [],
           rejectedUpdates: [],
           note: "base_version_mismatch",
+          estimatorUsage: output.usage,
         },
       };
     }
@@ -1639,6 +1646,7 @@ async function maybeRunTaskStateEstimator(
             transitions: built.transitions,
             rejectedUpdates: built.rejectedUpdates,
             note: "persist_version_mismatch",
+            estimatorUsage: output.usage,
           },
         };
       }
@@ -1667,6 +1675,7 @@ async function maybeRunTaskStateEstimator(
         transitionCount: built.transitions.length,
         transitions: built.transitions,
         rejectedUpdates: built.rejectedUpdates,
+        estimatorUsage: output.usage,
       },
     };
   } catch (error) {
