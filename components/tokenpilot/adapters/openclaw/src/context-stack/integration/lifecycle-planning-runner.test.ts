@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { runEvictionIfEnabled } from "./eviction-runner.js";
+import { runLifecyclePlanningIfEnabled } from "./lifecycle-planning-runner.js";
 
-test("eviction runner uses normalized eviction switches instead of legacy policy switch", async () => {
+test("lifecycle planning runner uses normalized eviction switches instead of legacy policy switch", async () => {
   let calls = 0;
-  const disabled = await runEvictionIfEnabled({
+  const disabled = await runLifecyclePlanningIfEnabled({
     cfg: {
       moduleEnablement: { stabilizer: false, reduction: false, eviction: false },
       modules: { policy: true, eviction: false },
@@ -30,8 +30,8 @@ test("eviction runner uses normalized eviction switches instead of legacy policy
   assert.equal(calls, 0);
 });
 
-test("eviction runner returns policy metadata after execution", async () => {
-  const result = await runEvictionIfEnabled({
+test("lifecycle planning runner returns policy metadata after execution", async () => {
+  const result = await runLifecyclePlanningIfEnabled({
     cfg: {
       moduleEnablement: { stabilizer: false, reduction: false, eviction: true },
       modules: { policy: false, eviction: true },
@@ -59,14 +59,16 @@ test("eviction runner returns policy metadata after execution", async () => {
   assert.deepEqual(result, {
     enabled: true,
     executed: true,
-    changed: false,
-    estimatedSavedChars: 0,
+    registryChanged: false,
+    planCreated: false,
+    plannedSavedChars: 0,
+    plannedInstructionCount: 0,
     policyMetadata: { decisions: { eviction: { enabled: true } } },
   });
 });
 
-test("eviction runner exposes estimator usage and planned savings", async () => {
-  const result = await runEvictionIfEnabled({
+test("lifecycle planning runner separates registry updates from the eviction plan", async () => {
+  const result = await runLifecyclePlanningIfEnabled({
     cfg: {
       moduleEnablement: { stabilizer: false, reduction: false, eviction: true },
       eviction: { enabled: true },
@@ -102,8 +104,10 @@ test("eviction runner exposes estimator usage and planned savings", async () => 
     }),
   });
 
-  assert.equal(result.changed, true);
-  assert.equal(result.estimatedSavedChars, 800);
+  assert.equal(result.registryChanged, true);
+  assert.equal(result.planCreated, true);
+  assert.equal(result.plannedSavedChars, 800);
+  assert.equal(result.plannedInstructionCount, 1);
   assert.deepEqual(result.estimatorUsage, {
     inputTokens: 120,
     outputTokens: 24,

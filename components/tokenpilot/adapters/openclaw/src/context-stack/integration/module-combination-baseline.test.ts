@@ -108,7 +108,7 @@ test("all-enabled request behavior remains stable before module decoupling", asy
     assert.deepEqual(traceStages, [
       "procedural_memory_retrieval",
       "stable_prefix_rewrite",
-      "eviction_runner_completed",
+      "lifecycle_planning_completed",
       "proxy_reduction_session_resolved",
       "proxy_before_call_rewrite",
     ]);
@@ -203,10 +203,10 @@ for (const combination of MODULE_COMBINATIONS) {
 
       assert.equal(reductionCalls, combination.enablement.reduction ? 1 : 0);
       assert.equal(policyCalls, combination.enablement.eviction ? 1 : 0);
-      assert.equal(prepared.evictionRun.enabled, combination.enablement.eviction);
-      assert.equal(prepared.evictionRun.executed, combination.enablement.eviction);
+      assert.equal(prepared.lifecycleRun.enabled, combination.enablement.eviction);
+      assert.equal(prepared.lifecycleRun.executed, combination.enablement.eviction);
       assert.equal(
-        effects.eviction.traces.some(({ name }) => name === "eviction_runner_completed"),
+        effects.eviction.traces.some(({ name }) => name === "lifecycle_planning_completed"),
         combination.enablement.eviction,
       );
       assert.equal(prepared.reductionApplied.changedBlocks > 0, combination.enablement.reduction);
@@ -221,6 +221,11 @@ for (const combination of MODULE_COMBINATIONS) {
       assert.equal(moduleSummary?.modules.stabilizer.enabled, combination.enablement.stabilizer);
       assert.equal(moduleSummary?.modules.reduction.enabled, combination.enablement.reduction);
       assert.equal(moduleSummary?.modules.eviction.enabled, combination.enablement.eviction);
+      assert.equal(moduleSummary?.modules.eviction.changes, 0);
+      assert.equal(
+        moduleSummary?.modules.eviction.executionsByPhase?.request,
+        combination.enablement.eviction ? 1 : 0,
+      );
     } finally {
       await rm(stateDir, { recursive: true, force: true });
     }
@@ -343,7 +348,7 @@ test("reduction-only mutates tool payload without prefix or eviction effects", a
     assert.equal("__tokenpilot_reduction_applied" in prepared.payload, false);
     assert.ok(String(toolMessage?.content ?? "").length < 3000);
     assert.ok(prepared.reductionApplied.savedChars > 0);
-    assert.deepEqual(prepared.evictionRun, {
+    assert.deepEqual(prepared.lifecycleRun, {
       enabled: false,
       executed: false,
       skippedReason: "module_disabled",

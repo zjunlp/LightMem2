@@ -2,11 +2,13 @@ import type { RuntimeModule } from "@tokenpilot/kernel";
 
 import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
 
-export type EvictionRunResult = {
+export type LifecyclePlanningResult = {
   enabled: boolean;
   executed: boolean;
-  changed?: boolean;
-  estimatedSavedChars?: number;
+  registryChanged?: boolean;
+  planCreated?: boolean;
+  plannedSavedChars?: number;
+  plannedInstructionCount?: number;
   estimatorUsage?: {
     inputTokens: number;
     outputTokens: number;
@@ -17,7 +19,7 @@ export type EvictionRunResult = {
   policyMetadata?: unknown;
 };
 
-export async function runEvictionIfEnabled(params: {
+export async function runLifecyclePlanningIfEnabled(params: {
   cfg: any;
   logger: any;
   payload: any;
@@ -30,7 +32,7 @@ export async function runEvictionIfEnabled(params: {
     logger: any,
     modules: { policy?: RuntimeModule },
   ): Promise<{ turnCtx: any }>;
-}): Promise<EvictionRunResult> {
+}): Promise<LifecyclePlanningResult> {
   const enabled = Boolean(params.cfg.moduleEnablement.eviction);
   if (!enabled) {
     return { enabled: false, executed: false, skippedReason: "module_disabled" };
@@ -50,11 +52,16 @@ export async function runEvictionIfEnabled(params: {
   const policyMetadata = applied.turnCtx.metadata?.policy as any;
   const evictionDecision = policyMetadata?.decisions?.eviction;
   const taskStateDecision = policyMetadata?.decisions?.taskState;
+  const plannedInstructionCount = Array.isArray(evictionDecision?.instructions)
+    ? evictionDecision.instructions.length
+    : 0;
   return {
     enabled: true,
     executed: true,
-    changed: Boolean(taskStateDecision?.applied || evictionDecision?.instructions?.length),
-    estimatedSavedChars: Math.max(0, Number(evictionDecision?.estimatedSavedChars ?? 0)),
+    registryChanged: Boolean(taskStateDecision?.applied),
+    planCreated: plannedInstructionCount > 0,
+    plannedSavedChars: Math.max(0, Number(evictionDecision?.estimatedSavedChars ?? 0)),
+    plannedInstructionCount,
     ...(taskStateDecision?.estimatorUsage
       ? { estimatorUsage: taskStateDecision.estimatorUsage }
       : {}),

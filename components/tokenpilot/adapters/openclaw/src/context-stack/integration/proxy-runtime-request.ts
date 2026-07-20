@@ -13,7 +13,10 @@ import type { UpstreamConfig } from "./upstream.js";
 import { normalizeResponsesInputForUpstream } from "./proxy-runtime-shared.js";
 import { recordProxyInbound } from "./proxy-runtime-logging.js";
 import { buildOpenClawCacheAuditSnapshot } from "../../cache-audit.js";
-import { runEvictionIfEnabled, type EvictionRunResult } from "./eviction-runner.js";
+import {
+  runLifecyclePlanningIfEnabled,
+  type LifecyclePlanningResult,
+} from "./lifecycle-planning-runner.js";
 import { runPrefixIfEnabled } from "./prefix-runner.js";
 import { runRequestModules, type ModuleExecutionRecord } from "./module-orchestrator.js";
 
@@ -35,7 +38,7 @@ type ProxyRequestPreparation = {
   stableRewrite: any;
   rootPromptRewrite: any;
   reductionApplied: any;
-  evictionRun: EvictionRunResult;
+  lifecycleRun: LifecyclePlanningResult;
   requestModuleExecutions: ModuleExecutionRecord[];
   developerForwardedText: string;
   developerCanonicalText: string;
@@ -249,7 +252,7 @@ export async function prepareProxyRequest(args: {
     beforeReductionInputCount: number;
     beforeReductionInputChars: number;
     beforeReductionCanonicalInput: string;
-    evictionRun: EvictionRunResult;
+    lifecycleRun: LifecyclePlanningResult;
     reductionApplied: any;
   } = {
     prefixRun: runPrefixIfEnabled({
@@ -265,7 +268,7 @@ export async function prepareProxyRequest(args: {
     beforeReductionInputCount: 0,
     beforeReductionInputChars: 0,
     beforeReductionCanonicalInput: "",
-    evictionRun: {
+    lifecycleRun: {
       enabled: false,
       executed: false,
       skippedReason: "module_disabled",
@@ -342,10 +345,10 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "eviction",
+        id: "lifecycle-planning",
         enabled: () => cfg.moduleEnablement.eviction,
         run: async () => {
-          requestModuleContext.evictionRun = await runEvictionIfEnabled({
+          requestModuleContext.lifecycleRun = await runLifecyclePlanningIfEnabled({
             cfg,
             logger,
             payload,
@@ -356,21 +359,25 @@ export async function prepareProxyRequest(args: {
           });
           if (cfg.stateDir) {
             const policyMetadata =
-              requestModuleContext.evictionRun.policyMetadata
-              && typeof requestModuleContext.evictionRun.policyMetadata === "object"
-                ? requestModuleContext.evictionRun.policyMetadata as Record<string, any>
+              requestModuleContext.lifecycleRun.policyMetadata
+              && typeof requestModuleContext.lifecycleRun.policyMetadata === "object"
+                ? requestModuleContext.lifecycleRun.policyMetadata as Record<string, any>
                 : undefined;
             await helpers.appendTaskStateTrace(cfg.stateDir, {
-              stage: "eviction_runner_completed",
+              stage: "lifecycle_planning_completed",
               sessionId: resolvedSessionId,
-              enabled: requestModuleContext.evictionRun.enabled,
-              executed: requestModuleContext.evictionRun.executed,
-              skippedReason: requestModuleContext.evictionRun.skippedReason ?? null,
-              decision: policyMetadata?.decisions?.eviction ?? null,
+              enabled: requestModuleContext.lifecycleRun.enabled,
+              executed: requestModuleContext.lifecycleRun.executed,
+              skippedReason: requestModuleContext.lifecycleRun.skippedReason ?? null,
+              registryChanged: Boolean(requestModuleContext.lifecycleRun.registryChanged),
+              planCreated: Boolean(requestModuleContext.lifecycleRun.planCreated),
+              plannedSavedChars: Number(requestModuleContext.lifecycleRun.plannedSavedChars ?? 0),
+              plannedInstructionCount: Number(requestModuleContext.lifecycleRun.plannedInstructionCount ?? 0),
+              evictionPlan: policyMetadata?.decisions?.eviction ?? null,
               taskState: policyMetadata?.decisions?.taskState ?? null,
             });
           }
-          return requestModuleContext.evictionRun;
+          return requestModuleContext.lifecycleRun;
         },
       },
       {
@@ -400,7 +407,7 @@ export async function prepareProxyRequest(args: {
     beforeReductionInputCount,
     beforeReductionInputChars,
     beforeReductionCanonicalInput,
-    evictionRun,
+    lifecycleRun,
     reductionApplied,
   } = requestModuleContext;
   const {
@@ -449,17 +456,17 @@ export async function prepareProxyRequest(args: {
       },
       {
         moduleId: "eviction" as const,
-        enabled: evictionRun.enabled,
-        executed: evictionRun.executed,
-        changed: Boolean(evictionRun.changed),
-        skippedReason: evictionRun.skippedReason,
+        enabled: lifecycleRun.enabled,
+        executed: lifecycleRun.executed,
+        changed: false,
+        skippedReason: lifecycleRun.skippedReason,
         savedChars: 0,
         savedTokens: 0,
         api: {
-          inputTokens: Math.max(0, Number(evictionRun.estimatorUsage?.inputTokens ?? 0)),
-          outputTokens: Math.max(0, Number(evictionRun.estimatorUsage?.outputTokens ?? 0)),
-          ...(typeof evictionRun.estimatorUsage?.costUsd === "number"
-            ? { costUsd: evictionRun.estimatorUsage.costUsd }
+          inputTokens: Math.max(0, Number(lifecycleRun.estimatorUsage?.inputTokens ?? 0)),
+          outputTokens: Math.max(0, Number(lifecycleRun.estimatorUsage?.outputTokens ?? 0)),
+          ...(typeof lifecycleRun.estimatorUsage?.costUsd === "number"
+            ? { costUsd: lifecycleRun.estimatorUsage.costUsd }
             : {}),
         },
       },
@@ -585,7 +592,7 @@ export async function prepareProxyRequest(args: {
     stableRewrite,
     rootPromptRewrite,
     reductionApplied,
-    evictionRun,
+    lifecycleRun,
     requestModuleExecutions,
     developerForwardedText,
     developerCanonicalText,
