@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
+
 export type TokenPilotFeatureModule = "stabilizer" | "reduction" | "eviction";
 
 export type ModuleEnablement = Record<TokenPilotFeatureModule, boolean>;
@@ -116,6 +120,75 @@ export function diffPayload(before: unknown, after: unknown, path = ""): Payload
   }
 
   return [{ path: path || "$", kind: "changed", before, after }];
+}
+
+export type StateFileSnapshot = {
+  bytes: number;
+  sha256: string;
+  text?: string;
+};
+
+export type StateDirectorySnapshot = Record<string, StateFileSnapshot>;
+
+export type StateFileDiff = {
+  path: string;
+  kind: "created" | "modified" | "deleted";
+  before?: StateFileSnapshot;
+  after?: StateFileSnapshot;
+};
+
+async function listFiles(rootDir: string, currentDir = rootDir): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(currentDir, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+
+  const files: string[] = [];
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const entryPath = join(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listFiles(rootDir, entryPath));
+    } else if (entry.isFile()) {
+      files.push(entryPath);
+    }
+  }
+  return files;
+}
+
+export async function snapshotStateDirectory(stateDir: string): Promise<StateDirectorySnapshot> {
+  const snapshot: StateDirectorySnapshot = {};
+  for (const filePath of await listFiles(stateDir)) {
+    const contents = await readFile(filePath);
+    const relativePath = relative(stateDir, filePath).split("\\").join("/");
+    const isText = !contents.includes(0);
+    snapshot[relativePath] = {
+      bytes: contents.byteLength,
+      sha256: createHash("sha256").update(contents).digest("hex"),
+      ...(isText ? { text: contents.toString("utf8") } : {}),
+    };
+  }
+  return snapshot;
+}
+
+export function diffStateDirectories(
+  before: StateDirectorySnapshot,
+  after: StateDirectorySnapshot,
+): StateFileDiff[] {
+  const changes: StateFileDiff[] = [];
+  const paths = new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const path of [...paths].sort()) {
+    if (!(path in before)) {
+      changes.push({ path, kind: "created", after: after[path] });
+    } else if (!(path in after)) {
+      changes.push({ path, kind: "deleted", before: before[path] });
+    } else if (before[path].sha256 !== after[path].sha256) {
+      changes.push({ path, kind: "modified", before: before[path], after: after[path] });
+    }
+  }
+  return changes;
 }
 
 export type ModuleAccounting = {

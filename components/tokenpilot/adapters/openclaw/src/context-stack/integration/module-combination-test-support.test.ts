@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   MODULE_COMBINATIONS,
   buildModuleCombinationConfig,
   createModuleEffectRecorder,
+  diffStateDirectories,
   diffPayload,
+  snapshotStateDirectory,
 } from "./module-combination-test-support.js";
 
 test("module combinations cover the complete three-feature matrix", () => {
@@ -69,6 +74,35 @@ test("payload diff records nested request field changes", () => {
       after: "a_tool",
     },
   ]);
+});
+
+test("state directory snapshots identify created, modified, and deleted files", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-module-effects-"));
+  try {
+    await mkdir(join(stateDir, "visual"), { recursive: true });
+    await writeFile(join(stateDir, "trace.jsonl"), "{\"stage\":\"before\"}\n", "utf8");
+    await writeFile(join(stateDir, "visual", "stability.jsonl"), "stable-before\n", "utf8");
+    const before = await snapshotStateDirectory(stateDir);
+
+    await writeFile(join(stateDir, "trace.jsonl"), "{\"stage\":\"after\"}\n", "utf8");
+    await rm(join(stateDir, "visual", "stability.jsonl"));
+    await writeFile(join(stateDir, "visual", "eviction.jsonl"), "evicted\n", "utf8");
+    const after = await snapshotStateDirectory(stateDir);
+
+    const changes = diffStateDirectories(before, after);
+    assert.deepEqual(
+      changes.map(({ path, kind }) => ({ path, kind })),
+      [
+        { path: "trace.jsonl", kind: "modified" },
+        { path: "visual/eviction.jsonl", kind: "created" },
+        { path: "visual/stability.jsonl", kind: "deleted" },
+      ],
+    );
+    assert.equal(changes[0].before?.text, "{\"stage\":\"before\"}\n");
+    assert.equal(changes[0].after?.text, "{\"stage\":\"after\"}\n");
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });
 
 test("module effect recorder keeps side effects and accounting isolated", () => {
