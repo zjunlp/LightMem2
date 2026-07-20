@@ -446,8 +446,8 @@ export async function prepareProxyRequest(args: {
         skippedReason:
           executionById.get("reduction")?.skippedReason
           ?? reductionApplied.diagnostics?.skippedReason,
-        savedChars: Math.max(0, Number(reductionApplied.savedChars ?? 0)),
-        savedTokens: Math.max(0, Math.round(Number(reductionApplied.savedChars ?? 0) / 4)),
+        savedChars: 0,
+        savedTokens: 0,
         api: { inputTokens: 0, outputTokens: 0 },
       },
       {
@@ -490,7 +490,6 @@ export async function prepareProxyRequest(args: {
     await upsertOpenClawSessionSummary(cfg.stateDir, resolvedSessionId, {
       latestModel: model || upstreamModel || "unknown",
       workspaceHint,
-      ...(reductionEnabled ? { reductionSavedChars: reductionApplied.savedChars } : {}),
       updatedAt: new Date().toISOString(),
     });
     if (reductionEnabled) {

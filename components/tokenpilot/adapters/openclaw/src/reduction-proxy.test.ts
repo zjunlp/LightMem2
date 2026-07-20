@@ -4,6 +4,10 @@ import {
   assertReductionMarkerText,
   assertStablePrefixRewrite,
 } from "@tokenpilot/host-adapter";
+import { readSessionModuleObservationSummary } from "@tokenpilot/product-surface";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const plugin = require("./index.js");
@@ -562,7 +566,9 @@ test("prepareProxyRequest falls back to system root prompt for stability view", 
 });
 
 test("prepareProxyRequest does not roll back payload mutations made after stable rewrite", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-request-observation-"));
   const cfg = hooks.normalizeConfig({
+    stateDir,
     modules: {
       policy: false,
       reduction: true,
@@ -631,6 +637,12 @@ test("prepareProxyRequest does not roll back payload mutations made after stable
   assert.equal(prepared.payload.prompt_cache_retention, "24h");
   assert.equal(prepared.requestEnvelope.metadata?.promptCacheKey, "runtime-pfx-test");
   assert.equal(prepared.requestEnvelope.metadata?.promptCacheRetention, "24h");
+  const moduleSummary = await readSessionModuleObservationSummary(stateDir, "session-no-rollback");
+  assert.equal(moduleSummary?.modules.reduction.executions, 1);
+  assert.equal(moduleSummary?.modules.reduction.changes, 1);
+  assert.equal(moduleSummary?.modules.reduction.savedChars, 0);
+  assert.equal(moduleSummary?.modules.reduction.savedTokens, 0);
+  await rm(stateDir, { recursive: true, force: true });
 });
 
 test("prepareProxyRequest preserves stable prefix, memory injection, and reduction mutations together", async () => {

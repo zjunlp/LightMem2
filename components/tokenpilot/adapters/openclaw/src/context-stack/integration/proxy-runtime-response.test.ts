@@ -4,6 +4,7 @@ import { PassThrough, Readable, Writable } from "node:stream";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { readSessionModuleObservationSummary } from "@tokenpilot/product-surface";
 
 import { handleNonStreamingProxyResponse, handleStreamingProxyResponse } from "./proxy-runtime-response.js";
 
@@ -63,6 +64,7 @@ function createMockResponse() {
 }
 
 test("handleNonStreamingProxyResponse forwards reduced JSON response and records ux", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-non-stream-observation-"));
   const recordedUx: any[] = [];
   const traces: any[] = [];
   const reductionCalls: any[] = [];
@@ -73,7 +75,7 @@ test("handleNonStreamingProxyResponse forwards reduced JSON response and records
 
   await handleNonStreamingProxyResponse({
     cfg: {
-      stateDir: "/tmp/tokenpilot-proxy-runtime-response-test",
+      stateDir,
       moduleEnablement: { stabilizer: false, reduction: true, eviction: false },
       modules: { reduction: true },
       reduction: { engine: "layered", passes: {} },
@@ -164,6 +166,61 @@ test("handleNonStreamingProxyResponse forwards reduced JSON response and records
   assert.equal(traces.some((item) => item.stage === "proxy_after_call_rewrite"), true);
   assert.equal(responseLogs.length, 0);
   assert.equal(forwardingLogs.length, 0);
+  const moduleSummary = await readSessionModuleObservationSummary(stateDir, "session-non-stream");
+  assert.equal(moduleSummary?.modules.reduction.executions, 0);
+  assert.equal(moduleSummary?.modules.reduction.skips, 0);
+  assert.equal(moduleSummary?.modules.reduction.savedChars, 10);
+  assert.equal(moduleSummary?.modules.reduction.savedTokens, 3);
+  await rm(stateDir, { recursive: true, force: true });
+});
+
+test("handleNonStreamingProxyResponse does not record savings when transport fails", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-failed-observation-"));
+  try {
+    await assert.rejects(
+      handleNonStreamingProxyResponse({
+        cfg: {
+          stateDir,
+          moduleEnablement: { stabilizer: false, reduction: true, eviction: false },
+        },
+        res: createMockResponse(),
+        helpers: {
+          requestUpstreamResponses: async () => {
+            throw new Error("upstream unavailable");
+          },
+        },
+        logger: {
+          warn: () => undefined,
+        },
+        upstream: {
+          baseUrl: "https://example.com/v1",
+          apiKey: "test-key",
+          apiFamily: "openai-responses",
+        },
+        activePayload: { input: [{ role: "user", content: "hello" }] },
+        resolvedSessionId: "session-failed-transport",
+        model: "tokenpilot/gpt-5.4-mini",
+        upstreamModel: "gpt-5.4-mini",
+        proxyPureForward: false,
+        originalInputText: "hello original",
+        afterReductionInputText: "hello reduced",
+        beforeReductionCanonicalInput: "hello original canonical",
+        afterReductionCanonicalInput: "hello reduced canonical",
+        reductionApplied: { savedChars: 400 },
+        reductionPassOptions: {},
+        reductionMaxToolChars: 1200,
+        reductionTriggerMinChars: 2200,
+      } as any),
+      /upstream unavailable/,
+    );
+    const moduleSummary = await readSessionModuleObservationSummary(
+      stateDir,
+      "session-failed-transport",
+    );
+    assert.equal(moduleSummary, null);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });
 
 test("handleNonStreamingProxyResponse skips reduction effects when module is disabled", async () => {
@@ -243,6 +300,7 @@ test("handleNonStreamingProxyResponse skips reduction effects when module is dis
 });
 
 test("handleStreamingProxyResponse forwards stream and records stream ux after finish", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-stream-observation-"));
   const recordedUx: any[] = [];
   const traces: any[] = [];
   const stream = Readable.from([
@@ -257,7 +315,7 @@ test("handleStreamingProxyResponse forwards stream and records stream ux after f
 
   await handleStreamingProxyResponse({
     cfg: {
-      stateDir: "/tmp/tokenpilot-proxy-runtime-stream-test",
+      stateDir,
       moduleEnablement: { stabilizer: false, reduction: true, eviction: false },
       modules: { reduction: true },
     },
@@ -323,6 +381,58 @@ test("handleStreamingProxyResponse forwards stream and records stream ux after f
   assert.equal(recordedUx.length, 1);
   assert.equal(recordedUx[0].savedCount, "hello original canonical".length - "hello reduced canonical".length);
   assert.equal(traces.some((item) => item.stage === "proxy_stream_forward"), true);
+  const moduleSummary = await readSessionModuleObservationSummary(stateDir, "session-stream");
+  assert.equal(moduleSummary?.modules.reduction.executions, 0);
+  assert.equal(moduleSummary?.modules.reduction.skips, 0);
+  assert.equal(moduleSummary?.modules.reduction.savedChars, 10);
+  assert.equal(moduleSummary?.modules.reduction.savedTokens, 3);
+  await rm(stateDir, { recursive: true, force: true });
+});
+
+test("handleStreamingProxyResponse does not record savings when transport fails", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-openclaw-failed-stream-observation-"));
+  try {
+    await assert.rejects(
+      handleStreamingProxyResponse({
+        cfg: {
+          stateDir,
+          moduleEnablement: { stabilizer: false, reduction: true, eviction: false },
+        },
+        res: createMockResponse(),
+        helpers: {
+          requestUpstreamResponsesStream: async () => {
+            throw new Error("upstream stream unavailable");
+          },
+        },
+        logger: {
+          warn: () => undefined,
+        },
+        upstream: {
+          baseUrl: "https://example.com/v1",
+          apiKey: "test-key",
+          apiFamily: "openai-responses",
+        },
+        activePayload: { input: [{ role: "user", content: "hello" }], stream: true },
+        resolvedSessionId: "session-failed-stream-transport",
+        model: "tokenpilot/gpt-5.4-mini",
+        upstreamModel: "gpt-5.4-mini",
+        proxyPureForward: false,
+        originalInputText: "hello original",
+        afterReductionInputText: "hello reduced",
+        beforeReductionCanonicalInput: "hello original canonical",
+        afterReductionCanonicalInput: "hello reduced canonical",
+        reductionApplied: { savedChars: 400 },
+      } as any),
+      /upstream stream unavailable/,
+    );
+    const moduleSummary = await readSessionModuleObservationSummary(
+      stateDir,
+      "session-failed-stream-transport",
+    );
+    assert.equal(moduleSummary, null);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });
 
 test("handleStreamingProxyResponse records cache-audit response prompt_cache_key and usage from SSE stream", async () => {

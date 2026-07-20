@@ -1,10 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { UpstreamConfig, UpstreamHttpResponse } from "./upstream.js";
+import { appendModuleObservation } from "@tokenpilot/product-surface";
 import { createOpenClawHostBridge } from "./openclaw-host-bridge.js";
 import { applyProxyAfterCallReduction, recordNonStreamingUxEffect } from "./proxy-runtime-postprocess.js";
 import { recordStreamingUxEffect } from "./proxy-runtime-stream.js";
 import { recordProxyForwarding, recordProxyResponse } from "./proxy-runtime-logging.js";
 import { appendOpenClawCacheAuditRecord } from "../../cache-audit.js";
+
+async function recordRealizedReductionSavings(args: {
+  cfg: any;
+  logger: any;
+  sessionId: string;
+  enabled: boolean;
+  reductionApplied: any;
+}): Promise<void> {
+  const { cfg, logger, sessionId, enabled, reductionApplied } = args;
+  if (!cfg.stateDir || !enabled) return;
+  const savedChars = Math.max(0, Number(reductionApplied?.savedChars ?? 0));
+  if (savedChars === 0) return;
+  try {
+    await appendModuleObservation(cfg.stateDir, {
+      sessionId,
+      phase: "response",
+      moduleId: "reduction",
+      enabled: true,
+      executed: false,
+      changed: false,
+      savedChars,
+      savedTokens: Math.max(0, Math.round(savedChars / 4)),
+      api: { inputTokens: 0, outputTokens: 0 },
+    });
+  } catch (error) {
+    logger.warn?.(
+      `[plugin-runtime] realized reduction observation write failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
 
 export async function handleStreamingProxyResponse(args: {
   cfg: any;
@@ -46,6 +77,13 @@ export async function handleStreamingProxyResponse(args: {
   } = args;
   const reductionEnabled = !proxyPureForward && Boolean(cfg.moduleEnablement?.reduction);
   const upstreamStreamResp = await helpers.requestUpstreamResponsesStream(upstream, activePayload, logger, cfg.stateDir);
+  await recordRealizedReductionSavings({
+    cfg,
+    logger,
+    sessionId: resolvedSessionId,
+    enabled: reductionEnabled,
+    reductionApplied,
+  });
   if (cfg.stateDir) {
     await helpers.appendTaskStateTrace(cfg.stateDir, {
       stage: "proxy_stream_forward",
@@ -183,6 +221,13 @@ export async function handleNonStreamingProxyResponse(args: {
   let responseContentType = "";
   const memoryFaultAutoReplayCount = 0;
   upstreamResp = await helpers.requestUpstreamResponses(upstream, activePayload, logger, cfg.stateDir);
+  await recordRealizedReductionSavings({
+    cfg,
+    logger,
+    sessionId: resolvedSessionId,
+    enabled: reductionEnabled,
+    reductionApplied,
+  });
   const upstreamRespFinal = upstreamResp!;
   txt = upstreamRespFinal.text;
   const originalResponseText = txt;
