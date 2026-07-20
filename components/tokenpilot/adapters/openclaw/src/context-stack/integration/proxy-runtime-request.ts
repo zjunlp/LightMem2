@@ -16,6 +16,7 @@ import { normalizeResponsesInputForUpstream } from "./proxy-runtime-shared.js";
 import { recordProxyInbound } from "./proxy-runtime-logging.js";
 import { buildOpenClawCacheAuditSnapshot } from "../../cache-audit.js";
 import { runEvictionIfEnabled, type EvictionRunResult } from "./eviction-runner.js";
+import { runPrefixIfEnabled } from "./prefix-runner.js";
 
 type ProxyRequestPreparation = {
   payload: any;
@@ -242,75 +243,25 @@ export async function prepareProxyRequest(args: {
     }
   }
   const instructions = helpers.normalizeText(String(requestEnvelope.instructions ?? payload?.instructions ?? ""));
-  const devAndUser = stabilizerEnabled ? helpers.findDeveloperAndPrimaryUser(requestEnvelope.messages) : null;
-  const rootPromptCandidate = stabilizerEnabled ? helpers.findRootPromptCandidate(requestEnvelope.messages) : null;
-  const firstTurnCandidate = Boolean(devAndUser);
-  const rootPromptRewrite = rootPromptCandidate && stabilizerEnabled
-    ? helpers.rewriteRootPromptForStablePrefix(rootPromptCandidate.text)
-    : null;
-  const developerCanonicalText = String(rootPromptRewrite?.canonicalPromptText ?? rootPromptCandidate?.text ?? "");
-  const developerForwardedText = String(rootPromptRewrite?.forwardedPromptText ?? rootPromptCandidate?.text ?? "");
-  const originalPromptCacheKey = typeof requestEnvelope.metadata?.promptCacheKey === "string" && requestEnvelope.metadata.promptCacheKey.trim().length > 0
-    ? String(requestEnvelope.metadata.promptCacheKey)
-    : typeof payload?.prompt_cache_key === "string" && payload.prompt_cache_key.trim().length > 0
-      ? String(payload.prompt_cache_key)
-      : "";
-  if (stabilizerEnabled && devAndUser && rootPromptRewrite && Array.isArray(requestEnvelope.messages) && devAndUser.developerIndex >= 0) {
-    const nextMessages = requestEnvelope.messages.slice();
-    const forwardedDeveloperText = rootPromptRewrite.forwardedPromptText;
-    nextMessages[devAndUser.developerIndex] = {
-      ...(devAndUser.developerItem ?? nextMessages[devAndUser.developerIndex]),
-      role: "developer",
-      content: forwardedDeveloperText,
-    };
-    if (dynamicContextTarget === "user" && rootPromptRewrite.dynamicContextText && devAndUser.userIndex >= 0) {
-      nextMessages[devAndUser.userIndex] = {
-        ...(devAndUser.userItem ?? nextMessages[devAndUser.userIndex]),
-        role: "user",
-        content: helpers.prependTextToContent(
-          (devAndUser.userItem ?? nextMessages[devAndUser.userIndex])?.content,
-          rootPromptRewrite.dynamicContextText,
-        ),
-      };
-    }
-    requestEnvelope = {
-      ...requestEnvelope,
-      messages: nextMessages,
-    };
-    syncOpenClawPayloadFromEnvelope(payload, requestEnvelope, payloadCodec);
-    if (dynamicContextTarget === "developer" && rootPromptRewrite.dynamicContextText) {
-      const inserted = helpers.insertDeveloperDynamicContextBlock(
-        payload?.input,
-        rootPromptRewrite.dynamicContextText,
-        devAndUser.developerIndex,
-      );
-      if (inserted.changed) {
-        payload.input = inserted.input;
-        requestEnvelope = payloadCodec.decodeRequest(payload);
-      }
-    }
-  }
-  const stableRewrite = stabilizerEnabled
-    ? helpers.rewritePayloadForStablePrefix(payload, model, {
-      dynamicContextTarget,
-      developerTextForKeyOverride: developerCanonicalText,
-    })
-    : {
-      promptCacheKey: typeof payload?.prompt_cache_key === "string" && payload.prompt_cache_key.trim().length > 0
-        ? String(payload.prompt_cache_key)
-        : "",
-      userContentRewrites: 0,
-      senderMetadataBlocksBefore: 0,
-      senderMetadataBlocksAfter: 0,
-    };
-  requestEnvelope = payloadCodec.decodeRequest(payload);
-  requestEnvelope = {
-    ...requestEnvelope,
-    metadata: {
-      ...(requestEnvelope.metadata ?? {}),
-      promptCacheKey: String(stableRewrite.promptCacheKey ?? ""),
-    },
-  };
+  const prefixRun = runPrefixIfEnabled({
+    enabled: stabilizerEnabled,
+    payload,
+    requestEnvelope,
+    payloadCodec,
+    model,
+    dynamicContextTarget,
+    helpers,
+  });
+  requestEnvelope = prefixRun.requestEnvelope;
+  const {
+    stableRewrite,
+    rootPromptRewrite,
+    developerCanonicalText,
+    developerForwardedText,
+    devAndUser,
+    firstTurnCandidate,
+    originalPromptCacheKey,
+  } = prefixRun;
   const memoryInjection = !proxyPureForward
     ? await injectProceduralMemoryHints({
       cfg,
