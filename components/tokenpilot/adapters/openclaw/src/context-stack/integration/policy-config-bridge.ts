@@ -58,7 +58,7 @@ export async function applyPolicyBeforeCall(
   let nextCtx = turnCtx;
   const bridgedReductionDecision = asRecord(asRecord(asRecord(nextCtx.metadata?.policy)?.decisions)?.reduction);
 
-  if (cfg.modules.policy && modules?.policy?.beforeBuild) {
+  if (modules?.policy?.beforeBuild) {
     nextCtx = await modules.policy.beforeBuild(nextCtx, NULL_RUNTIME);
     applyPolicyMonitors(nextCtx, logger, asRecord);
     if (bridgedReductionDecision) {

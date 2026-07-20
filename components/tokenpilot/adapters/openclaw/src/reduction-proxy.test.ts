@@ -480,11 +480,15 @@ test("prepareProxyRequest does not emit read-state instructions for distinct rea
   assert.equal(outputs.every((text: string) => !text.includes("[Read stale]")), true);
 });
 
-test("prepareProxyRequest still runs policy before-call when reduction module is disabled", async () => {
+test("prepareProxyRequest still runs eviction policy when reduction module is disabled", async () => {
   const cfg = hooks.normalizeConfig({
     modules: {
-      policy: true,
+      policy: false,
       reduction: false,
+      eviction: true,
+    },
+    eviction: {
+      enabled: true,
     },
   });
 

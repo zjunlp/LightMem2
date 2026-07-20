@@ -15,7 +15,7 @@ import type { UpstreamConfig } from "./upstream.js";
 import { normalizeResponsesInputForUpstream } from "./proxy-runtime-shared.js";
 import { recordProxyInbound } from "./proxy-runtime-logging.js";
 import { buildOpenClawCacheAuditSnapshot } from "../../cache-audit.js";
-import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
+import { runEvictionIfEnabled, type EvictionRunResult } from "./eviction-runner.js";
 
 type ProxyRequestPreparation = {
   payload: any;
@@ -35,6 +35,7 @@ type ProxyRequestPreparation = {
   stableRewrite: any;
   rootPromptRewrite: any;
   reductionApplied: any;
+  evictionRun: EvictionRunResult;
   developerForwardedText: string;
   developerCanonicalText: string;
   devAndUser: any;
@@ -178,25 +179,6 @@ async function applyProxyReduction(
     },
     reductionContext,
   );
-}
-
-async function runPolicyBeforeReduction(
-  cfg: any,
-  logger: any,
-  helpers: any,
-  payload: any,
-  resolvedSessionId: string,
-  policyModule: any,
-): Promise<void> {
-  if (!cfg.modules.policy || !policyModule) return;
-  const turnCtx = buildLifecyclePolicyContext({
-    sessionId: resolvedSessionId,
-    model: String(payload?.model ?? "unknown"),
-    prompt: helpers.extractInputText(payload?.input),
-  });
-  await helpers.applyPolicyBeforeCall(turnCtx, cfg, logger, {
-    policy: policyModule,
-  });
 }
 
 export async function prepareProxyRequest(args: {
@@ -355,14 +337,15 @@ export async function prepareProxyRequest(args: {
   const beforeReductionInputCount = Array.isArray(payload?.input) ? payload.input.length : 0;
   const beforeReductionInputChars = helpers.estimatePayloadInputChars(payload?.input);
   const beforeReductionCanonicalInput = helpers.serializeCanonicalInputForUx(payload?.input);
-  await runPolicyBeforeReduction(
+  const evictionRun = await runEvictionIfEnabled({
     cfg,
     logger,
-    helpers,
     payload,
-    resolvedSessionId,
+    sessionId: resolvedSessionId,
     policyModule,
-  );
+    extractInputText: helpers.extractInputText,
+    applyPolicyBeforeCall: helpers.applyPolicyBeforeCall,
+  });
   const reductionApplied = await applyProxyReduction(
     cfg,
     logger,
@@ -479,6 +462,7 @@ export async function prepareProxyRequest(args: {
     stableRewrite,
     rootPromptRewrite,
     reductionApplied,
+    evictionRun,
     developerForwardedText,
     developerCanonicalText,
     devAndUser,

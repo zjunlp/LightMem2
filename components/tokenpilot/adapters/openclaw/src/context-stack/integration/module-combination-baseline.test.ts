@@ -197,6 +197,8 @@ for (const combination of MODULE_COMBINATIONS) {
 
       assert.equal(reductionCalls, combination.enablement.reduction ? 1 : 0);
       assert.equal(policyCalls, combination.enablement.eviction ? 1 : 0);
+      assert.equal(prepared.evictionRun.enabled, combination.enablement.eviction);
+      assert.equal(prepared.evictionRun.executed, combination.enablement.eviction);
       assert.equal(prepared.reductionApplied.changedBlocks > 0, combination.enablement.reduction);
       assert.ok(payloadChanges.length > 0);
       assert.ok(stateChanges.some(({ path }) => path === "tokenpilot/proxy-requests.jsonl"));
