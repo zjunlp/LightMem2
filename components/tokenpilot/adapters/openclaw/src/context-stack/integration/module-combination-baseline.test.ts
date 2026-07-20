@@ -8,10 +8,34 @@ import { __testHooks } from "../../plugin-test-support.js";
 import {
   MODULE_COMBINATIONS,
   buildModuleCombinationConfig,
+  createModuleEffectRecorder,
   diffPayload,
   diffStateDirectories,
   snapshotStateDirectory,
 } from "./module-combination-test-support.js";
+
+function createRequestPayload() {
+  return {
+    model: "tokenpilot/gpt-5.4-mini",
+    prompt_cache_key: "inbound-cache-key",
+    instructions: "Keep the implementation precise.",
+    input: [
+      {
+        role: "developer",
+        content: "Runtime: agent=baseline-agent | host=demo\nYour working directory is: /tmp/baseline\n\nDeveloper prompt",
+      },
+      {
+        role: "user",
+        content: "[2026-07-20 10:00:00] Continue the task.",
+      },
+      {
+        role: "tool",
+        toolName: "search",
+        content: "T".repeat(3000),
+      },
+    ],
+  };
+}
 
 test("all-enabled request behavior remains stable before module decoupling", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-all-enabled-baseline-"));
@@ -28,26 +52,7 @@ test("all-enabled request behavior remains stable before module decoupling", asy
         },
       },
     });
-    const payload: any = {
-      model: "tokenpilot/gpt-5.4-mini",
-      prompt_cache_key: "inbound-cache-key",
-      instructions: "Keep the implementation precise.",
-      input: [
-        {
-          role: "developer",
-          content: "Runtime: agent=baseline-agent | host=demo\nYour working directory is: /tmp/baseline\n\nDeveloper prompt",
-        },
-        {
-          role: "user",
-          content: "[2026-07-20 10:00:00] Continue the task.",
-        },
-        {
-          role: "tool",
-          toolName: "search",
-          content: "T".repeat(3000),
-        },
-      ],
-    };
+    const payload: any = createRequestPayload();
     const beforePayload = structuredClone(payload);
     const beforeState = await snapshotStateDirectory(stateDir);
     const traceStages: string[] = [];
@@ -113,3 +118,77 @@ test("all-enabled request behavior remains stable before module decoupling", asy
     await rm(stateDir, { recursive: true, force: true });
   }
 });
+
+for (const combination of MODULE_COMBINATIONS) {
+  test(`module combination harness captures ${combination.id} request effects`, async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), `tokenpilot-${combination.id}-`));
+    try {
+      const cfg = __testHooks.normalizeConfig({
+        stateDir,
+        ...buildModuleCombinationConfig(combination.enablement),
+        memory: { enabled: false },
+        reduction: {
+          triggerMinChars: 256,
+          maxToolChars: 256,
+          passes: { toolPayloadTrim: true },
+        },
+      });
+      const payload: any = createRequestPayload();
+      const beforePayload = structuredClone(payload);
+      const beforeState = await snapshotStateDirectory(stateDir);
+      const recorder = createModuleEffectRecorder();
+      let policyCalls = 0;
+      let reductionCalls = 0;
+
+      const prepared = await __testHooks.prepareProxyRequest({
+        cfg,
+        payload,
+        resolveSessionIdForPayload: () => `session-${combination.id}`,
+        policyModule: {
+          async beforeBuild(turnCtx: any) {
+            policyCalls += 1;
+            return turnCtx;
+          },
+        },
+        helpers: {
+          appendTaskStateTrace: async (_stateDir: string, record: any) => {
+            const stage = String(record.stage ?? "");
+            const module = stage.includes("reduction") || stage === "proxy_before_call_rewrite"
+              ? "reduction"
+              : stage.includes("stable_prefix")
+                ? "stabilizer"
+                : "eviction";
+            recorder.recordTrace(module, stage, record);
+          },
+          appendReductionPassTrace: async (_stateDir: string, record: any) => {
+            recorder.recordTrace("reduction", "reduction-pass", record);
+          },
+          applyProxyReductionToInput: async (...args: any[]) => {
+            reductionCalls += 1;
+            return __testHooks.applyProxyReductionToInput(args[0], args[1]);
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+          debug: () => undefined,
+        },
+      });
+      const afterState = await snapshotStateDirectory(stateDir);
+      const payloadChanges = diffPayload(beforePayload, prepared.payload);
+      const stateChanges = diffStateDirectories(beforeState, afterState);
+      const effects = recorder.snapshot();
+
+      assert.equal(reductionCalls, combination.enablement.reduction ? 1 : 0);
+      assert.equal(policyCalls, combination.enablement.eviction ? 1 : 0);
+      assert.equal(prepared.reductionApplied.changedBlocks > 0, combination.enablement.reduction);
+      assert.ok(payloadChanges.length > 0);
+      assert.ok(stateChanges.some(({ path }) => path === "tokenpilot/proxy-requests.jsonl"));
+      assert.ok(effects.stabilizer.traces.length > 0);
+      assert.ok(effects.reduction.traces.length > 0);
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+}
