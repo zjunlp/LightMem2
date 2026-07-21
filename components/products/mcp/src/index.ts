@@ -10,6 +10,9 @@ import {
   resolveArchivePathAcrossSessions,
   resolveRecoveryStateDir,
 } from "@tokenpilot/artifact-store";
+import { TOKENPILOT_RECOVERY_MCP_PRODUCT } from "./product-registration.js";
+
+export { TOKENPILOT_RECOVERY_MCP_PRODUCT } from "./product-registration.js";
 
 export const TOKENPILOT_MCP_SERVER_NAME = "tokenpilot_memory_fault_recover";
 export const DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC = 90;
@@ -85,7 +88,7 @@ export function resolveTokenPilotMcpPackageRoot(params?: {
   }
   let current = resolve(moduleDir, "..");
   for (let i = 0; i < 10; i += 1) {
-    const directCandidate = join(current, "components", "tokenpilot", "products", "mcp");
+    const directCandidate = join(current, "components", "products", "mcp");
     if (isTokenPilotMcpPackageRoot(directCandidate)) {
       return directCandidate;
     }
@@ -96,7 +99,7 @@ export function resolveTokenPilotMcpPackageRoot(params?: {
   }
   current = resolve(params?.cwd ?? process.cwd());
   for (let i = 0; i < 10; i += 1) {
-    const directCandidate = join(current, "components", "tokenpilot", "products", "mcp");
+    const directCandidate = join(current, "components", "products", "mcp");
     if (isTokenPilotMcpPackageRoot(directCandidate)) {
       return directCandidate;
     }
@@ -520,7 +523,7 @@ export async function handleMcpRequest(message: McpRequest, params?: {
           tools: {},
         },
         serverInfo: {
-          name: "tokenpilot-memory-fault-recover",
+          name: TOKENPILOT_RECOVERY_MCP_PRODUCT.productId,
           version: "0.1.0",
         },
       },

@@ -13,7 +13,9 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/artifact-store": "workspace:*"
+    "@tokenpilot/artifact-store": "workspace:*",
+    "@tokenpilot/decision": "workspace:*",
+    "@tokenpilot/product-surface": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.25.10",
