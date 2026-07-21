@@ -6,6 +6,11 @@ LightMem2 runtime path.
 This subtree keeps the public PinchBench benchmark surface for the current
 TokenPilot-based LightMem2 method path and its matching single-agent baseline.
 
+The harness resolves the repository root and invokes the root plugin install
+script. The reorganized source adapter lives at
+`components/adapters/openclaw/`; the runtime copy remains
+`~/.openclaw/extensions/tokenpilot` for OpenClaw compatibility.
+
 ## Current Contents
 
 - `docs/runtime-profile.md`

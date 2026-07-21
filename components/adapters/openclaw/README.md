@@ -3,6 +3,10 @@
 This package contains the live OpenClaw adapter runtime for the current LightMem2 OpenClaw path.
 Within the broader LightMem2 framework, this package is the runtime adapter layer used by the TokenPilot component.
 
+This adapter explicitly binds TokenPilot with `stabilizer`, `reduction`, and
+`eviction`, and contributes OpenClaw state discovery to the shared CLI/Visual
+product registry.
+
 For the component-level overview, command surface, and full configuration reference, see:
 
 - [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)

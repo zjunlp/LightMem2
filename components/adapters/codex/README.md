@@ -3,6 +3,11 @@
 This package contains the current Codex CLI adapter for the TokenPilot component.
 It integrates through Codex config mutation, hook registration, and a local OpenAI-compatible Responses proxy.
 
+This adapter explicitly binds the TokenPilot `stabilizer` and `reduction`
+features. It does not advertise lifecycle eviction support. Its product
+registration provides Codex state discovery to the shared CLI and Visual
+surface.
+
 For the component-level overview and shared command surface, see:
 
 - [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)
@@ -222,6 +227,21 @@ Expected install shape:
 - the real upstream base URL is stored in `~/.codex/tokenpilot.json`
 
 If Codex reports that hooks need review, trust the TokenPilot hooks in Codex, open a new session, and rerun the doctor.
+
+If Codex displays `Stop hook (failed)` or `PostToolUse hook (failed)` after a
+repository reorganization, rebuild and reinstall the adapter so
+`~/.codex/hooks.json` points at the current handler:
+
+```bash
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
+```
+
+The expected handler path is
+`components/adapters/codex/dist/hooks-handler.js`. The handler uses bounded
+iterative traversal for large or deeply nested tool results, and observation
+write failures are best-effort so they do not fail a successful Codex tool
+call.
 
 ## Package Scripts
 

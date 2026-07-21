@@ -5,29 +5,28 @@ The LightMem2 repository is organized around the plugin platform and its compone
 ```text
 LightMem2/
 ├── components/
-│   └── tokenpilot/              # TokenPilot plugin
-│       ├── adapters/            # Host-specific integration
-│       │   ├── openclaw/        #   OpenClaw native plugin adapter
-│       │   ├── codex/           #   Codex CLI proxy + hooks adapter
-│       │   └── claude-code/     #   Claude Code gateway + MCP adapter
-│       ├── products/
-│       │   ├── cli/             #   Shared lightmem2 CLI
-│       │   └── mcp/             #   Shared MCP recovery server
-│       ├── presets/
-│       │   └── tokenpilot/      #   TokenPilot feature composition policy
-│       └── packages/
-│           ├── foundation/      #   Shared contracts and infrastructure
-│           │   ├── kernel/
-│           │   ├── runtime-core/
-│           │   ├── host-adapter/
-│           │   ├── history/
-│           │   ├── artifact-store/
-│           │   └── product-surface/
-│           └── features/        #   Independently testable capabilities
-│               ├── stabilizer/
-│               ├── reduction/
-│               ├── eviction/
-│               └── memory/
+│   ├── packages/
+│   │   ├── foundation/          # Shared contracts and infrastructure
+│   │   │   ├── kernel/
+│   │   │   ├── runtime-core/
+│   │   │   ├── host-adapter/
+│   │   │   ├── history/
+│   │   │   ├── artifact-store/
+│   │   │   └── product-surface/
+│   │   └── features/            # Independently testable capabilities
+│   │       ├── stabilizer/
+│   │       ├── reduction/
+│   │       ├── eviction/
+│   │       └── memory/
+│   ├── presets/
+│   │   └── tokenpilot/          # Verified composition and host bindings
+│   ├── adapters/                # Host-specific integration
+│   │   ├── openclaw/            # OpenClaw native plugin adapter
+│   │   ├── codex/               # Codex CLI proxy + hooks adapter
+│   │   └── claude-code/         # Claude Code gateway adapter
+│   └── products/
+│       ├── cli/                 # Shared lightmem2 CLI and visual launcher
+│       └── mcp/                 # Shared MCP recovery server
 ├── docs/                        # Public-facing notes and helpers
 ├── experiments/                 # Benchmark adapters and scripts
 ├── website/                     # This documentation site
@@ -47,6 +46,17 @@ LightMem2/
 | `components/adapters/` | One adapter per host |
 | `components/products/cli/` | The `lightmem2` CLI |
 | `components/products/mcp/` | Shared MCP server |
+
+TokenPilot is a preset, not the owner of the shared packages. Each adapter
+binds the preset explicitly and declares the feature subset it supports:
+
+- OpenClaw: Stabilizer, Reduction, and Eviction
+- Codex: Stabilizer and Reduction
+- Claude Code: Stabilizer and Reduction
+
+CLI and Visual host discovery use adapter-provided product registrations. The
+MCP recovery server declares its TokenPilot preset ownership separately because
+it is host-neutral.
 
 ## Workspace
 

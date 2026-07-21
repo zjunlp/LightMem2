@@ -13,6 +13,11 @@ while host-specific install surfaces and runtime wiring live under
 | `Codex CLI` | available | hooks + local Responses proxy + shared CLI | `npm --prefix components/adapters/codex run build` then `npm --prefix components/adapters/codex run install:codex` | [codex/README.md](./codex/README.md) |
 | `Claude Code` | available | gateway routing + observability hooks + shared CLI | `npm --prefix components/adapters/claude-code run build` then `npm --prefix components/adapters/claude-code run install:claude-code` | [claude-code/README.md](./claude-code/README.md) |
 
+Each host adapter binds the versioned TokenPilot preset explicitly. OpenClaw
+declares Stabilizer, Reduction, and Eviction; Codex and Claude Code declare
+Stabilizer and Reduction only. The same adapter-owned product registrations are
+used by the shared CLI and browser Visual surface for host discovery.
+
 ## Capability Matrix
 
 Legend:

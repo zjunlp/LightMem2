@@ -31,6 +31,10 @@ The current public experiment surface includes:
 ## Notes
 
 - This directory is a landing page, not a duplicate of the benchmark manuals.
+- Harnesses install the OpenClaw release through the root
+  `pnpm plugin:install:release` command and load the user-state copy from
+  `~/.openclaw/extensions/tokenpilot`. They do not depend on the removed
+  monolithic component source parent.
 - Large benchmark datasets and experiment outputs are stored outside Git.
 - Use [experiments/README.md](../README.md) for the shared Google Drive layout
   and external storage policy.

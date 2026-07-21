@@ -24,6 +24,11 @@ LightMem2 separates:
 
 This layout is meant to let a single component support multiple agent hosts over time.
 
+TokenPilot is represented by `presets/tokenpilot/`; it no longer owns the
+shared packages, adapters, or products. Adapters explicitly bind the preset and
+declare which TokenPilot features they support. Products discover host state
+through adapter-provided registrations rather than a second hardcoded host map.
+
 ## How To Read This Directory
 
 Use the root [README.md](../README.md) first if you want the fastest path to:
@@ -68,6 +73,14 @@ components/
     ├── cli/
     └── mcp/
 ```
+
+Current preset bindings:
+
+| Host | TokenPilot feature support |
+| :-- | :-- |
+| OpenClaw | Stabilizer, Reduction, Eviction |
+| Codex | Stabilizer, Reduction |
+| Claude Code | Stabilizer, Reduction |
 
 ## Naming Boundary
 

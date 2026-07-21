@@ -5,6 +5,11 @@ component. It is gateway-first: Claude Code requests are routed through a local
 Anthropic-compatible gateway, while hooks and a shared MCP server provide
 observability and real archive recovery.
 
+This adapter explicitly binds the TokenPilot `stabilizer` and `reduction`
+features. It does not advertise lifecycle eviction support. Its product
+registration provides Claude Code state discovery to the shared CLI and Visual
+surface.
+
 For the shared component overview and host matrix, see:
 
 - [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)

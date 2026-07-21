@@ -9,6 +9,11 @@ Within the current LightMem2 runtime path, TokenPilot primarily addresses this t
 - observation reduction before large tool outputs poison later turns
 - lifecycle-aware canonical-history eviction for longer shared-session workflows where the host supports it
 
+The preset owns the verified composition contract, not the feature
+implementations. `components/packages/features/` remains reusable by future
+presets, while each host adapter explicitly declares its supported TokenPilot
+feature subset.
+
 ## Where It Fits
 
 Use the root [README.md](../../../README.md) for the fastest first-run path:
@@ -83,6 +88,24 @@ components/
 ├── adapters/             # OpenClaw, Codex, and Claude Code bindings
 └── products/             # Shared CLI and MCP surfaces
 ```
+
+## Explicit Host Bindings
+
+The preset exports a versioned host-binding contract from
+`src/host-binding.ts`. Current adapters bind it as follows:
+
+| Adapter | Declared feature subset |
+| :-- | :-- |
+| OpenClaw | `stabilizer`, `reduction`, `eviction` |
+| Codex | `stabilizer`, `reduction` |
+| Claude Code | `stabilizer`, `reduction` |
+
+Feature product-surface contributions are initialized through this binding.
+They no longer depend on importing a feature package for side effects.
+
+Host state discovery is also adapter-owned. The shared CLI and Visual surface
+consume `ProductHostRegistration` records from the adapters, while the recovery
+MCP server declares its preset ownership as a host-neutral product.
 
 ## Host Integrations
 

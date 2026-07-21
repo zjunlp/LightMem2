@@ -7,6 +7,14 @@ Shared runtime logic belongs under `components/packages/`.
 Anything that depends on one concrete host should stay under
 `components/adapters/<host>/`.
 
+Each adapter owns two explicit declarations in addition to its runtime code:
+
+- a TokenPilot preset binding describing the supported feature subset
+- a product registration describing host identity and state discovery
+
+The shared CLI and browser Visual surface consume those registrations instead
+of maintaining separate hardcoded host metadata.
+
 ## Current Status
 
 Adapter inventory:

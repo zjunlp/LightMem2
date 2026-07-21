@@ -4,6 +4,10 @@ This directory contains the OpenClaw execution adapter for the current
 LightMem2 runtime path on the `claw-eval` benchmark, using the TokenPilot
 component as the active runtime method path.
 
+The harness invokes the root TokenPilot release installer. The reorganized
+source adapter lives at `components/adapters/openclaw/`, while OpenClaw still
+loads the installed runtime copy from `~/.openclaw/extensions/tokenpilot`.
+
 The current layout is designed to be mostly self-contained inside this repo:
 
 - `scripts/`: runtime adapter entrypoints and execution glue
