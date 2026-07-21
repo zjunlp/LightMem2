@@ -28,7 +28,7 @@ importers:
         version: link:../../packages/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/kernel
+        version: link:../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
@@ -62,7 +62,7 @@ importers:
         version: link:../../packages/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/kernel
+        version: link:../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
@@ -105,7 +105,7 @@ importers:
         version: link:../../packages/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/kernel
+        version: link:../../packages/foundation/kernel
       '@tokenpilot/memory':
         specifier: workspace:*
         version: link:../../packages/features/memory
@@ -142,7 +142,7 @@ importers:
         version: link:../../layers/history
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../kernel
+        version: link:../../foundation/kernel
 
   components/tokenpilot/packages/features/memory: {}
 
@@ -153,13 +153,13 @@ importers:
         version: link:../../foundation/artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../kernel
+        version: link:../../foundation/kernel
 
   components/tokenpilot/packages/features/stabilizer:
     dependencies:
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../kernel
+        version: link:../../foundation/kernel
 
   components/tokenpilot/packages/foundation/artifact-store:
     dependencies:
@@ -167,19 +167,19 @@ importers:
         specifier: workspace:*
         version: link:../../host-adapter
 
+  components/tokenpilot/packages/foundation/kernel: {}
+
   components/tokenpilot/packages/host-adapter:
     dependencies:
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../foundation/kernel
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../features/stabilizer
       js-tiktoken:
         specifier: ^1.0.21
         version: 1.0.21
-
-  components/tokenpilot/packages/kernel: {}
 
   components/tokenpilot/packages/layers/decision:
     dependencies:
@@ -191,7 +191,7 @@ importers:
         version: link:../history
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../kernel
+        version: link:../../foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../features/reduction
@@ -200,7 +200,7 @@ importers:
     dependencies:
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../kernel
+        version: link:../../foundation/kernel
 
   components/tokenpilot/packages/product-surface:
     dependencies:
@@ -221,7 +221,7 @@ importers:
         version: link:../foundation/artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../features/reduction

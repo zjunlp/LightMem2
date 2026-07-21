@@ -32,7 +32,7 @@ LightMem2/
 
 | Directory | Purpose |
 | :-- | :-- |
-| `components/tokenpilot/packages/kernel/` | Types, interfaces, events — the contract layer |
+| `components/tokenpilot/packages/foundation/kernel/` | Types, interfaces, events — the contract layer |
 | `components/tokenpilot/packages/runtime-core/` | Plugin execution engine |
 | `components/tokenpilot/packages/layers/` | Stateful processing (history, decision, memory) |
 | `components/tokenpilot/adapters/` | One adapter per host |

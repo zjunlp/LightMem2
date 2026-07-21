@@ -34,7 +34,7 @@ Keep these responsibilities inside the adapter layer:
 
 Keep these responsibilities in shared packages:
 
-- runtime contracts in `packages/kernel/`
+- runtime contracts in `packages/foundation/kernel/`
 - host-neutral execution primitives in `packages/runtime-core/`
 - state and policy logic in `packages/layers/*`
 - host abstraction helpers in `packages/host-adapter/`
