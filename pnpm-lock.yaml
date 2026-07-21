@@ -18,6 +18,18 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  components/packages/features/stabilizer:
+    dependencies:
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../../foundation/host-adapter
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../foundation/kernel
+      '@tokenpilot/product-surface':
+        specifier: workspace:*
+        version: link:../../foundation/product-surface
+
   components/packages/foundation/artifact-store:
     dependencies:
       '@tokenpilot/host-adapter':
@@ -81,7 +93,7 @@ importers:
         version: link:../../packages/features/reduction
       '@tokenpilot/stabilizer':
         specifier: workspace:*
-        version: link:../../packages/features/stabilizer
+        version: link:../../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -115,7 +127,7 @@ importers:
         version: link:../../packages/features/reduction
       '@tokenpilot/stabilizer':
         specifier: workspace:*
-        version: link:../../packages/features/stabilizer
+        version: link:../../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -161,7 +173,7 @@ importers:
         version: link:../../../packages/foundation/runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
-        version: link:../../packages/features/stabilizer
+        version: link:../../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -196,18 +208,6 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/foundation/kernel
 
-  components/tokenpilot/packages/features/stabilizer:
-    dependencies:
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/kernel
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/product-surface
-
   components/tokenpilot/presets/tokenpilot:
     dependencies:
       '@tokenpilot/eviction':
@@ -236,7 +236,7 @@ importers:
         version: link:../../../packages/foundation/product-surface
       '@tokenpilot/stabilizer':
         specifier: workspace:*
-        version: link:../../packages/features/stabilizer
+        version: link:../../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10

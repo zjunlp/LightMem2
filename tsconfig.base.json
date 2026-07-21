@@ -40,7 +40,7 @@
                 "components/packages/foundation/host-adapter/src/index.ts"
             ],
             "@tokenpilot/stabilizer": [
-                "components/tokenpilot/packages/features/stabilizer/src/index.ts"
+                "components/packages/features/stabilizer/src/index.ts"
             ],
             "@tokenpilot/product-surface": [
                 "components/packages/foundation/product-surface/src/index.ts"
