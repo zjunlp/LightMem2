@@ -3,6 +3,7 @@ export * from "./daemon.js";
 export * from "./install.js";
 export * from "./logger.js";
 export * from "./preset.js";
+export * from "./product-registration.js";
 export * from "./proxy-runtime.js";
 export * from "./reduction.js";
 export * from "./responses-codec.js";

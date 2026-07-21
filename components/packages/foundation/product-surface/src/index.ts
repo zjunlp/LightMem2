@@ -3,6 +3,7 @@ export * from "./presentation.js";
 export * from "./command-actions.js";
 export * from "./commands.js";
 export * from "./registration.js";
+export * from "./product-registration.js";
 export * from "./commands/shared.js";
 export * from "./commands/host.js";
 export * from "./commands/runtime-mode.js";

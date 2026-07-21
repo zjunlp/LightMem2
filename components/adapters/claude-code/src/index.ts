@@ -7,6 +7,7 @@ export * from "./host-config-adapter.js";
 export * from "./install.js";
 export * from "./logger.js";
 export * from "./preset.js";
+export * from "./product-registration.js";
 export * from "./messages-codec.js";
 export * from "./reduction.js";
 export * from "./session-report.js";
