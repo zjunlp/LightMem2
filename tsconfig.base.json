@@ -16,7 +16,7 @@
                 "components/packages/foundation/kernel/src/index.ts"
             ],
             "@tokenpilot/artifact-store": [
-                "components/tokenpilot/packages/foundation/artifact-store/src/index.ts"
+                "components/packages/foundation/artifact-store/src/index.ts"
             ],
             "@tokenpilot/decision": [
                 "components/tokenpilot/presets/tokenpilot/src/index.ts"
