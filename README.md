@@ -134,8 +134,8 @@ pnpm component:install:tokenpilot:openclaw
 Default install:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 This keeps your current active Codex provider name, reroutes that provider through the local TokenPilot proxy, writes `~/.codex/tokenpilot.json`, registers hooks in `~/.codex/hooks.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server, and creates the standalone `lightmem2` CLI entrypoint at `~/.local/bin/lightmem2`.
@@ -151,8 +151,8 @@ export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
 Then run the same install flow:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
@@ -167,8 +167,8 @@ If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `
 Default install:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/claude-code run build
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 This updates `~/.claude/settings.json` for local gateway routing, writes `~/.claude/tokenpilot.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server in `~/.claude/.claude.json`, installs a `SessionStart` hook that auto-starts the local gateway on first use, and preserves existing Claude files as `.tokenpilot.bak` backups before rewriting.
@@ -184,8 +184,8 @@ export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
 Then run the same install flow:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/claude-code run build
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.

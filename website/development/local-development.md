@@ -42,10 +42,10 @@ pnpm lightmem2:test
 
 ```bash
 # Build a specific adapter
-npm --prefix components/tokenpilot/adapters/openclaw run build
+npm --prefix components/adapters/openclaw run build
 
 # Typecheck a specific package
-npm --prefix components/tokenpilot/packages/foundation/runtime-core run typecheck
+npm --prefix components/packages/foundation/runtime-core run typecheck
 ```
 
 ## Documentation Site

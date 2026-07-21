@@ -1,6 +1,6 @@
-# TokenPilot Component
+# TokenPilot Preset
 
-TokenPilot is the current public runtime component inside LightMem2.
+TokenPilot is the current public runtime preset inside LightMem2.
 It targets a practical long-running-session problem: prompt history grows, tool outputs accumulate, cache reuse becomes unstable, and shared sessions become increasingly expensive.
 
 Within the current LightMem2 runtime path, TokenPilot primarily addresses this through:
@@ -11,7 +11,7 @@ Within the current LightMem2 runtime path, TokenPilot primarily addresses this t
 
 ## Where It Fits
 
-Use the root [README.md](../../README.md) for the fastest first-run path:
+Use the root [README.md](../../../README.md) for the fastest first-run path:
 
 - `OpenClaw`
   - install the repo
@@ -28,7 +28,7 @@ Use the root [README.md](../../README.md) for the fastest first-run path:
   - open a new Claude Code session to trigger `SessionStart`
   - verify with `lightmem2 claude-code doctor`
 
-Use [components/README.md](../README.md) if you want the framework-level
+Use [components/README.md](../../README.md) if you want the framework-level
 component index before diving into TokenPilot-specific details.
 
 Use this component README when you need TokenPilot-specific details:
@@ -47,51 +47,41 @@ command and model namespace aliases in addition to the established
 
 ## Component And Adapter Boundary
 
-Within LightMem2, `TokenPilot` is the reusable component layer.
-Its shared logic stays under `packages/`, while each concrete host integration lives under `adapters/`.
+Within LightMem2, `TokenPilot` is a thin preset rather than the owner of shared
+packages or host adapters. It composes Stabilizer, Reduction, and Eviction.
 
 In the current public repo:
 
-- `packages/`
-  - shared runtime engine, contracts, and stateful layers
-- `adapters/openclaw/`
+- `components/packages/`
+  - shared foundation and independently composable feature packages
+- `components/adapters/openclaw/`
   - the current production host adapter for OpenClaw
-- `adapters/codex/`
+- `components/adapters/codex/`
   - Codex CLI adapter with hook-based integration and local Responses proxy
-- `adapters/claude-code/`
+- `components/adapters/claude-code/`
   - Claude Code adapter with gateway routing and MCP-backed recovery
-- `products/cli/`
+- `components/products/cli/`
   - standalone `lightmem2` CLI surface for hosts without native slash commands
-- `products/mcp/`
+- `components/products/mcp/`
   - shared stdio MCP surface for internal archive recovery
 
 Adapter development notes live in:
 
-- [adapters/README.md](./adapters/README.md)
+- [adapters/README.md](../../adapters/README.md)
 
 This is the intended reuse boundary for future hosts such as Codex CLI or Claude Code.
 
 ## Component Layout
 
 ```text
-components/tokenpilot/
-├── adapters/
-│   ├── openclaw/         # OpenClaw adapter, hooks, commands, embedded proxy
-│   ├── codex/            # Codex CLI adapter, hooks, provider install, local proxy
-│   └── claude-code/      # Claude Code adapter, gateway routing, MCP recovery
-├── products/
-│   ├── cli/              # Standalone lightmem2 CLI surface
-│   └── mcp/              # Shared memory_fault_recover MCP server
-├── README.md
-└── packages/
-    ├── host-adapter/     # Shared host contracts and host-specific path/state interfaces
-    ├── product-surface/  # Shared user-facing command actions and product semantics
-    ├── runtime-core/     # Host-agnostic runtime engine and reduction pipeline
-    ├── kernel/           # Shared contracts, events, and runtime-facing types
-    └── layers/
-        ├── history/      # Canonical state, anchors, lifecycle bookkeeping
-        ├── decision/     # Reduction and eviction analysis / policy logic
-        └── memory/       # Experimental memory layer still under active development
+components/
+├── packages/
+│   ├── foundation/       # Kernel, runtime, history, artifacts, host and surface infrastructure
+│   └── features/         # Stabilizer, Reduction, Eviction, and Memory
+├── presets/
+│   └── tokenpilot/       # This preset: Stabilizer + Reduction + Eviction
+├── adapters/             # OpenClaw, Codex, and Claude Code bindings
+└── products/             # Shared CLI and MCP surfaces
 ```
 
 ## Host Integrations
@@ -101,8 +91,8 @@ adapters, rather than as a permanently OpenClaw-only implementation.
 
 Host integration index:
 
-- [adapters/README.md](./adapters/README.md)
-- [HOSTS.md](./HOSTS.md)
+- [adapters/README.md](../../adapters/README.md)
+- [HOSTS.md](../../adapters/HOSTS.md)
 
 Supported host adapters:
 
@@ -117,7 +107,7 @@ Shared product surfaces:
 
 - `lightmem2 visual`: standalone browser visual entrypoint with multi-host selection
 
-Use [HOSTS.md](./HOSTS.md) for the current capability matrix and host-specific boundaries.
+Use [HOSTS.md](../../adapters/HOSTS.md) for the current capability matrix and host-specific boundaries.
 
 ## Runtime Commands
 
@@ -155,7 +145,7 @@ lightmem2 codex stabilizer target user
 
 Recommended first-run order for Codex:
 
-1. `npm --prefix components/tokenpilot/adapters/codex run install:codex`
+1. `npm --prefix components/adapters/codex run install:codex`
 2. trust hooks in Codex if prompted
 3. open a new Codex session
 4. `lightmem2 codex doctor`
@@ -176,7 +166,7 @@ lightmem2 claude-code stabilizer target developer
 
 Recommended first-run order for Claude Code:
 
-1. `npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code`
+1. `npm --prefix components/adapters/claude-code run install:claude-code`
 2. open a new Claude Code session
 3. `lightmem2 claude-code doctor`
 4. `lightmem2 claude-code status`
@@ -464,8 +454,8 @@ Current OpenClaw adapter self-check:
 
 More package-level adapter notes live in:
 
-- [adapters/README.md](./adapters/README.md)
-- [adapters/openclaw/README.md](./adapters/openclaw/README.md)
-- [adapters/codex/README.md](./adapters/codex/README.md)
-- [adapters/claude-code/README.md](./adapters/claude-code/README.md)
-- [../../experiments/tokenpilot/README.md](../../experiments/tokenpilot/README.md)
+- [adapters/README.md](../../adapters/README.md)
+- [adapters/openclaw/README.md](../../adapters/openclaw/README.md)
+- [adapters/codex/README.md](../../adapters/codex/README.md)
+- [adapters/claude-code/README.md](../../adapters/claude-code/README.md)
+- [experiments/tokenpilot/README.md](../../../experiments/tokenpilot/README.md)

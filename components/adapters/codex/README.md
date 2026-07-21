@@ -5,9 +5,9 @@ It integrates through Codex config mutation, hook registration, and a local Open
 
 For the component-level overview and shared command surface, see:
 
-- [`components/tokenpilot/README.md`](../../README.md)
-- [`components/tokenpilot/adapters/README.md`](../README.md)
-- [`components/tokenpilot/HOSTS.md`](../../HOSTS.md)
+- [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)
+- [`components/adapters/README.md`](../README.md)
+- [`components/adapters/HOSTS.md`](../HOSTS.md)
 
 ## Supports
 
@@ -40,7 +40,7 @@ Build the adapter:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/codex run build
+npm --prefix components/adapters/codex run build
 ```
 
 If your Codex files are not under the default `~/.codex`, set:
@@ -55,7 +55,7 @@ Then install:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run install:codex
 ```
 
 If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
@@ -92,7 +92,7 @@ You can run the adapter doctor immediately after install:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/codex run doctor:codex
+npm --prefix components/adapters/codex run doctor:codex
 ```
 
 Then use the first real-session path:
@@ -211,7 +211,7 @@ cat ~/.codex/tokenpilot.json
 cat ~/.codex/hooks.json
 rg "model_provider|base_url" ~/.codex/config.toml
 rg "mcp_servers.tokenpilot_memory_fault_recover" ~/.codex/config.toml
-npm --prefix components/tokenpilot/adapters/codex run doctor:codex
+npm --prefix components/adapters/codex run doctor:codex
 tokenpilot-codex status
 ```
 
@@ -228,9 +228,9 @@ If Codex reports that hooks need review, trust the TokenPilot hooks in Codex, op
 Primary package scripts:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run typecheck
-npm --prefix components/tokenpilot/adapters/codex test
-npm --prefix components/tokenpilot/adapters/codex run install:codex
-npm --prefix components/tokenpilot/adapters/codex run doctor:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run typecheck
+npm --prefix components/adapters/codex test
+npm --prefix components/adapters/codex run install:codex
+npm --prefix components/adapters/codex run doctor:codex
 ```

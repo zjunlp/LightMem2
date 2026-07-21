@@ -39,14 +39,14 @@ LightMem2/
 
 | Directory | Purpose |
 | :-- | :-- |
-| `components/tokenpilot/packages/foundation/kernel/` | Types, interfaces, events — the contract layer |
-| `components/tokenpilot/packages/foundation/runtime-core/` | Plugin execution engine |
-| `components/tokenpilot/packages/foundation/` | Shared host, history, artifact, and product infrastructure |
-| `components/tokenpilot/packages/features/` | Stabilizer, Reduction, Eviction, and Memory capabilities |
-| `components/tokenpilot/presets/tokenpilot/` | TokenPilot policy and feature composition |
-| `components/tokenpilot/adapters/` | One adapter per host |
-| `components/tokenpilot/products/cli/` | The `lightmem2` CLI |
-| `components/tokenpilot/products/mcp/` | Shared MCP server |
+| `components/packages/foundation/kernel/` | Types, interfaces, events — the contract layer |
+| `components/packages/foundation/runtime-core/` | Plugin execution engine |
+| `components/packages/foundation/` | Shared host, history, artifact, and product infrastructure |
+| `components/packages/features/` | Stabilizer, Reduction, Eviction, and Memory capabilities |
+| `components/presets/tokenpilot/` | TokenPilot policy and feature composition |
+| `components/adapters/` | One adapter per host |
+| `components/products/cli/` | The `lightmem2` CLI |
+| `components/products/mcp/` | Shared MCP server |
 
 ## Workspace
 

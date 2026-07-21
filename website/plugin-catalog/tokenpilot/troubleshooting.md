@@ -40,10 +40,10 @@ pnpm install
 **Diagnosis**:
 ```bash
 # Check if the adapter exists
-ls components/tokenpilot/adapters/<host>/
+ls components/adapters/<host>/
 
 # Run the build step manually
-npm --prefix components/tokenpilot/adapters/<host> run build
+npm --prefix components/adapters/<host> run build
 
 # Check for custom path issues
 echo $LIGHTMEM2_OPENCLAW_HOME
@@ -90,10 +90,10 @@ lsof -i :<port>
 pnpm component:install:tokenpilot:openclaw
 
 # Codex
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run install:codex
 
 # Claude Code
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 ### Mode change not taking effect

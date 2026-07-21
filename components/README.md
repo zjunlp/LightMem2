@@ -1,13 +1,13 @@
 # Components
 
-This directory contains runtime components built on top of the LightMem2 framework.
-Each component can expose one or more host adapters without duplicating its shared runtime logic.
+This directory contains the shared packages, feature modules, presets, products,
+and host adapters that make up LightMem2.
 
 The current public repository ships one component:
 
 | Component | Status | Role | Docs |
 | :-- | :-- | :-- | :-- |
-| `TokenPilot` | public | Runtime component for context stabilization, reduction, and lifecycle-aware eviction | [components/tokenpilot/README.md](./tokenpilot/README.md) |
+| `TokenPilot` | public | Preset combining Stabilizer, Reduction, and Eviction | [presets/tokenpilot/README.md](./presets/tokenpilot/README.md) |
 
 ## Component And Adapter Split
 
@@ -32,7 +32,7 @@ Use the root [README.md](../README.md) first if you want the fastest path to:
 - install the current component
 - verify the runtime path in a real session
 
-Use a component subtree when you need component-specific material such as:
+Use a preset subtree when you need product-specific material such as:
 
 - command surface
 - package layout
@@ -45,19 +45,28 @@ Use a component subtree when you need component-specific material such as:
 
 ```text
 components/
-└── tokenpilot/
-    ├── adapters/
-    │   ├── openclaw/
-    │   ├── codex/
-    │   └── claude-code/
-    ├── README.md
-    ├── products/
-    └── packages/
-        ├── host-adapter/
-        ├── product-surface/
-        ├── runtime-core/
-        ├── kernel/
-        └── layers/
+├── packages/
+│   ├── foundation/
+│   │   ├── kernel/
+│   │   ├── runtime-core/
+│   │   ├── host-adapter/
+│   │   ├── history/
+│   │   ├── artifact-store/
+│   │   └── product-surface/
+│   └── features/
+│       ├── stabilizer/
+│       ├── reduction/
+│       ├── eviction/
+│       └── memory/
+├── presets/
+│   └── tokenpilot/
+├── adapters/
+│   ├── openclaw/
+│   ├── codex/
+│   └── claude-code/
+└── products/
+    ├── cli/
+    └── mcp/
 ```
 
 ## Naming Boundary

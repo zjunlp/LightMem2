@@ -44,9 +44,9 @@ The adapter abstracts these differences so plugins only deal with one consistent
 
 | Host | Adapter Location | Integration Style |
 | :-- | :-- | :-- |
-| OpenClaw | `components/tokenpilot/adapters/openclaw/` | Native plugin slot + restart |
-| Codex | `components/tokenpilot/adapters/codex/` | Local proxy + hooks |
-| Claude Code | `components/tokenpilot/adapters/claude-code/` | Local gateway + MCP |
+| OpenClaw | `components/adapters/openclaw/` | Native plugin slot + restart |
+| Codex | `components/adapters/codex/` | Local proxy + hooks |
+| Claude Code | `components/adapters/claude-code/` | Local gateway + MCP |
 
 ## Integration Patterns
 

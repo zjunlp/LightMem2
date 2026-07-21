@@ -50,16 +50,16 @@ Every adapter should make these explicit:
 Preferred structure:
 
 ```text
-components/tokenpilot/
+components/
 ├── packages/
-│   ├── kernel/
-│   ├── runtime-core/
-│   ├── host-adapter/
-│   └── layers/
-└── packages/<host-adapter> or future adapters/<host>/
+│   ├── foundation/
+│   └── features/
+├── presets/
+├── products/
+└── adapters/<host>/
 ```
 
-Shared logic belongs in `kernel`, `runtime-core`, or `layers/*`.
+Shared logic belongs in `packages/foundation/*` or `packages/features/*`.
 Host-specific config, transcript parsing, command wiring, and install logic
 belong in the host adapter.
 
@@ -77,8 +77,8 @@ If adapter-specific tests exist, run the relevant package test command as well.
 
 The current reference adapter is:
 
-- [components/tokenpilot/adapters/openclaw/README.md](../components/tokenpilot/adapters/openclaw/README.md)
+- [components/adapters/openclaw/README.md](../components/adapters/openclaw/README.md)
 
 The current host integration index is:
 
-- [components/tokenpilot/HOSTS.md](../components/tokenpilot/HOSTS.md)
+- [components/adapters/HOSTS.md](../components/adapters/HOSTS.md)

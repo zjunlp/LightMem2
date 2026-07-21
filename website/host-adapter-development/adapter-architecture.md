@@ -10,12 +10,12 @@
 
 | Host |  |  |
 | :-- | :-- | :-- |
-| OpenClaw | `components/tokenpilot/adapters/openclaw/` |  |
-| Codex | `components/tokenpilot/adapters/codex/` |  + Hooks |
-| Claude Code | `components/tokenpilot/adapters/claude-code/` |  + MCP |
+| OpenClaw | `components/adapters/openclaw/` |  |
+| Codex | `components/adapters/codex/` |  + Hooks |
+| Claude Code | `components/adapters/claude-code/` |  + MCP |
 
 ## 
 
-`components/tokenpilot/packages/foundation/host-adapter/`  adapter 
+`components/packages/foundation/host-adapter/`  adapter
 
  Adapter Architecture 

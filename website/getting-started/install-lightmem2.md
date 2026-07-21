@@ -74,7 +74,7 @@ This shows your current default host, pinned session, and config target.
 | :-- | :-- | :-- |
 | `lightmem2` CLI | `~/.local/bin/lightmem2` | Standalone CLI for all hosts |
 | Shared packages | `node_modules/` (workspace) | Runtime engine, types, contracts |
-| Host adapter code | `components/tokenpilot/adapters/` | Per-host integration code |
+| Host adapter code | `components/adapters/` | Per-host integration code |
 
 ## Next
 

@@ -9,9 +9,9 @@ while host-specific install surfaces and runtime wiring live under
 
 | Host | Status | Integration Mode | Install Surface | Main Adapter Docs |
 | :-- | :-- | :-- | :-- | :-- |
-| `OpenClaw` | production | bundled plugin + embedded runtime | `pnpm component:install:tokenpilot:openclaw` or `npm --prefix components/tokenpilot/adapters/openclaw run install:release` | [adapters/openclaw/README.md](./adapters/openclaw/README.md) |
-| `Codex CLI` | available | hooks + local Responses proxy + shared CLI | `npm --prefix components/tokenpilot/adapters/codex run build` then `npm --prefix components/tokenpilot/adapters/codex run install:codex` | [adapters/codex/README.md](./adapters/codex/README.md) |
-| `Claude Code` | available | gateway routing + observability hooks + shared CLI | `npm --prefix components/tokenpilot/adapters/claude-code run build` then `npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code` | [adapters/claude-code/README.md](./adapters/claude-code/README.md) |
+| `OpenClaw` | production | bundled plugin + embedded runtime | `pnpm component:install:tokenpilot:openclaw` or `npm --prefix components/adapters/openclaw run install:release` | [openclaw/README.md](./openclaw/README.md) |
+| `Codex CLI` | available | hooks + local Responses proxy + shared CLI | `npm --prefix components/adapters/codex run build` then `npm --prefix components/adapters/codex run install:codex` | [codex/README.md](./codex/README.md) |
+| `Claude Code` | available | gateway routing + observability hooks + shared CLI | `npm --prefix components/adapters/claude-code run build` then `npm --prefix components/adapters/claude-code run install:claude-code` | [claude-code/README.md](./claude-code/README.md) |
 
 ## Capability Matrix
 
@@ -86,16 +86,16 @@ The intended split is:
 
 In directory form, that means:
 
-- `components/tokenpilot/packages/*`
+- `components/packages/*`
   - reusable component logic
-- `components/tokenpilot/products/*`
+- `components/products/*`
   - shared product surfaces such as the standalone CLI and MCP server
-- `components/tokenpilot/adapters/<host>`
+- `components/adapters/<host>`
   - host-specific integration layer
 
 General adapter development guidance lives in:
 
-- [adapters/README.md](./adapters/README.md)
+- [README.md](./README.md)
 
 ## Adapter Checklist
 

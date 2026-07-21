@@ -5,9 +5,9 @@ Within the broader LightMem2 framework, this package is the runtime adapter laye
 
 For the component-level overview, command surface, and full configuration reference, see:
 
-- [`components/tokenpilot/README.md`](../../README.md)
-- [`components/tokenpilot/adapters/README.md`](../README.md)
-- [`components/tokenpilot/HOSTS.md`](../../HOSTS.md)
+- [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)
+- [`components/adapters/README.md`](../README.md)
+- [`components/adapters/HOSTS.md`](../HOSTS.md)
 
 Current adapter responsibilities:
 
@@ -23,7 +23,7 @@ Current adapter responsibilities:
 Release-style install:
 
 ```bash
-cd /path/to/LightMem2/components/tokenpilot/adapters/openclaw
+cd /path/to/LightMem2/components/adapters/openclaw
 npm run install:release
 ```
 
@@ -36,7 +36,7 @@ This installs the packaged TokenPilot runtime component into:
 After install, run the adapter doctor:
 
 ```bash
-cd /path/to/LightMem2/components/tokenpilot/adapters/openclaw
+cd /path/to/LightMem2/components/adapters/openclaw
 npm run doctor:openclaw
 ```
 
@@ -63,13 +63,13 @@ mixing release and load-path installs. The current sanity workflow is:
 
 See:
 
-- [`README.md`](../../../../README.md)
-- [`components/tokenpilot/README.md`](../../README.md)
+- [`README.md`](../../../README.md)
+- [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)
 
 ## Build
 
 ```bash
-cd /path/to/LightMem2/components/tokenpilot/adapters/openclaw
+cd /path/to/LightMem2/components/adapters/openclaw
 corepack pnpm build
 corepack pnpm typecheck
 ```
@@ -123,14 +123,14 @@ rg 'stable_prefix_rewrite|proxy_before_call_rewrite|proxy_after_call_rewrite|too
 Lightweight integration self-check:
 
 ```bash
-cd /path/to/LightMem2/components/tokenpilot/adapters/openclaw
+cd /path/to/LightMem2/components/adapters/openclaw
 npm run doctor:openclaw
 ```
 
 The runtime sanity guide lives in:
 
-- [`../../README.md`](../../README.md)
-- [`../../HOSTS.md`](../../HOSTS.md)
+- [`../README.md`](../README.md)
+- [`../HOSTS.md`](../HOSTS.md)
 
 ## Package Scripts
 
@@ -144,6 +144,6 @@ npm run doctor:openclaw
 ```
 
 The package still contains a small release-helper surface under
-`components/tokenpilot/adapters/openclaw/scripts/`. Benchmarking and evaluation flows should
+`components/adapters/openclaw/scripts/`. Benchmarking and evaluation flows should
 stay outside this package and eventually live under the top-level
 `experiments/` tree.

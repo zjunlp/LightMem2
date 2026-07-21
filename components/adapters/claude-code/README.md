@@ -7,9 +7,9 @@ observability and real archive recovery.
 
 For the shared component overview and host matrix, see:
 
-- [`components/tokenpilot/README.md`](../../README.md)
-- [`components/tokenpilot/HOSTS.md`](../../HOSTS.md)
-- [`components/tokenpilot/adapters/README.md`](../README.md)
+- [`components/presets/tokenpilot/README.md`](../../presets/tokenpilot/README.md)
+- [`components/adapters/HOSTS.md`](../HOSTS.md)
+- [`components/adapters/README.md`](../README.md)
 
 ## Supports
 
@@ -40,7 +40,7 @@ Build the adapter:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run build
 ```
 
 If your Claude Code files are not under the default `~/.claude`, set:
@@ -55,7 +55,7 @@ Then install:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 If `lightmem2` is not found after install, make sure `~/.local/bin` is on your `PATH`.
@@ -88,7 +88,7 @@ You can run the adapter doctor immediately after install:
 
 ```bash
 cd /path/to/LightMem2
-npm --prefix components/tokenpilot/adapters/claude-code run doctor:claude-code
+npm --prefix components/adapters/claude-code run doctor:claude-code
 ```
 
 Then use the first real-session path:
@@ -216,7 +216,7 @@ Useful checks:
 cat ~/.claude/tokenpilot.json
 cat ~/.claude/settings.json
 cat ~/.claude/.claude.json
-npm --prefix components/tokenpilot/adapters/claude-code run doctor:claude-code
+npm --prefix components/adapters/claude-code run doctor:claude-code
 ```
 
 If install finishes in degraded MCP mode, gateway routing and reduction remain
@@ -228,9 +228,9 @@ startup succeeds.
 Primary package scripts:
 
 ```bash
-npm --prefix components/tokenpilot/adapters/claude-code run build
-npm --prefix components/tokenpilot/adapters/claude-code run typecheck
-npm --prefix components/tokenpilot/adapters/claude-code test
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
-npm --prefix components/tokenpilot/adapters/claude-code run doctor:claude-code
+npm --prefix components/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run typecheck
+npm --prefix components/adapters/claude-code test
+npm --prefix components/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run doctor:claude-code
 ```

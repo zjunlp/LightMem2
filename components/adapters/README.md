@@ -3,9 +3,9 @@
 This directory contains host-specific integration layers for the TokenPilot
 component.
 
-Shared runtime logic belongs under `components/tokenpilot/packages/`.
+Shared runtime logic belongs under `components/packages/`.
 Anything that depends on one concrete host should stay under
-`components/tokenpilot/adapters/<host>/`.
+`components/adapters/<host>/`.
 
 ## Current Status
 
@@ -116,7 +116,7 @@ spot.
 ## Related Docs
 
 - [../README.md](../README.md)
-- [../HOSTS.md](../HOSTS.md)
+- [HOSTS.md](./HOSTS.md)
 - [openclaw/README.md](./openclaw/README.md)
 - [codex/README.md](./codex/README.md)
 - [claude-code/README.md](./claude-code/README.md)

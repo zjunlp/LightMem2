@@ -6,9 +6,9 @@ LightMem2 supports three agent hosts. Each host has a different integration styl
 
 | Host | Integration | Adapter Location |
 | :-- | :-- | :-- |
-| [OpenClaw](./openclaw) | Native plugin slot | `components/tokenpilot/adapters/openclaw/` |
-| [Codex CLI](./codex) | Local proxy + hooks | `components/tokenpilot/adapters/codex/` |
-| [Claude Code](./claude-code) | Local gateway + MCP | `components/tokenpilot/adapters/claude-code/` |
+| [OpenClaw](./openclaw) | Native plugin slot | `components/adapters/openclaw/` |
+| [Codex CLI](./codex) | Local proxy + hooks | `components/adapters/codex/` |
+| [Claude Code](./claude-code) | Local gateway + MCP | `components/adapters/claude-code/` |
 
 ## Feature Matrix
 

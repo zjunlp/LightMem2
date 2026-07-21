@@ -1,28 +1,25 @@
 # Plugin Directory Structure
 
 ::: danger 
- `components/tokenpilot/`  README 
+ `components/`  README
 :::
 
 ## 
 
 ```text
-components/tokenpilot/
+components/
  adapters/               # Host-specific integration
     openclaw/
     codex/
     claude-code/
+ presets/
+    tokenpilot/          # TokenPilot feature composition
  products/
     cli/                # Shared CLI
     mcp/                # Shared MCP server
  packages/
-     host-adapter/       # Shared adapter contracts
-     runtime-core/       # Runtime engine
-     kernel/             # Shared types and interfaces
-     layers/
-         history/
-         decision/
-         memory/         # Experimental
+     foundation/         # Shared runtime and infrastructure
+     features/           # Stabilizer, Reduction, Eviction, Memory
 ```
 
  Plugin Directory Structure 

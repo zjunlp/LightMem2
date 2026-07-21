@@ -4,4 +4,4 @@
 README  Runtime API 
 :::
 
-Runtime API  `components/tokenpilot/packages/foundation/kernel/`  `components/tokenpilot/packages/foundation/runtime-core/`
+Runtime API  `components/packages/foundation/kernel/`  `components/packages/foundation/runtime-core/`

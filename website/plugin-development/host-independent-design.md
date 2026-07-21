@@ -4,4 +4,4 @@
 `packages/` `adapters/`Host  README 
 :::
 
- Host  `components/tokenpilot/packages/`Host  `components/tokenpilot/adapters/`
+ Host  `components/packages/`Host  `components/adapters/`

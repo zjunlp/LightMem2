@@ -70,7 +70,7 @@ Delete the plugin config file and re-run the install command:
 
 ```bash
 rm ~/.codex/tokenpilot.json
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run install:codex
 ```
 
 ## Next

@@ -13,9 +13,9 @@ pnpm lightmem2:build
 pnpm lightmem2:install
 
 # Build specific adapter
-npm --prefix components/tokenpilot/adapters/openclaw run build
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/claude-code run build
+npm --prefix components/adapters/openclaw run build
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/claude-code run build
 ```
 
 ## Typecheck
@@ -25,7 +25,7 @@ npm --prefix components/tokenpilot/adapters/claude-code run build
 pnpm typecheck
 
 # Typecheck specific package
-npm --prefix components/tokenpilot/packages/foundation/runtime-core run typecheck
+npm --prefix components/packages/foundation/runtime-core run typecheck
 ```
 
 ## Test
@@ -35,7 +35,7 @@ npm --prefix components/tokenpilot/packages/foundation/runtime-core run typechec
 pnpm lightmem2:test
 
 # Run tests for specific package
-npm --prefix components/tokenpilot/products/cli test
+npm --prefix components/products/cli test
 ```
 
 ## CI
