@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -138,6 +138,92 @@ test("processCodexHookEvent returns minimal JSON output for Stop hooks", async (
 
     assert.equal(output, "{}\n");
   } finally {
+    if (originalCodexConfig === undefined) {
+      delete process.env.TOKENPILOT_CODEX_CONFIG;
+    } else {
+      process.env.TOKENPILOT_CODEX_CONFIG = originalCodexConfig;
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("processCodexHookEvent handles deeply nested tool output without overflowing the stack", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-hooks-handler-deep-"));
+  const originalCodexConfig = process.env.TOKENPILOT_CODEX_CONFIG;
+  try {
+    const stateDir = join(dir, "state");
+    const configPath = join(dir, "tokenpilot.json");
+    process.env.TOKENPILOT_CODEX_CONFIG = configPath;
+
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({ stateDir, proxyPort: 17667 }),
+      configPath,
+    );
+
+    const toolResponse: Record<string, unknown> = {};
+    let cursor = toolResponse;
+    for (let depth = 0; depth < 12_000; depth += 1) {
+      const child: Record<string, unknown> = {};
+      cursor.child = child;
+      cursor = child;
+    }
+    cursor.output = "complete";
+
+    await processCodexHookEvent({
+      hook_event_name: "PostToolUse",
+      session_id: "deep-hook-session",
+      cwd: "/repo/from-hook",
+      tool_name: "Bash",
+      tool_response: toolResponse,
+    });
+
+    const snapshotRaw = await readFile(
+      join(stateDir, "session-state", "sessions", "deep-hook-session.json"),
+      "utf8",
+    );
+    const snapshot = JSON.parse(snapshotRaw) as { lastToolOutputChars?: number };
+    assert.equal(snapshot.lastToolOutputChars, "complete".length);
+  } finally {
+    if (originalCodexConfig === undefined) {
+      delete process.env.TOKENPILOT_CODEX_CONFIG;
+    } else {
+      process.env.TOKENPILOT_CODEX_CONFIG = originalCodexConfig;
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("processCodexHookEvent treats observation persistence failures as best effort", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-hooks-handler-best-effort-"));
+  const originalCodexConfig = process.env.TOKENPILOT_CODEX_CONFIG;
+  const originalConsoleError = console.error;
+  const errors: string[] = [];
+  try {
+    const blockedStateDir = join(dir, "blocked-state");
+    const configPath = join(dir, "tokenpilot.json");
+    await writeFile(blockedStateDir, "not a directory", "utf8");
+    process.env.TOKENPILOT_CODEX_CONFIG = configPath;
+    console.error = (...args: unknown[]) => {
+      errors.push(args.map(String).join(" "));
+    };
+
+    await writeTokenPilotCodexConfig(
+      normalizeTokenPilotCodexConfig({ stateDir: blockedStateDir, proxyPort: 17667 }),
+      configPath,
+    );
+
+    const output = await processCodexHookEvent({
+      hook_event_name: "PostToolUse",
+      session_id: "best-effort-hook-session",
+      cwd: "/repo/from-hook",
+      tool_name: "Bash",
+      tool_response: "complete",
+    });
+
+    assert.equal(output, undefined);
+    assert.ok(errors.some((message) => message.includes("continuing without hook telemetry")));
+  } finally {
+    console.error = originalConsoleError;
     if (originalCodexConfig === undefined) {
       delete process.env.TOKENPILOT_CODEX_CONFIG;
     } else {

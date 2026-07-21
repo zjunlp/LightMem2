@@ -29,28 +29,56 @@ function stringValue(value: unknown): string | undefined {
 
 function findFirstString(value: unknown, keys: string[]): string | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const obj = value as Record<string, unknown>;
-  for (const key of keys) {
-    const direct = stringValue(obj[key]);
-    if (direct) return direct;
-  }
-  for (const child of Object.values(obj)) {
-    if (!child || typeof child !== "object") continue;
-    const nested = findFirstString(child, keys);
-    if (nested) return nested;
+  const pending: object[] = [value as object];
+  const visited = new WeakSet<object>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || visited.has(current)) continue;
+    visited.add(current);
+    const obj = current as Record<string, unknown>;
+    for (const key of keys) {
+      const direct = stringValue(obj[key]);
+      if (direct) return direct;
+    }
+    for (const child of Object.values(obj)) {
+      if (child && typeof child === "object") {
+        pending.push(child as object);
+      }
+    }
   }
   return undefined;
 }
 
 function estimateTextChars(value: unknown): number {
-  if (typeof value === "string") return value.length;
-  if (value == null) return 0;
-  if (Array.isArray(value)) return value.reduce((sum, item) => sum + estimateTextChars(item), 0);
-  if (typeof value === "object") {
-    return Object.values(value as Record<string, unknown>)
-      .reduce<number>((sum, item) => sum + estimateTextChars(item), 0);
+  let total = 0;
+  const pending: unknown[] = [value];
+  const visited = new WeakSet<object>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (typeof current === "string") {
+      total += current.length;
+      continue;
+    }
+    if (current == null) continue;
+    if (typeof current === "object") {
+      if (visited.has(current)) continue;
+      visited.add(current);
+      pending.push(...Object.values(current as Record<string, unknown>));
+      continue;
+    }
+    total += String(current).length;
   }
-  return String(value).length;
+  return total;
+}
+
+function hookErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function reportObservationFailure(hookEventName: string, operation: string, error: unknown): void {
+  console.error(
+    `[tokenpilot-codex] ${hookEventName} ${operation} failed; continuing without hook telemetry: ${hookErrorMessage(error)}`,
+  );
 }
 
 function extractToolEvent(input: Record<string, unknown>): {
@@ -117,15 +145,20 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
   };
 
   if (sessionId) {
-    await upsertCodexSessionSnapshot(config.stateDir, sessionId, {
-      workspaceHint,
-      lastHookEvent: hookEventName,
-      lastToolName: tool.toolName ?? undefined,
-      lastToolInputChars: tool.toolInputChars,
-      lastToolOutputChars: tool.toolOutputChars,
-    }, {
-      markLatest: false,
-    });
+    try {
+      await upsertCodexSessionSnapshot(config.stateDir, sessionId, {
+        workspaceHint,
+        lastHookEvent: hookEventName,
+        lastToolName: tool.toolName ?? undefined,
+        lastToolInputChars: tool.toolInputChars,
+        lastToolOutputChars: tool.toolOutputChars,
+      }, {
+        markLatest: false,
+      });
+    } catch (error) {
+      if (hookEventName === "SessionStart") throw error;
+      reportObservationFailure(hookEventName, "session snapshot", error);
+    }
   }
 
   if (hookEventName === "SessionStart") {
@@ -144,30 +177,42 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
   }
 
   if (hookEventName === "PostToolUse") {
-    await appendTrace(config.stateDir, {
-      stage: "codex_hook_post_tool_use",
-      ...common,
-      ...tool,
-    });
+    try {
+      await appendTrace(config.stateDir, {
+        stage: "codex_hook_post_tool_use",
+        ...common,
+        ...tool,
+      });
+    } catch (error) {
+      reportObservationFailure(hookEventName, "trace append", error);
+    }
     return successOutputForHook(hookEventName);
   }
 
   if (hookEventName === "PreToolUse") {
-    await appendTrace(config.stateDir, {
-      stage: "codex_hook_pre_tool_use",
-      ...common,
-      ...tool,
-    });
+    try {
+      await appendTrace(config.stateDir, {
+        stage: "codex_hook_pre_tool_use",
+        ...common,
+        ...tool,
+      });
+    } catch (error) {
+      reportObservationFailure(hookEventName, "trace append", error);
+    }
     return successOutputForHook(hookEventName);
   }
 
   if (hookEventName === "Stop") {
-    const daemon = await readDaemonStatus(config);
-    await appendTrace(config.stateDir, {
-      stage: "codex_hook_stop",
-      ...common,
-      daemon,
-    });
+    try {
+      const daemon = await readDaemonStatus(config);
+      await appendTrace(config.stateDir, {
+        stage: "codex_hook_stop",
+        ...common,
+        daemon,
+      });
+    } catch (error) {
+      reportObservationFailure(hookEventName, "trace append", error);
+    }
     return successOutputForHook(hookEventName);
   }
 
