@@ -22,7 +22,7 @@
                 "components/tokenpilot/packages/layers/decision/src/index.ts"
             ],
             "@tokenpilot/history": [
-                "components/tokenpilot/packages/layers/history/src/index.ts"
+                "components/tokenpilot/packages/foundation/history/src/index.ts"
             ],
             "@tokenpilot/memory": [
                 "components/tokenpilot/packages/features/memory/src/index.ts"

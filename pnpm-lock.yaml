@@ -99,7 +99,7 @@ importers:
         version: link:../../packages/features/eviction
       '@tokenpilot/history':
         specifier: workspace:*
-        version: link:../../packages/layers/history
+        version: link:../../packages/foundation/history
       '@tokenpilot/host-adapter':
         specifier: workspace:*
         version: link:../../packages/host-adapter
@@ -139,7 +139,7 @@ importers:
         version: link:../../foundation/artifact-store
       '@tokenpilot/history':
         specifier: workspace:*
-        version: link:../../layers/history
+        version: link:../../foundation/history
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
@@ -167,6 +167,12 @@ importers:
         specifier: workspace:*
         version: link:../../host-adapter
 
+  components/tokenpilot/packages/foundation/history:
+    dependencies:
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
   components/tokenpilot/packages/foundation/kernel: {}
 
   components/tokenpilot/packages/host-adapter:
@@ -188,19 +194,13 @@ importers:
         version: link:../../features/eviction
       '@tokenpilot/history':
         specifier: workspace:*
-        version: link:../history
+        version: link:../../foundation/history
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../features/reduction
-
-  components/tokenpilot/packages/layers/history:
-    dependencies:
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../foundation/kernel
 
   components/tokenpilot/packages/product-surface:
     dependencies:
