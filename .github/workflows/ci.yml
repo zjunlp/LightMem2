@@ -38,17 +38,20 @@ jobs:
       - name: Build workspace
         run: pnpm build
 
+      - name: Check package boundaries
+        run: pnpm check:boundaries
+
       - name: Test OpenClaw adapter
-        run: npm --prefix components/tokenpilot/adapters/openclaw test
+        run: pnpm --dir components/adapters/openclaw test
 
       - name: Test host adapter package
-        run: npm --prefix components/tokenpilot/packages/host-adapter test
+        run: pnpm --dir components/packages/foundation/host-adapter test
 
-      - name: Test decision package
-        run: npm --prefix components/tokenpilot/packages/layers/decision test
+      - name: Test TokenPilot preset
+        run: pnpm --dir components/presets/tokenpilot test
 
       - name: Test runtime core package
-        run: npm --prefix components/tokenpilot/packages/runtime-core test
+        run: pnpm --dir components/packages/foundation/runtime-core test
 
       - name: Test product surface package
-        run: npm --prefix components/tokenpilot/packages/product-surface test
+        run: pnpm --dir components/packages/foundation/product-surface test
