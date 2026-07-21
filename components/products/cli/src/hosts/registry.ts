@@ -1,117 +1,64 @@
-import { readFile } from "node:fs/promises";
-import { readCliHostPathOverrides } from "../context-store.js";
-import { readLatestUxEffect as readSharedLatestUxEffect } from "@tokenpilot/host-adapter";
 import type { VisualHostSource } from "@tokenpilot/product-surface";
-import {
-  defaultTokenPilotClaudeCodeConfigPath,
-  loadTokenPilotClaudeCodeConfig,
-} from "../../../../adapters/claude-code/src/config.js";
-import {
-  defaultTokenPilotConfigPath,
-  loadTokenPilotCodexConfig,
-} from "../../../../adapters/codex/src/config.js";
-import { readLatestUxEffect as readOpenClawLatestUxEffect } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
-import { resolveOpenClawConfigPath } from "../../../../adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
-import { resolveStateDir as resolveOpenClawStateDir } from "../../../../adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
+import { ProductHostRegistry, type ProductHostRegistration } from "@tokenpilot/product-surface";
+import { CLAUDE_CODE_PRODUCT_HOST_REGISTRATION } from "../../../../adapters/claude-code/src/product-registration.js";
+import { CODEX_PRODUCT_HOST_REGISTRATION } from "../../../../adapters/codex/src/product-registration.js";
+import { OPENCLAW_PRODUCT_HOST_REGISTRATION } from "../../../../adapters/openclaw/src/product-registration.js";
+import { readCliHostPathOverrides, type CliHostPathOverrides } from "../context-store.js";
+
+export type CliHostRuntime = {
+  handleCommand(ctx: { args: string; sessionId?: string }): Promise<{ text: string }>;
+  maybeResolveLatestSessionId(): Promise<string | undefined>;
+  resolveSessionId(sessionId?: string): Promise<string | undefined>;
+};
+
+export type CliHostRegistration = ProductHostRegistration & {
+  createRuntime(target: {
+    host: string;
+    sessionId?: string;
+    pathOverrides?: CliHostPathOverrides;
+  }): CliHostRuntime;
+};
 
 export const CLI_HOSTS = [
-  {
-    hostId: "openclaw",
-    displayName: "OpenClaw",
-  },
-  {
-    hostId: "codex",
-    displayName: "Codex",
-  },
-  {
-    hostId: "claude-code",
-    displayName: "Claude Code",
-  },
+  OPENCLAW_PRODUCT_HOST_REGISTRATION,
+  CODEX_PRODUCT_HOST_REGISTRATION,
+  CLAUDE_CODE_PRODUCT_HOST_REGISTRATION,
 ] as const;
 
 export type CliHostId = (typeof CLI_HOSTS)[number]["hostId"];
 
-type CliVisualHostDefinition = {
-  hostId: CliHostId;
-  displayName: string;
-  resolveStateDir(): Promise<string | undefined>;
-  readLatestUxEffect(stateDir: string): Promise<{ at?: string } | null>;
-};
+let cliHostRegistry: ProductHostRegistry<CliHostRegistration> | undefined;
+
+export function registerCliHostProducts(registrations: readonly CliHostRegistration[]): void {
+  cliHostRegistry = new ProductHostRegistry(registrations);
+}
+
+function registry(): ProductHostRegistry<CliHostRegistration> {
+  if (!cliHostRegistry) {
+    throw new Error("CLI host products have not been registered");
+  }
+  return cliHostRegistry;
+}
 
 export function parseCliHostId(value: string | undefined): CliHostId | undefined {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  for (const host of CLI_HOSTS) {
-    if (host.hostId === normalized) return host.hostId;
-  }
-  return undefined;
+  return registry().parseHostId(value) as CliHostId | undefined;
 }
 
-async function resolveCodexTokenPilotConfigPath(): Promise<string> {
-  return (
-    process.env.TOKENPILOT_CODEX_CONFIG?.trim()
-    || (await readCliHostPathOverrides("codex"))?.tokenPilotConfigPath?.trim()
-    || defaultTokenPilotConfigPath()
-  );
+async function productConfigPath(hostId: CliHostId): Promise<string | undefined> {
+  const environmentPath = hostId === "codex"
+    ? process.env.TOKENPILOT_CODEX_CONFIG?.trim()
+    : hostId === "claude-code"
+      ? process.env.TOKENPILOT_CLAUDE_CODE_CONFIG?.trim()
+      : undefined;
+  return environmentPath || (await readCliHostPathOverrides(hostId))?.tokenPilotConfigPath?.trim();
 }
-
-async function resolveClaudeCodeTokenPilotConfigPath(): Promise<string> {
-  return (
-    process.env.TOKENPILOT_CLAUDE_CODE_CONFIG?.trim()
-    || (await readCliHostPathOverrides("claude-code"))?.tokenPilotConfigPath?.trim()
-    || defaultTokenPilotClaudeCodeConfigPath()
-  );
-}
-
-async function readOpenClawConfig(): Promise<Record<string, unknown>> {
-  const configPath = resolveOpenClawConfigPath();
-  try {
-    const raw = await readFile(configPath, "utf8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-const CLI_VISUAL_HOST_DEFINITIONS: CliVisualHostDefinition[] = [
-  {
-    hostId: "openclaw",
-    displayName: "OpenClaw",
-    async resolveStateDir(): Promise<string | undefined> {
-      const openclawConfig = await readOpenClawConfig();
-      return resolveOpenClawStateDir(openclawConfig);
-    },
-    readLatestUxEffect(stateDir: string) {
-      return readOpenClawLatestUxEffect(stateDir);
-    },
-  },
-  {
-    hostId: "codex",
-    displayName: "Codex",
-    async resolveStateDir(): Promise<string | undefined> {
-      const codexConfig = await loadTokenPilotCodexConfig(await resolveCodexTokenPilotConfigPath());
-      return typeof codexConfig.stateDir === "string" ? codexConfig.stateDir : undefined;
-    },
-    readLatestUxEffect(stateDir: string) {
-      return readSharedLatestUxEffect(stateDir);
-    },
-  },
-  {
-    hostId: "claude-code",
-    displayName: "Claude Code",
-    async resolveStateDir(): Promise<string | undefined> {
-      const claudeConfig = await loadTokenPilotClaudeCodeConfig(await resolveClaudeCodeTokenPilotConfigPath());
-      return typeof claudeConfig.stateDir === "string" ? claudeConfig.stateDir : undefined;
-    },
-    readLatestUxEffect(stateDir: string) {
-      return readSharedLatestUxEffect(stateDir);
-    },
-  },
-];
 
 export async function resolveCliVisualHosts(): Promise<VisualHostSource[]> {
   const hosts: VisualHostSource[] = [];
-  for (const definition of CLI_VISUAL_HOST_DEFINITIONS) {
-    const stateDir = String((await definition.resolveStateDir()) ?? "").trim();
+  for (const definition of registry().list()) {
+    const stateDir = String((await definition.resolveStateDir({
+      productConfigPath: await productConfigPath(definition.hostId as CliHostId),
+    })) ?? "").trim();
     if (!stateDir) continue;
     hosts.push({
       hostId: definition.hostId,
@@ -128,28 +75,21 @@ export async function resolveLatestCliReportHost(): Promise<{
   latestAt: string;
 } | undefined> {
   let latestHost:
-    | {
-      hostId: CliHostId;
-      displayName: string;
-      latestAt: string;
-      latestAtMs: number;
-    }
+    | { hostId: CliHostId; displayName: string; latestAt: string; latestAtMs: number }
     | undefined;
 
-  for (const definition of CLI_VISUAL_HOST_DEFINITIONS) {
-    const stateDir = String((await definition.resolveStateDir()) ?? "").trim();
+  for (const definition of registry().list()) {
+    const hostId = definition.hostId as CliHostId;
+    const stateDir = String((await definition.resolveStateDir({
+      productConfigPath: await productConfigPath(hostId),
+    })) ?? "").trim();
     if (!stateDir) continue;
-    const latest = await definition.readLatestUxEffect(stateDir);
+    const latest = await definition.readLatestActivity(stateDir);
     const latestAt = typeof latest?.at === "string" ? latest.at.trim() : "";
     const latestAtMs = latestAt ? Date.parse(latestAt) : Number.NaN;
     if (!Number.isFinite(latestAtMs)) continue;
     if (!latestHost || latestAtMs > latestHost.latestAtMs) {
-      latestHost = {
-        hostId: definition.hostId,
-        displayName: definition.displayName,
-        latestAt,
-        latestAtMs,
-      };
+      latestHost = { hostId, displayName: definition.displayName, latestAt, latestAtMs };
     }
   }
 
@@ -159,4 +99,10 @@ export async function resolveLatestCliReportHost(): Promise<{
     displayName: latestHost.displayName,
     latestAt: latestHost.latestAt,
   };
+}
+
+export function getCliHostRegistration(hostId: CliHostId): CliHostRegistration {
+  const registration = registry().get(hostId);
+  if (!registration) throw new Error(`No CLI host registration for '${hostId}'`);
+  return registration;
 }

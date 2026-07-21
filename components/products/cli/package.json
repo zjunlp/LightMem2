@@ -17,6 +17,7 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/product-surface": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"

@@ -39,7 +39,7 @@ import {
   resolvePreferredSessionId,
 } from "./shared.js";
 import { handleStandaloneVisualCommandWithSelection } from "./visual.js";
-import type { CliHostPathOverrides } from "./factory.js";
+import type { CliHostPathOverrides } from "../context-store.js";
 
 const CODEX_REDUCTION_PASS_NAMES = [
   "readStateCompaction",

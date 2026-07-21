@@ -1,53 +1,38 @@
 import { createProductSurfaceCommandHandler } from "@tokenpilot/product-surface";
-import type { CliHostId } from "./registry.js";
+import type { CliHostPathOverrides } from "../context-store.js";
 import { createClaudeCodeCliBridge } from "./claude-code.js";
 import { createCodexCliBridge } from "./codex.js";
 import { createOpenClawCliBridge } from "./openclaw.js";
+import {
+  CLI_HOSTS,
+  getCliHostRegistration,
+  registerCliHostProducts,
+  type CliHostId,
+  type CliHostRegistration,
+  type CliHostRuntime,
+} from "./registry.js";
 
-export type CliHostRuntime = {
-  handleCommand(ctx: { args: string; sessionId?: string }): Promise<{ text: string }>;
-  maybeResolveLatestSessionId(): Promise<string | undefined>;
-  resolveSessionId(sessionId?: string): Promise<string | undefined>;
-};
+export type { CliHostPathOverrides } from "../context-store.js";
+export type { CliHostRuntime } from "./registry.js";
 
-export type CliHostPathOverrides = {
-  tokenPilotConfigPath?: string;
-  hostConfigPath?: string;
-  hostAuxConfigPath?: string;
-};
-
-type CliHostRuntimeFactory = (target: {
-  host: CliHostId;
-  sessionId?: string;
-  pathOverrides?: CliHostPathOverrides;
-}) => CliHostRuntime;
-
-const CLI_HOST_RUNTIME_FACTORIES: Record<CliHostId, CliHostRuntimeFactory> = {
-  codex(target) {
-    return createCodexCliBridge({
-      host: "codex",
-      sessionId: target.sessionId,
-      pathOverrides: target.pathOverrides,
-    });
-  },
-  "claude-code"(target) {
-    const bridge = createClaudeCodeCliBridge({
-      host: "claude-code",
-      sessionId: target.sessionId,
-      pathOverrides: target.pathOverrides,
-    });
-    return {
-      ...bridge,
-      async resolveSessionId(sessionId?: string): Promise<string | undefined> {
-        return sessionId?.trim() || undefined;
-      },
-    };
-  },
-  openclaw(target) {
-    const bridge = createOpenClawCliBridge({
-      host: "openclaw",
-      sessionId: target.sessionId,
-    });
+const CLI_HOST_REGISTRATIONS: CliHostRegistration[] = CLI_HOSTS.map((host) => ({
+  ...host,
+  createRuntime(target) {
+    if (host.hostId === "codex") {
+      return createCodexCliBridge({
+        host: "codex",
+        sessionId: target.sessionId,
+        pathOverrides: target.pathOverrides,
+      });
+    }
+    if (host.hostId === "claude-code") {
+      return createClaudeCodeCliBridge({
+        host: "claude-code",
+        sessionId: target.sessionId,
+        pathOverrides: target.pathOverrides,
+      });
+    }
+    const bridge = createOpenClawCliBridge({ host: "openclaw", sessionId: target.sessionId });
     const handler = createProductSurfaceCommandHandler({
       bridge: bridge.bridge,
       configAdapter: bridge.configAdapter,
@@ -57,17 +42,21 @@ const CLI_HOST_RUNTIME_FACTORIES: Record<CliHostId, CliHostRuntimeFactory> = {
         return handler(ctx);
       },
       maybeResolveLatestSessionId: bridge.maybeResolveLatestSessionId,
-      resolveSessionId(sessionId?: string): Promise<string | undefined> {
+      resolveSessionId(sessionId?: string) {
         return bridge.resolveSessionId(sessionId);
       },
     };
   },
-};
+}));
+
+export function registerBuiltInCliHostProducts(): void {
+  registerCliHostProducts(CLI_HOST_REGISTRATIONS);
+}
 
 export function createCliHostRuntime(target: {
   host: CliHostId;
   sessionId?: string;
   pathOverrides?: CliHostPathOverrides;
 }): CliHostRuntime {
-  return CLI_HOST_RUNTIME_FACTORIES[target.host](target);
+  return getCliHostRegistration(target.host).createRuntime(target);
 }

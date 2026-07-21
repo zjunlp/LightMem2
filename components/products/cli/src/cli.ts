@@ -1,5 +1,9 @@
 import { dispatchCli } from "./dispatch.js";
 import { maybeRunVisualDaemon } from "./hosts/visual.js";
+import { initializeTokenPilotPreset } from "@tokenpilot/decision";
+import { CODEX_TOKENPILOT_HOST_BINDING } from "../../../adapters/codex/src/preset.js";
+
+initializeTokenPilotPreset(CODEX_TOKENPILOT_HOST_BINDING);
 
 async function main() {
   if (await maybeRunVisualDaemon(process.argv.slice(2))) {

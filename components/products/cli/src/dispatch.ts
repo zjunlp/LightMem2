@@ -3,11 +3,13 @@ import {
   readCliContextState,
   updateCliContextState,
 } from "./context-store.js";
-import type { CliHostPathOverrides } from "./hosts/factory.js";
+import type { CliHostPathOverrides } from "./context-store.js";
 import { CLI_HOSTS, parseCliHostId, resolveLatestCliReportHost, type CliHostId } from "./hosts/registry.js";
-import { createCliHostRuntime } from "./hosts/factory.js";
+import { createCliHostRuntime, registerBuiltInCliHostProducts } from "./hosts/factory.js";
 import { handleStandaloneVisualCommandWithSelection } from "./hosts/visual.js";
 import { formatCliUsage } from "./usage.js";
+
+registerBuiltInCliHostProducts();
 
 type HostTarget = {
   host: CliHostId;

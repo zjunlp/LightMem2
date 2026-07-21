@@ -237,6 +237,9 @@ importers:
 
   components/products/cli:
     dependencies:
+      '@tokenpilot/decision':
+        specifier: workspace:*
+        version: link:../../presets/tokenpilot
       '@tokenpilot/host-adapter':
         specifier: workspace:*
         version: link:../../packages/foundation/host-adapter
@@ -262,6 +265,12 @@ importers:
       '@tokenpilot/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@tokenpilot/decision':
+        specifier: workspace:*
+        version: link:../../presets/tokenpilot
+      '@tokenpilot/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
     devDependencies:
       esbuild:
         specifier: ^0.25.10
