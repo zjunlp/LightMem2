@@ -13,7 +13,7 @@
         "baseUrl": ".",
         "paths": {
             "@tokenpilot/kernel": [
-                "components/tokenpilot/packages/foundation/kernel/src/index.ts"
+                "components/packages/foundation/kernel/src/index.ts"
             ],
             "@tokenpilot/artifact-store": [
                 "components/tokenpilot/packages/foundation/artifact-store/src/index.ts"

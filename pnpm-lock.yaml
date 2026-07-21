@@ -18,6 +18,8 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  components/packages/foundation/kernel: {}
+
   components/tokenpilot/adapters/claude-code:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -28,7 +30,7 @@ importers:
         version: link:../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/foundation/kernel
+        version: link:../../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
@@ -62,7 +64,7 @@ importers:
         version: link:../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/foundation/kernel
+        version: link:../../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
@@ -105,7 +107,7 @@ importers:
         version: link:../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/foundation/kernel
+        version: link:../../../packages/foundation/kernel
       '@tokenpilot/memory':
         specifier: workspace:*
         version: link:../../packages/features/memory
@@ -142,7 +144,7 @@ importers:
         version: link:../../foundation/history
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../foundation/kernel
+        version: link:../../../../packages/foundation/kernel
 
   components/tokenpilot/packages/features/memory: {}
 
@@ -153,7 +155,7 @@ importers:
         version: link:../../foundation/artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../foundation/kernel
+        version: link:../../../../packages/foundation/kernel
 
   components/tokenpilot/packages/features/stabilizer:
     dependencies:
@@ -162,7 +164,7 @@ importers:
         version: link:../../foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../foundation/kernel
+        version: link:../../../../packages/foundation/kernel
       '@tokenpilot/product-surface':
         specifier: workspace:*
         version: link:../../foundation/product-surface
@@ -177,18 +179,16 @@ importers:
     dependencies:
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../../../../packages/foundation/kernel
 
   components/tokenpilot/packages/foundation/host-adapter:
     dependencies:
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../../../../packages/foundation/kernel
       js-tiktoken:
         specifier: ^1.0.21
         version: 1.0.21
-
-  components/tokenpilot/packages/foundation/kernel: {}
 
   components/tokenpilot/packages/foundation/product-surface:
     dependencies:
@@ -206,7 +206,7 @@ importers:
         version: link:../artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../../../../packages/foundation/kernel
 
   components/tokenpilot/presets/tokenpilot:
     dependencies:
@@ -218,7 +218,7 @@ importers:
         version: link:../../packages/foundation/history
       '@tokenpilot/kernel':
         specifier: workspace:*
-        version: link:../../packages/foundation/kernel
+        version: link:../../../packages/foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
