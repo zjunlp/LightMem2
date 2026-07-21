@@ -28,7 +28,7 @@
                 "components/tokenpilot/packages/features/memory/src/index.ts"
             ],
             "@tokenpilot/runtime-core": [
-                "components/tokenpilot/packages/foundation/runtime-core/src/index.ts"
+                "components/packages/foundation/runtime-core/src/index.ts"
             ],
             "@tokenpilot/reduction": [
                 "components/tokenpilot/packages/features/reduction/src/index.ts"

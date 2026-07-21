@@ -41,6 +41,15 @@ importers:
 
   components/packages/foundation/kernel: {}
 
+  components/packages/foundation/runtime-core:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
   components/tokenpilot/adapters/claude-code:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -140,7 +149,7 @@ importers:
         version: link:../../packages/features/reduction
       '@tokenpilot/runtime-core':
         specifier: workspace:*
-        version: link:../../packages/foundation/runtime-core
+        version: link:../../../packages/foundation/runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
@@ -199,15 +208,6 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/foundation/host-adapter
 
-  components/tokenpilot/packages/foundation/runtime-core:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/artifact-store
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/kernel
-
   components/tokenpilot/presets/tokenpilot:
     dependencies:
       '@tokenpilot/eviction':
@@ -224,7 +224,7 @@ importers:
         version: link:../../packages/features/reduction
       '@tokenpilot/runtime-core':
         specifier: workspace:*
-        version: link:../../packages/foundation/runtime-core
+        version: link:../../../packages/foundation/runtime-core
 
   components/tokenpilot/products/cli:
     dependencies:
