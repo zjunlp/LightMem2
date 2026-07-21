@@ -36,7 +36,8 @@ Keep these responsibilities in shared packages:
 
 - runtime contracts in `packages/foundation/kernel/`
 - host-neutral execution primitives in `packages/foundation/runtime-core/`
-- state and policy logic in `packages/layers/*`
+- shared state infrastructure in `packages/foundation/history/`
+- feature and policy logic in `packages/features/*` and `presets/*`
 - host abstraction helpers in `packages/foundation/host-adapter/`
 - shared command semantics in `packages/foundation/product-surface/`
 - standalone product entrypoints in `products/`
