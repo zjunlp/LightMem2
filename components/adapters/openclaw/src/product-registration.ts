@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { defineProductHostRegistration } from "@tokenpilot/product-surface";
+import { defineProductHostRegistration } from "@lightmem2/product-surface";
 import { resolveStateDir } from "./commands/tokenpilot/host-config-adapter.js";
 import { resolveOpenClawConfigPath } from "./context-stack/integration/openclaw-paths.js";
 import { readLatestUxEffect } from "./context-stack/integration/ux-effects.js";

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepareBeforeCall } from "@tokenpilot/host-adapter";
+import { prepareBeforeCall } from "@lightmem2/host-adapter";
 import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
 
 import {

@@ -1,4 +1,4 @@
-import type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext, RuntimeTurnResult } from "@lightmem2/kernel";
 
 export type BuiltinReductionPassId =
   | "read_state_compaction"

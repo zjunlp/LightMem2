@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/history",
+  "name": "@lightmem2/history",
   "version": "0.1.0",
   "private": true,
   "lightmem2": {
@@ -13,6 +13,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@tokenpilot/kernel": "workspace:*"
+    "@lightmem2/kernel": "workspace:*"
   }
 }

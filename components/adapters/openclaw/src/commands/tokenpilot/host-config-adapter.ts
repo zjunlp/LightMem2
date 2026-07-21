@@ -1,11 +1,11 @@
 import {
   type TokenPilotProductSurfaceConfigAdapter,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   getNestedValue,
   setNestedValue,
   toRecord,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 
 export const TOKENPILOT_CONFIG_ROOT = ["plugins", "entries", "tokenpilot", "config"] as const;
 export const TOKENPILOT_ENTRY_ROOT = ["plugins", "entries", "tokenpilot"] as const;

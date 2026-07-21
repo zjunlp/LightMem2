@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceHostBridge } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductSurfaceHostBridge } from "@lightmem2/host-adapter";
 import { handleVisual } from "./session-visual.js";
 import { formatOpenClawDoctorReport, inspectOpenClawDoctor } from "./openclaw-doctor.js";
 import { handleReport } from "./session-report.js";

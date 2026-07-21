@@ -5,7 +5,7 @@ import type {
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
   TokenPilotRegisteredCommandSpec,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { registerProductSurfaceCommands } from "../src/index.js";
 
 function createTestConfigAdapter(): TokenPilotProductSurfaceConfigAdapter {

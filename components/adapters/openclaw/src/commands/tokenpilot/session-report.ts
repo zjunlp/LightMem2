@@ -9,7 +9,7 @@ import {
   readSessionModuleObservationSummary,
   renderSessionReport,
   toRecord,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import {
   pluginConfigRecord,
   resolveStateDir,

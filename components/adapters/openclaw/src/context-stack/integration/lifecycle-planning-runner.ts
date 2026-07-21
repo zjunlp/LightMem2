@@ -1,4 +1,4 @@
-import type { RuntimeModule } from "@tokenpilot/kernel";
+import type { RuntimeModule } from "@lightmem2/kernel";
 import {
   buildLifecyclePolicyContext,
   type LifecyclePlanningResult,

@@ -1,10 +1,10 @@
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,
   buildArchiveLocation,
   buildRecoveryHint,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 import {
   reduceToolPayloadText,
   type PayloadBlockConfig,
@@ -16,7 +16,7 @@ import {
   hasRecoverySkipReductionFlag,
   isRecoveryText,
   MEMORY_FAULT_RECOVER_TOOL_NAME,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 import { classifyReadStates, isReadOutputSegment } from "../reduction/read-state-compaction.js";
 
 const DEFAULT_MAX_CHARS = 1200;

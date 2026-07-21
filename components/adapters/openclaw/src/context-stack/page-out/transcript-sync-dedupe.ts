@@ -1,4 +1,4 @@
-import type { RawSemanticTurnRecord } from "@tokenpilot/history";
+import type { RawSemanticTurnRecord } from "@lightmem2/history";
 
 export function dedupeRawSemanticMessages(
   record: RawSemanticTurnRecord["messages"],

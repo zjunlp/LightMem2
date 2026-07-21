@@ -20,24 +20,24 @@ importers:
 
   components/adapters/claude-code:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@lightmem2/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@lightmem2/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
@@ -57,24 +57,24 @@ importers:
 
   components/adapters/codex:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@lightmem2/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@lightmem2/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
@@ -94,36 +94,36 @@ importers:
 
   components/adapters/openclaw:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@lightmem2/history':
+        specifier: workspace:*
+        version: link:../../packages/foundation/history
+      '@lightmem2/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@lightmem2/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
+      '@lightmem2/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/foundation/runtime-core
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
       '@tokenpilot/eviction':
         specifier: workspace:*
         version: link:../../packages/features/eviction
-      '@tokenpilot/history':
-        specifier: workspace:*
-        version: link:../../packages/foundation/history
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../packages/foundation/kernel
       '@tokenpilot/memory':
         specifier: workspace:*
         version: link:../../packages/features/memory
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
-      '@tokenpilot/runtime-core':
-        specifier: workspace:*
-        version: link:../../packages/foundation/runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
@@ -140,13 +140,13 @@ importers:
 
   components/packages/features/eviction:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../foundation/artifact-store
-      '@tokenpilot/history':
+      '@lightmem2/history':
         specifier: workspace:*
         version: link:../../foundation/history
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
 
@@ -154,40 +154,40 @@ importers:
 
   components/packages/features/reduction:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../foundation/artifact-store
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
 
   components/packages/features/stabilizer:
     dependencies:
-      '@tokenpilot/host-adapter':
+      '@lightmem2/host-adapter':
         specifier: workspace:*
         version: link:../../foundation/host-adapter
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
-      '@tokenpilot/product-surface':
+      '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../foundation/product-surface
 
   components/packages/foundation/artifact-store:
     dependencies:
-      '@tokenpilot/host-adapter':
+      '@lightmem2/host-adapter':
         specifier: workspace:*
         version: link:../host-adapter
 
   components/packages/foundation/history:
     dependencies:
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../kernel
 
   components/packages/foundation/host-adapter:
     dependencies:
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../kernel
       js-tiktoken:
@@ -198,54 +198,54 @@ importers:
 
   components/packages/foundation/product-surface:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../artifact-store
-      '@tokenpilot/host-adapter':
+      '@lightmem2/host-adapter':
         specifier: workspace:*
         version: link:../host-adapter
 
   components/packages/foundation/runtime-core:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../artifact-store
-      '@tokenpilot/kernel':
+      '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../kernel
 
   components/presets/tokenpilot:
     dependencies:
+      '@lightmem2/history':
+        specifier: workspace:*
+        version: link:../../packages/foundation/history
+      '@lightmem2/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@lightmem2/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/foundation/runtime-core
       '@tokenpilot/eviction':
         specifier: workspace:*
         version: link:../../packages/features/eviction
-      '@tokenpilot/history':
-        specifier: workspace:*
-        version: link:../../packages/foundation/history
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../packages/foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
-      '@tokenpilot/runtime-core':
-        specifier: workspace:*
-        version: link:../../packages/foundation/runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
 
   components/products/cli:
     dependencies:
+      '@lightmem2/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
@@ -262,15 +262,15 @@ importers:
 
   components/products/mcp:
     dependencies:
-      '@tokenpilot/artifact-store':
+      '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
     devDependencies:
       esbuild:
         specifier: ^0.25.10

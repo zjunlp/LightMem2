@@ -6,7 +6,7 @@ import type {
   HostResponseEnvelope,
   HostSessionContext,
   HostSessionResolver,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 
 function normalizeSessionId(value: unknown): string | undefined {
   const text = String(value ?? "").trim();

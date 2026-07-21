@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { runBeforeCallReductionOrchestrator } from "@tokenpilot/host-adapter";
-import { appendModuleObservations } from "@tokenpilot/product-surface";
+import { runBeforeCallReductionOrchestrator } from "@lightmem2/host-adapter";
+import { appendModuleObservations } from "@lightmem2/product-surface";
 import { injectProceduralMemoryHints } from "./procedural-memory.js";
 import {
   createOpenClawPayloadCodec,

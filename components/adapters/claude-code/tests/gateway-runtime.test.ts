@@ -9,8 +9,8 @@ import {
   assertRecoveryProtocolText,
   assertStablePrefixRewrite,
   type HostGatewayForwarder,
-} from "@tokenpilot/host-adapter";
-import { readVisualSessionData, readVisualSessionList } from "@tokenpilot/product-surface";
+} from "@lightmem2/host-adapter";
+import { readVisualSessionData, readVisualSessionList } from "@lightmem2/product-surface";
 import { normalizeTokenPilotClaudeCodeConfig } from "../src/config.js";
 import { startClaudeCodeGatewayRuntime } from "../src/gateway-runtime.js";
 import { createConsoleLogger } from "../src/logger.js";

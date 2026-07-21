@@ -1,4 +1,4 @@
-import { defineProductRegistration } from "@tokenpilot/product-surface";
+import { defineProductRegistration } from "@lightmem2/product-surface";
 import {
   TOKENPILOT_PRESET_ID,
   TOKENPILOT_PRESET_VERSION,

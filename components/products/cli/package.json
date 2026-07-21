@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@tokenpilot/decision": "workspace:*",
-    "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/product-surface": "workspace:*",
+    "@lightmem2/host-adapter": "workspace:*",
+    "@lightmem2/product-surface": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"
   },
   "devDependencies": {

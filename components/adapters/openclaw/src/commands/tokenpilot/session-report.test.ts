@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 
 import { handleReport } from "./session-report.js";
 import { upsertOpenClawSessionSummary } from "../../session/session-summary.js";
-import { appendModuleObservation } from "@tokenpilot/product-surface";
+import { appendModuleObservation } from "@lightmem2/product-surface";
 
 test("openclaw handleReport includes recent metrics and recovery aggregates when details are enabled", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tokenpilot-openclaw-report-"));

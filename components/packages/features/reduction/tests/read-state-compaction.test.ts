@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import { classifyReadStates } from "../src/reduction/read-state-compaction.js";
 import { readStateCompactionPass } from "../src/passes/pass-read-state-compaction.js";
 import { resolveReductionPasses, runReductionBeforeCall } from "../src/reduction/pipeline.js";

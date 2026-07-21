@@ -4,6 +4,6 @@ export type {
   ModuleExecutionStatus,
   RequestModuleContract,
   RuntimeModuleContract,
-} from "@tokenpilot/kernel";
+} from "@lightmem2/kernel";
 
-export { runHistoryModules, runModulesInOrder, runRequestModules } from "@tokenpilot/runtime-core";
+export { runHistoryModules, runModulesInOrder, runRequestModules } from "@lightmem2/runtime-core";

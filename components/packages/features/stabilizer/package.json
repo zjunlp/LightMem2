@@ -14,8 +14,8 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/product-surface": "workspace:*"
+    "@lightmem2/host-adapter": "workspace:*",
+    "@lightmem2/kernel": "workspace:*",
+    "@lightmem2/product-surface": "workspace:*"
   }
 }

@@ -12,22 +12,22 @@
         "esModuleInterop": true,
         "baseUrl": ".",
         "paths": {
-            "@tokenpilot/kernel": [
+            "@lightmem2/kernel": [
                 "components/packages/foundation/kernel/src/index.ts"
             ],
-            "@tokenpilot/artifact-store": [
+            "@lightmem2/artifact-store": [
                 "components/packages/foundation/artifact-store/src/index.ts"
             ],
             "@tokenpilot/decision": [
                 "components/presets/tokenpilot/src/index.ts"
             ],
-            "@tokenpilot/history": [
+            "@lightmem2/history": [
                 "components/packages/foundation/history/src/index.ts"
             ],
             "@tokenpilot/memory": [
                 "components/packages/features/memory/src/index.ts"
             ],
-            "@tokenpilot/runtime-core": [
+            "@lightmem2/runtime-core": [
                 "components/packages/foundation/runtime-core/src/index.ts"
             ],
             "@tokenpilot/reduction": [
@@ -36,13 +36,13 @@
             "@tokenpilot/eviction": [
                 "components/packages/features/eviction/src/index.ts"
             ],
-            "@tokenpilot/host-adapter": [
+            "@lightmem2/host-adapter": [
                 "components/packages/foundation/host-adapter/src/index.ts"
             ],
             "@tokenpilot/stabilizer": [
                 "components/packages/features/stabilizer/src/index.ts"
             ],
-            "@tokenpilot/product-surface": [
+            "@lightmem2/product-surface": [
                 "components/packages/foundation/product-surface/src/index.ts"
             ],
             "@tokenpilot/mcp": [

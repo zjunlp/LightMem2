@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 import {
   TOKENPILOT_FEATURE_MODULE_IDS,
   type SessionModuleObservationSummary,

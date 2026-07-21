@@ -8,7 +8,7 @@ import {
   type ApiFamily,
   type RuntimeModule,
   type RuntimeTurnContext,
-} from "@tokenpilot/kernel";
+} from "@lightmem2/kernel";
 import {
   analyzePolicyLocality,
   type LocalityActionHint,
@@ -52,7 +52,7 @@ import {
   type SessionTaskRegistry,
   type TaskLifecycle,
   type TaskState,
-} from "@tokenpilot/history";
+} from "@lightmem2/history";
 
 export type PolicyModuleConfig = {
   localityEnabled?: boolean;

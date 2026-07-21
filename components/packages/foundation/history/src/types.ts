@@ -1,4 +1,4 @@
-import type { ContextSegment } from "@tokenpilot/kernel";
+import type { ContextSegment } from "@lightmem2/kernel";
 
 export type HistoryBlockType =
   | "tool_result"

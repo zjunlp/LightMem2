@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 
 export function ensureCodexPluginConfig(config: Record<string, unknown>): Record<string, unknown> {
   return config;

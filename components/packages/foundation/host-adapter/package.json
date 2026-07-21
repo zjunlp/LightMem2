@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/host-adapter",
+  "name": "@lightmem2/host-adapter",
   "version": "0.1.0",
   "private": true,
   "lightmem2": {
@@ -9,7 +9,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@tokenpilot/kernel": "workspace:*",
+    "@lightmem2/kernel": "workspace:*",
     "js-tiktoken": "^1.0.21"
   },
   "scripts": {

@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 
 export const REDUCTION_PASS_PATHS: Record<string, string[]> = {
   readStateCompaction: ["reduction", "passes", "readStateCompaction"],

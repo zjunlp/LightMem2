@@ -1,4 +1,4 @@
-import type { RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { RuntimeTurnContext } from "@lightmem2/kernel";
 import { buildHistoryBlocks } from "./chunking.js";
 import { deriveHistoryLifecycle } from "./lifecycle.js";
 import { scoreHistoryBlocks } from "./scoring.js";

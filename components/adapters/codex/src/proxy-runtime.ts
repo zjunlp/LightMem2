@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import {
   findFirstMessageText,
   prepareObservedBeforeCall,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import {
   countTextWithPreciseTokens,
   createStaticStatePathResolver,
@@ -12,8 +12,8 @@ import {
   sendJsonResponse,
   startHostGatewayRuntimeServer,
   setForwardResponseHeaders,
-} from "@tokenpilot/host-adapter";
-import { configureStatePathResolver } from "@tokenpilot/artifact-store";
+} from "@lightmem2/host-adapter";
+import { configureStatePathResolver } from "@lightmem2/artifact-store";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   defaultCodexConfigPath,

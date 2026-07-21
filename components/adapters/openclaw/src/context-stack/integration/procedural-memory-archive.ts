@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { loadSessionTaskRegistry } from "@tokenpilot/history";
-import { hashText, pluginStateSubdirCandidates } from "@tokenpilot/artifact-store";
+import { loadSessionTaskRegistry } from "@lightmem2/history";
+import { hashText, pluginStateSubdirCandidates } from "@lightmem2/artifact-store";
 
 function extractTaskObjective(registry: Awaited<ReturnType<typeof loadSessionTaskRegistry>>, taskId: string): string {
   return String(registry.tasks[taskId]?.objective ?? "").trim();

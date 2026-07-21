@@ -1,4 +1,4 @@
-import type { RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { RuntimeTurnContext } from "@lightmem2/kernel";
 
 export function buildLifecyclePolicyContext(params: {
   sessionId: string;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RuntimeModuleRegistry } from "@tokenpilot/runtime-core";
+import { RuntimeModuleRegistry } from "@lightmem2/runtime-core";
 import {
   TOKENPILOT_FEATURE_MODULE_IDS,
   TOKENPILOT_HISTORY_MODULE_ORDER,

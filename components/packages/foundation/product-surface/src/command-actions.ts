@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter, TokenPilotProductSurfaceHostBridge } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductSurfaceConfigAdapter, TokenPilotProductSurfaceHostBridge } from "@lightmem2/host-adapter";
 import { createEvictionHandler } from "./commands/runtime-eviction.js";
 import { createModeHandler } from "./commands/runtime-mode.js";
 import { createReductionHandler } from "./commands/runtime-reduction.js";

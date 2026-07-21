@@ -9,7 +9,7 @@ import {
   renderRecoveredArchive,
   resolveArchivePathAcrossSessions,
   resolveRecoveryStateDir,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 import { TOKENPILOT_RECOVERY_MCP_PRODUCT } from "./product-registration.js";
 
 export { TOKENPILOT_RECOVERY_MCP_PRODUCT } from "./product-registration.js";
@@ -17,7 +17,7 @@ export { TOKENPILOT_RECOVERY_MCP_PRODUCT } from "./product-registration.js";
 export const TOKENPILOT_MCP_SERVER_NAME = "tokenpilot_memory_fault_recover";
 export const DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC = 90;
 export const DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS = 15_000;
-export { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@tokenpilot/artifact-store";
+export { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@lightmem2/artifact-store";
 
 export type TokenPilotMcpServerSpec = {
   serverName: string;

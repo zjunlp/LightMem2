@@ -4,7 +4,7 @@ import type {
   TokenPilotProductSurfacePayload,
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 
 export type ProductSurfaceActionHandler = (
   ctx: TokenPilotProductCommandContext,

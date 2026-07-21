@@ -1,9 +1,9 @@
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,
   buildRecoveryHint,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 // =============================================================================
 // Per-Tool Threshold Configuration

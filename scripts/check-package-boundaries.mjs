@@ -15,9 +15,9 @@ const allowedDependencies = {
 
 // Remove each exception as its implementation moves to the correct owner.
 const knownBoundaryDebt = new Set([
-  "@tokenpilot/host-adapter -> @tokenpilot/stabilizer",
-  "@tokenpilot/product-surface -> @tokenpilot/stabilizer",
-  "@tokenpilot/runtime-core -> @tokenpilot/reduction",
+  "@lightmem2/host-adapter -> @tokenpilot/stabilizer",
+  "@lightmem2/product-surface -> @tokenpilot/stabilizer",
+  "@lightmem2/runtime-core -> @tokenpilot/reduction",
 ]);
 
 async function findPackageFiles(directory) {

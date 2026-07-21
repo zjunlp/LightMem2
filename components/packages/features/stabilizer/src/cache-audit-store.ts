@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { appendJsonl, readCachedInputTokens, readRecentJsonlEntries } from "@tokenpilot/host-adapter";
+import { appendJsonl, readCachedInputTokens, readRecentJsonlEntries } from "@lightmem2/host-adapter";
 import {
   extractStablePrefixContract,
   fingerprintStablePrefixEnvelope,

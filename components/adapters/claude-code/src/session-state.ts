@@ -5,7 +5,7 @@ import {
   resolveLatestSessionId,
   writeLatestSessionRef,
   writeSessionSnapshot,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 
 export type ClaudeCodeSessionSnapshot = {
   sessionId: string;

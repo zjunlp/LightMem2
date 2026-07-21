@@ -1,4 +1,4 @@
-import { createStaticStatePathResolver } from "@tokenpilot/host-adapter";
+import { createStaticStatePathResolver } from "@lightmem2/host-adapter";
 import {
   resolveDefaultOpenClawTokenPilotStateDir,
   resolveOpenClawTokenPilotStateDirCandidates,

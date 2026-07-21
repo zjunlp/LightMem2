@@ -1,5 +1,5 @@
-import type { RuntimeTurnContext, RuntimeTurnResult } from "@tokenpilot/kernel";
-import type { PersistedMessageKind, PersistedMessageOrigin, PersistedMessageRole } from "@tokenpilot/kernel";
+import type { RuntimeTurnContext, RuntimeTurnResult } from "@lightmem2/kernel";
+import type { PersistedMessageKind, PersistedMessageOrigin, PersistedMessageRole } from "@lightmem2/kernel";
 
 // Inlined from @tokenpilot/layer-context (being removed)
 export type ContextViewMessageSnapshot = {

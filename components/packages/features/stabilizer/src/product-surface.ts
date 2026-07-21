@@ -1,9 +1,9 @@
-import { extractContentText } from "@tokenpilot/kernel";
+import { extractContentText } from "@lightmem2/kernel";
 import {
   registerProductSurfaceCacheAuditContribution,
   type ProductSurfaceCacheAuditRecord,
   type StabilityVisualSnapshot,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import type { StabilizerRequestEnvelope } from "./contracts.js";
 import { diagnoseCacheAudit } from "./cache-audit-diagnosis.js";
 import {

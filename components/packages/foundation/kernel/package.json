@@ -1,5 +1,5 @@
 {
-    "name":  "@tokenpilot/kernel",
+    "name":  "@lightmem2/kernel",
     "version":  "0.1.0",
     "private":  true,
     "lightmem2":  {

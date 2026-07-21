@@ -1,5 +1,5 @@
-import { readLatestUxEffect } from "@tokenpilot/host-adapter";
-import { defineProductHostRegistration } from "@tokenpilot/product-surface";
+import { readLatestUxEffect } from "@lightmem2/host-adapter";
+import { defineProductHostRegistration } from "@lightmem2/product-surface";
 import {
   defaultTokenPilotClaudeCodeConfigPath,
   loadTokenPilotClaudeCodeConfig,

@@ -5,9 +5,9 @@ import {
   buildVisualRequestId,
   findFirstMessageText,
   recordBeforeCallVisualState,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import { buildStabilityVisualSnapshotFromEnvelopes } from "@tokenpilot/stabilizer";
-import { pluginStateSubdir } from "@tokenpilot/artifact-store";
+import { pluginStateSubdir } from "@lightmem2/artifact-store";
 import { summarizeResponseFunctionCalls } from "./proxy-runtime-shared.js";
 
 export async function recordProxyInbound(params: {

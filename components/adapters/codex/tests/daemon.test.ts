@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { reserveUnusedPort } from "@tokenpilot/host-adapter";
+import { reserveUnusedPort } from "@lightmem2/host-adapter";
 import { daemonPaths, startDaemon, stopDaemon } from "../src/daemon.js";
 import { normalizeTokenPilotCodexConfig, writeTokenPilotCodexConfig } from "../src/config.js";
 

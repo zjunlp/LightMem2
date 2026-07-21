@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {
   assertReductionMarkerText,
   assertStablePrefixRewrite,
-} from "@tokenpilot/host-adapter";
-import { readSessionModuleObservationSummary } from "@tokenpilot/product-surface";
+} from "@lightmem2/host-adapter";
+import { readSessionModuleObservationSummary } from "@lightmem2/product-surface";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

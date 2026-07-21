@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/runtime-core",
+  "name": "@lightmem2/runtime-core",
   "version": "0.1.0",
   "private": true,
   "lightmem2": {
@@ -14,7 +14,7 @@
     "test": "pnpm exec node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/artifact-store": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*"
+    "@lightmem2/artifact-store": "workspace:*",
+    "@lightmem2/kernel": "workspace:*"
   }
 }

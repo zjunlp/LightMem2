@@ -1,4 +1,4 @@
-import type { TokenPilotProductCommandResult } from "@tokenpilot/host-adapter";
+import type { TokenPilotProductCommandResult } from "@lightmem2/host-adapter";
 import {
   readCliContextState,
   updateCliContextState,

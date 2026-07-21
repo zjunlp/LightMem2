@@ -1,4 +1,4 @@
-import type { RuntimeMessage } from "@tokenpilot/kernel";
+import type { RuntimeMessage } from "@lightmem2/kernel";
 
 export type StabilizerRequestEnvelope = {
   session: {

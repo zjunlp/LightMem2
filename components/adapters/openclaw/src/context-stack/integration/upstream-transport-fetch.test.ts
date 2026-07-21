@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
-import { reserveUnusedPort, withTempHome } from "@tokenpilot/host-adapter";
+import { reserveUnusedPort, withTempHome } from "@lightmem2/host-adapter";
 import { requestUpstreamResponses } from "./upstream-transport-fetch.js";
 
 test("openclaw upstream transport caches unsupported prompt_cache_retention and skips retry later", async () => {

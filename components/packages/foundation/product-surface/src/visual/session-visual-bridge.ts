@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   extractContentText,
-} from "@tokenpilot/kernel";
+} from "@lightmem2/kernel";
 import {
   prepareBeforeCallWithReductionSummary,
   recordUxEffect,
@@ -9,7 +9,7 @@ import {
   type HostRequestEnvelope,
   type PreparedBeforeCallResult,
   type TokenPilotUxCountMode,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   appendReductionVisualSnapshot,
   appendStabilityVisualSnapshot,

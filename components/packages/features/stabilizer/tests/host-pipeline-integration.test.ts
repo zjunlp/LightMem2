@@ -10,7 +10,7 @@ import {
   runBeforeCallReductionOrchestrator,
   stripInternalPayloadFields,
   type HostRequestEnvelope,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   applyStablePrefixToInstructions,
   applyStablePrefixToMessage,

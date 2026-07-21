@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { readJsonFile, writeJsonFileAtomic } from "@tokenpilot/host-adapter";
+import { readJsonFile, writeJsonFileAtomic } from "@lightmem2/host-adapter";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { CodexProviderConfig } from "./config.js";

@@ -1,4 +1,4 @@
-import type { CanonicalTranscriptState } from "@tokenpilot/history";
+import type { CanonicalTranscriptState } from "@lightmem2/history";
 
 export type LifecyclePlanningResult = {
   enabled: boolean;

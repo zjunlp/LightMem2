@@ -1,10 +1,10 @@
-import type { ContextSegment } from "@tokenpilot/kernel";
+import type { ContextSegment } from "@lightmem2/kernel";
 import type { ReductionPassHandler } from "../reduction/types.js";
 import {
   archiveContent,
   buildRecoveryHint,
   buildRecoveryContextSafePatch,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 import {
   analyzeReadStateCompaction,
   isReadOutputSegment,

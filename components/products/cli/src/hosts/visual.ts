@@ -5,7 +5,7 @@ import {
   startVisualServer,
   readVisualSessionList,
   type VisualHostSource,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import { resolveCliVisualHosts } from "./registry.js";
 import {
   ensureDetachedVisualDaemon,

@@ -4,7 +4,7 @@ import {
   runReductionBeforeCall as runLayerReductionBeforeCall,
   resolveReductionPasses as resolveLayerReductionPasses,
 } from "@tokenpilot/reduction";
-import { configureStatePathResolver } from "@tokenpilot/artifact-store";
+import { configureStatePathResolver } from "@lightmem2/artifact-store";
 import {
   extractInputText,
   normalizeTurnBindingMessage,
@@ -66,7 +66,7 @@ import {
 } from "./context-stack/integration/tool-call-memo.js";
 import { appendTaskStateTrace } from "./trace/io.js";
 import { registerTokenPilotCommand } from "./commands/tokenpilot-command.js";
-import { appendEvictionVisualSnapshot } from "@tokenpilot/product-surface";
+import { appendEvictionVisualSnapshot } from "@lightmem2/product-surface";
 import { registerLayeredContextEngine, registerToolCallHooks, registerToolResultPersistHook } from "./plugin-register-hooks.js";
 import { __testHooks, contextSafeRecovery, proxyRuntimeHelpers } from "./plugin-test-support.js";
 import { createWorkspaceHintStore } from "./plugin-workspace-hints.js";

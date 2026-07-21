@@ -1,4 +1,4 @@
-import type { HostRequestEnvelope } from "@tokenpilot/host-adapter";
+import type { HostRequestEnvelope } from "@lightmem2/host-adapter";
 import {
   appendCacheAuditRecord,
   buildCacheAuditSnapshot,

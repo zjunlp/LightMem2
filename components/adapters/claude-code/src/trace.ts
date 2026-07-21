@@ -1,4 +1,4 @@
-import { appendEventTrace } from "@tokenpilot/host-adapter";
+import { appendEventTrace } from "@lightmem2/host-adapter";
 
 export async function appendClaudeCodeTrace(
   stateDir: string,

@@ -6,7 +6,7 @@ import {
   renderRecoveredArchive,
   resolveArchivePathFromLookup,
   resolveRecoveryStateDir,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 export function registerMemoryFaultRecoverTool(
   api: any,

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ContextSegment } from "@tokenpilot/kernel";
+import type { ContextSegment } from "@lightmem2/kernel";
 import {
   buildReadWindowKey,
   detectToolPayloadKind,

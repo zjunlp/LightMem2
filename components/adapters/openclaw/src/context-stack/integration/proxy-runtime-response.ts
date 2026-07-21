@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { UpstreamConfig, UpstreamHttpResponse } from "./upstream.js";
-import { appendModuleObservation } from "@tokenpilot/product-surface";
+import { appendModuleObservation } from "@lightmem2/product-surface";
 import { createOpenClawHostBridge } from "./openclaw-host-bridge.js";
 import { applyProxyAfterCallReduction, recordNonStreamingUxEffect } from "./proxy-runtime-postprocess.js";
 import { recordStreamingUxEffect } from "./proxy-runtime-stream.js";

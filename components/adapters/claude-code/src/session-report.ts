@@ -1,13 +1,13 @@
 import {
   readLatestUxEffect,
   readUxSessionAggregate,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   buildBaseSessionOverview,
   resolveBaseSessionTopology,
   renderSessionReport,
   type ProductSurfaceSessionOverviewItem,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import {
   readRecentClaudeCodeCacheAuditRecordsForSession,
   summarizeClaudeCodeCacheAudit,

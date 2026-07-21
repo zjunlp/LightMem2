@@ -4,7 +4,7 @@ import {
   computeClosureDeferredTaskInfo,
   type EvictionHelpers,
 } from "@tokenpilot/eviction";
-import { pluginStateSubdir } from "@tokenpilot/artifact-store";
+import { pluginStateSubdir } from "@lightmem2/artifact-store";
 
 export { computeClosureDeferredTaskInfo, type EvictionHelpers };
 

@@ -3,8 +3,8 @@ import { dirname } from "node:path";
 import type {
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
-import { handleVisual as handleSharedVisual } from "@tokenpilot/product-surface";
+} from "@lightmem2/host-adapter";
+import { handleVisual as handleSharedVisual } from "@lightmem2/product-surface";
 import { readLatestUxEffect, readSessionUxAggregate } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
 import {
   readRecentOpenClawCacheAuditRecordsForSession,

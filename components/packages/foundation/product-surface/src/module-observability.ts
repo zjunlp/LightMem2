@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import {
   pluginStateSubdirCandidates,
   pluginStateSubdirWriteTargets,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 export const TOKENPILOT_FEATURE_MODULE_IDS = ["stabilizer", "reduction", "eviction"] as const;
 export type TokenPilotFeatureModuleId = (typeof TOKENPILOT_FEATURE_MODULE_IDS)[number];

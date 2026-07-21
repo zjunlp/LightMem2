@@ -1,4 +1,4 @@
-import type { ApiFamily, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ApiFamily, RuntimeTurnContext } from "@lightmem2/kernel";
 
 export const ROUTING_TIERS = ["simple", "standard", "complex", "reasoning"] as const;
 export type RoutingTier = (typeof ROUTING_TIERS)[number];

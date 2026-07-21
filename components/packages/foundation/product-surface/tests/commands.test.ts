@@ -6,7 +6,7 @@ import type {
   TokenPilotRegisteredCommandSpec,
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   createProductSurfaceCommandHandler,
   DEFAULT_TOKENPILOT_COMMAND_ALIASES,

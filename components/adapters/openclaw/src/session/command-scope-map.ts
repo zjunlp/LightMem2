@@ -5,7 +5,7 @@ import {
   pluginStateDirCandidates,
   pluginStateSubdirCandidates,
   pluginStateSubdirWriteTargets,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 export type CommandScopeBinding = {
   scopeKey: string;

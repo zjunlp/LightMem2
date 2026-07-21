@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ContextSegment } from "@tokenpilot/kernel";
+import type { ContextSegment } from "@lightmem2/kernel";
 import type { ReductionDecision, ReductionInstruction } from "../decision-types.js";
 
 // ============================================================================

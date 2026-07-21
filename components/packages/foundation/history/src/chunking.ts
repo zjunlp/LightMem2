@@ -1,4 +1,4 @@
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import type { HistoryBlock, HistoryChunkingConfig, HistoryChunkingResult, HistoryBlockType } from "./types.js";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

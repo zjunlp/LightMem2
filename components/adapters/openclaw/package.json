@@ -27,16 +27,16 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@tokenpilot/artifact-store": "workspace:*",
+    "@lightmem2/artifact-store": "workspace:*",
     "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/eviction": "workspace:*",
-    "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/history": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*",
+    "@lightmem2/host-adapter": "workspace:*",
+    "@lightmem2/history": "workspace:*",
+    "@lightmem2/kernel": "workspace:*",
     "@tokenpilot/memory": "workspace:*",
-    "@tokenpilot/product-surface": "workspace:*",
+    "@lightmem2/product-surface": "workspace:*",
     "@tokenpilot/reduction": "workspace:*",
-    "@tokenpilot/runtime-core": "workspace:*",
+    "@lightmem2/runtime-core": "workspace:*",
     "@tokenpilot/stabilizer": "workspace:*"
   },
   "scripts": {

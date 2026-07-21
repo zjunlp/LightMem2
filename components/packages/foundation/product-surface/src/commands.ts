@@ -1,7 +1,7 @@
 import type {
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { parseCommandAction } from "./config.js";
 import { formatTokenPilotHelp, summarizeTokenPilotStatus } from "./presentation.js";
 import { createProductSurfaceActionHandlers } from "./command-actions.js";

@@ -1,4 +1,4 @@
-import type { CanonicalTranscriptState } from "@tokenpilot/history";
+import type { CanonicalTranscriptState } from "@lightmem2/history";
 import type { HistoryEvictionResult } from "@tokenpilot/eviction";
 
 export type { HistoryEvictionResult } from "@tokenpilot/eviction";

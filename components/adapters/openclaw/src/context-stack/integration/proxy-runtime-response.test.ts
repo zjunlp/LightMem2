@@ -4,7 +4,7 @@ import { PassThrough, Readable, Writable } from "node:stream";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readSessionModuleObservationSummary } from "@tokenpilot/product-surface";
+import { readSessionModuleObservationSummary } from "@lightmem2/product-surface";
 
 import { handleNonStreamingProxyResponse, handleStreamingProxyResponse } from "./proxy-runtime-response.js";
 

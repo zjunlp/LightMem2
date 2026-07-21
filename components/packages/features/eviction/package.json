@@ -12,8 +12,8 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/artifact-store": "workspace:*",
-    "@tokenpilot/history": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*"
+    "@lightmem2/artifact-store": "workspace:*",
+    "@lightmem2/history": "workspace:*",
+    "@lightmem2/kernel": "workspace:*"
   }
 }

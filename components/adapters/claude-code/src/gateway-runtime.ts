@@ -12,11 +12,11 @@ import {
   sendJsonResponse,
   startHostGatewayRuntimeServer,
   setForwardResponseHeaders,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   prepareObservedBeforeCall,
-} from "@tokenpilot/product-surface";
-import { configureStatePathResolver } from "@tokenpilot/artifact-store";
+} from "@lightmem2/product-surface";
+import { configureStatePathResolver } from "@lightmem2/artifact-store";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 import { proxyBaseUrlForPort } from "./config.js";
 import type { TokenPilotClaudeCodeLogger } from "./logger.js";

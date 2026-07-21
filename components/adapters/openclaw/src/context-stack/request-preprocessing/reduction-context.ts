@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import type { BuildLayeredReductionContextDeps } from "./reduction-context-shared.js";
 import { createReductionInstructionCollector } from "./reduction-context-instructions.js";
 import { scanReductionInput } from "./reduction-context-scan.js";

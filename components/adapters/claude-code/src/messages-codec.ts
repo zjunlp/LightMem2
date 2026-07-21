@@ -7,7 +7,7 @@ import type {
   HostResponseEnvelope,
   HostSessionContext,
   HostSessionResolver,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)

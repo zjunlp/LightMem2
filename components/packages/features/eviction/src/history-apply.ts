@@ -4,7 +4,7 @@ import { readdir } from "node:fs/promises";
 import {
   archiveContent,
   readArchive,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 type RegistryLike = {
   evictableTaskIds: string[];

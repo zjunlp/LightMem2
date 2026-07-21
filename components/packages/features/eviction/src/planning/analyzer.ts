@@ -1,4 +1,4 @@
-import type { HistoryBlock, SessionTaskRegistry } from "@tokenpilot/history";
+import type { HistoryBlock, SessionTaskRegistry } from "@lightmem2/history";
 import type { EvictionBlock, EvictionDecision, EvictionPolicy } from "../types.js";
 
 export type EvictionAnalyzerConfig = {

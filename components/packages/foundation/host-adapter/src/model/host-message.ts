@@ -1,4 +1,4 @@
-import type { RuntimeContentBlock, RuntimeMessage, RuntimeToolCall, RuntimeToolResult } from "@tokenpilot/kernel";
+import type { RuntimeContentBlock, RuntimeMessage, RuntimeToolCall, RuntimeToolResult } from "@lightmem2/kernel";
 
 export type HostMessage = RuntimeMessage;
 

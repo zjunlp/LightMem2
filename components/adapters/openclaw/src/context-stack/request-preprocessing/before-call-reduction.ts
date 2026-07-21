@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveReductionPasses, runReductionBeforeCall } from "@tokenpilot/reduction";
-import type { ContextSegment, RuntimeModule } from "@tokenpilot/kernel";
+import type { ContextSegment, RuntimeModule } from "@lightmem2/kernel";
 import type { ProxyReductionBinding } from "./reduction-context-types.js";
 
 export type BeforeCallPassToggles = {

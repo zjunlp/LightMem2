@@ -1,4 +1,4 @@
-import type { TranscriptTurn } from "@tokenpilot/kernel";
+import type { TranscriptTurn } from "@lightmem2/kernel";
 
 export type CanonicalMessageRole = "system" | "user" | "assistant" | "tool";
 

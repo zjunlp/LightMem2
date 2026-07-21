@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { RuntimeTurnContext } from "@lightmem2/kernel";
 import { toolPayloadTrimPass } from "../src/passes/pass-tool-payload-trim.js";
 
 function buildTurnContext(text: string, metadata?: Record<string, unknown>): RuntimeTurnContext {

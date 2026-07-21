@@ -5,12 +5,12 @@ import {
   TokenPilotProductSurfaceHostBridge,
   readLatestUxEffect,
   readUxSessionAggregate,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   getNestedValue,
   formatDisplayValue,
   formatOnOff,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 import {
   defaultCodexConfigPath,
   defaultHooksConfigPath,

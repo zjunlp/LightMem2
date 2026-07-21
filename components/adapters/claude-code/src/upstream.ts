@@ -4,13 +4,13 @@ import type {
   HostGatewayHttpResponse,
   HostGatewayStreamResponse,
   HostGatewayUpstreamConfig,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import {
   buildGatewayForwardHeaders,
   readJsonFile,
   resolveGatewayRequestUrl,
   writeJsonFileAtomic,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { join } from "node:path";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 

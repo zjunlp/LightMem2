@@ -9,7 +9,7 @@ import {
   writeJsonFileAtomic,
   writeLatestSessionRef,
   writeSessionSnapshot,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { join } from "node:path";
 
 export type CodexSessionSnapshot = {

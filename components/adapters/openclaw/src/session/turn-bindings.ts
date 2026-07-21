@@ -6,7 +6,7 @@ import {
   pluginStateSubdir,
   pluginStateSubdirCandidates,
   pluginStateSubdirWriteTargets,
-} from "@tokenpilot/artifact-store";
+} from "@lightmem2/artifact-store";
 
 export type RecentTurnBinding = {
   userMessage: string;

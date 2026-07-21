@@ -13,8 +13,8 @@ import {
   startMockCachingJsonUpstream,
   withTempHome,
   type HostGatewayForwarder,
-} from "@tokenpilot/host-adapter";
-import { readVisualSessionData, readVisualSessionList } from "@tokenpilot/product-surface";
+} from "@lightmem2/host-adapter";
+import { readVisualSessionData, readVisualSessionList } from "@lightmem2/product-surface";
 import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../products/mcp/src/index.js";
 import {
   defaultTokenPilotClaudeCodeConfigPath,

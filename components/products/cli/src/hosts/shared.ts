@@ -2,7 +2,7 @@ import type {
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductCommandResult,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { diagnoseCacheAudit, summarizeCacheAudit, type CacheAuditRecord } from "@tokenpilot/stabilizer";
 import {
   buildSessionReportText,
@@ -15,7 +15,7 @@ import {
   type ProductSurfaceCacheAuditSummary,
   type ProductSurfaceLatestUxEffect,
   type ProductSurfaceSessionAggregate,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 
 type LatestUxEffectWithSessionId = ProductSurfaceLatestUxEffect & {
   sessionId?: string | null;

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { HostPayloadCodec, HostRequestEnvelope } from "@tokenpilot/host-adapter";
-import type { ContextSegment, RuntimeTurnContext } from "@tokenpilot/kernel";
+import type { HostPayloadCodec, HostRequestEnvelope } from "@lightmem2/host-adapter";
+import type { ContextSegment, RuntimeTurnContext } from "@lightmem2/kernel";
 import {
   analyzeExecOutputTruncation,
   analyzeToolPayloadTrim,

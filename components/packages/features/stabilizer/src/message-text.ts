@@ -4,10 +4,10 @@ export {
   extractContentText,
   prependTextToContent,
   replaceContentText,
-} from "@tokenpilot/kernel";
+} from "@lightmem2/kernel";
 import {
   extractContentText,
-} from "@tokenpilot/kernel";
+} from "@lightmem2/kernel";
 
 const SENDER_METADATA_BLOCK_RE =
   /(?:^|\n{1,2})Sender\s+\(untrusted metadata\):\s*```json\s*[\s\S]*?```(?:\n{1,2}|$)/gi;

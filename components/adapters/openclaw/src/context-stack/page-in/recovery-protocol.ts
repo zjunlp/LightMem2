@@ -1,8 +1,8 @@
 import {
   appendRecoveryProtocolText,
   stripInternalPayloadFields,
-} from "@tokenpilot/host-adapter";
-import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@tokenpilot/artifact-store";
+} from "@lightmem2/host-adapter";
+import { MEMORY_FAULT_RECOVER_TOOL_NAME } from "@lightmem2/artifact-store";
 
 export const MEMORY_FAULT_PROTOCOL_INSTRUCTIONS = [
   "[Recovery Protocol]",

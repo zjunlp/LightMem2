@@ -28,7 +28,7 @@ export {
 export {
   loadOrderedTurnAnchors,
   loadSegmentAnchorByCallId,
-} from "@tokenpilot/history";
+} from "@lightmem2/history";
 export {
   isReductionPassEnabled,
   type ReductionPassToggles,

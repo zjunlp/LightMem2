@@ -1,4 +1,4 @@
-import type { ContextSegment } from "@tokenpilot/kernel";
+import type { ContextSegment } from "@lightmem2/kernel";
 
 export type ReadState = "fresh" | "superseded" | "stale";
 export type ReadStateReason = "later_read" | "later_mutation" | "none";

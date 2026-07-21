@@ -49,7 +49,7 @@ import {
   createOpenClawSessionResolver,
 } from "./context-stack/integration/openclaw-host-adapter.js";
 import { isReductionPassEnabled } from "@tokenpilot/reduction";
-import { loadOrderedTurnAnchors, loadSegmentAnchorByCallId } from "@tokenpilot/history";
+import { loadOrderedTurnAnchors, loadSegmentAnchorByCallId } from "@lightmem2/history";
 import {
   appendJsonl,
   appendForwardedInputDump,
@@ -63,7 +63,7 @@ import {
   appendStabilityVisualSnapshot,
   readVisualSessionData,
   readVisualSessionList,
-} from "@tokenpilot/product-surface";
+} from "@lightmem2/product-surface";
 
 export const TEST_WORKSPACE_DIR = "/tmp/tokenpilot-openclaw-plugin-tests";
 

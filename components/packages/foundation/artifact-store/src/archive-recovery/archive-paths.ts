@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { TokenPilotStatePathResolver } from "@tokenpilot/host-adapter";
+import type { TokenPilotStatePathResolver } from "@lightmem2/host-adapter";
 
 export const PLUGIN_STATE_DIRNAME = "tokenpilot-plugin-state";
 export const PLUGIN_NAMESPACE_DIR = "tokenpilot";

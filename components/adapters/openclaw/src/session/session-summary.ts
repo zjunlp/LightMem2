@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
-import { pluginStateSubdirCandidates, pluginStateSubdirWriteTargets } from "@tokenpilot/artifact-store";
+import { pluginStateSubdirCandidates, pluginStateSubdirWriteTargets } from "@lightmem2/artifact-store";
 
 export type OpenClawSessionSummary = {
   sessionId: string;

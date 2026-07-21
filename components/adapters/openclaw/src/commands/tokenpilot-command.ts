@@ -1,4 +1,4 @@
-import { registerProductSurfaceCommands } from "@tokenpilot/product-surface";
+import { registerProductSurfaceCommands } from "@lightmem2/product-surface";
 import { openClawProductSurfaceConfigAdapter } from "./tokenpilot/host-config-adapter.js";
 import { createOpenClawProductSurfaceBridge } from "./tokenpilot/openclaw-command-bridge.js";
 import { createOpenClawCommandRegistrar } from "./tokenpilot/openclaw-command-registrar.js";

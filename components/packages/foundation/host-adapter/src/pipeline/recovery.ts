@@ -1,5 +1,5 @@
 import type { HostRequestEnvelope } from "../model/host-request.js";
-import { extractContentText, replaceContentText } from "@tokenpilot/kernel";
+import { extractContentText, replaceContentText } from "@lightmem2/kernel";
 
 export const DEFAULT_RECOVERY_TOOL_NAME = "memory_fault_recover";
 

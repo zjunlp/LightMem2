@@ -1,4 +1,4 @@
-import { defaultPluginStateDir, pluginStateSubdir } from "@tokenpilot/artifact-store";
+import { defaultPluginStateDir, pluginStateSubdir } from "@lightmem2/artifact-store";
 import type {
   NormalizedPluginHostConfig,
   NormalizedPluginRuntimeConfig,

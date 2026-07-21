@@ -2,7 +2,7 @@ import type {
   TokenPilotProductCommandRegistrar,
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductSurfaceHostBridge,
-} from "@tokenpilot/host-adapter";
+} from "@lightmem2/host-adapter";
 import { createProductSurfaceCommandHandler } from "./commands.js";
 
 export type TokenPilotCommandAliasSpec = {
