@@ -13,6 +13,7 @@ export * from "./commands/runtime-eviction.js";
 export * from "./metrics.js";
 export * from "./module-observability.js";
 export * from "./session-topology.js";
+export * from "./feature-contributions.js";
 export * from "./visual/session-visual.js";
 export * from "./visual/session-visual-data.js";
 export * from "./visual/session-visual-bridge.js";

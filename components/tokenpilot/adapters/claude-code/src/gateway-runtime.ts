@@ -27,7 +27,10 @@ import {
   upsertClaudeCodeSessionSnapshot,
 } from "./session-state.js";
 import { prepareClaudeStablePrefix } from "./stable-prefix.js";
-import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
+import {
+  buildStabilityVisualSnapshotFromEnvelopes,
+  canonicalizeEnvelopeTools,
+} from "@tokenpilot/stabilizer";
 import { appendClaudeCodeTrace } from "./trace.js";
 import { createClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./upstream.js";
 import { appendClaudeCodeCacheAuditRecord, buildClaudeCodeCacheAuditSnapshot } from "./cache-audit.js";
@@ -324,13 +327,17 @@ export async function startClaudeCodeGatewayRuntime(params: {
           recordUxEffectNow: false,
           buildStability({ originalEnvelope, prepared }) {
             return prepared.diagnostics.stablePrefixApplied === true
-              ? {
+              ? buildStabilityVisualSnapshotFromEnvelopes({
+                sessionId,
+                model,
+                upstreamModel: model,
                 originalEnvelope,
+                preparedEnvelope: prepared.envelope,
                 dynamicContextTarget: config.hooks.dynamicContextTarget,
                 getDeveloperText(envelope) {
                   return typeof envelope.instructions === "string" ? envelope.instructions : "";
                 },
-              }
+              })
               : undefined;
           },
           buildReduction(reductionSummary) {

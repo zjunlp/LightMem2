@@ -30,7 +30,10 @@ import {
   type CodexReductionSummary,
   reduceCodexRequestEnvelope,
 } from "./reduction.js";
-import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
+import {
+  buildStabilityVisualSnapshotFromEnvelopes,
+  canonicalizeEnvelopeTools,
+} from "@tokenpilot/stabilizer";
 import { prepareCodexStablePrefix } from "./stable-prefix.js";
 import {
   requestUpstreamResponses,
@@ -186,8 +189,12 @@ export async function startCodexResponsesProxy(params: {
           recordUxEffectNow: false,
           buildStability({ originalEnvelope, prepared }) {
             return prepared.diagnostics.stablePrefixApplied === true
-              ? {
+              ? buildStabilityVisualSnapshotFromEnvelopes({
+                sessionId,
+                model,
+                upstreamModel: model,
                 originalEnvelope,
+                preparedEnvelope: prepared.envelope,
                 dynamicContextTarget: config.hooks.dynamicContextTarget,
                 getDeveloperText(envelope) {
                   return findFirstMessageText(envelope, (message: any) => {
@@ -196,7 +203,7 @@ export async function startCodexResponsesProxy(params: {
                     return originalRole === "developer" || originalRole === "system";
                   });
                 },
-              }
+              })
               : undefined;
           },
           buildReduction(reductionSummary) {

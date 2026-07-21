@@ -1,13 +1,11 @@
 import { readdir, readFile, mkdir, appendFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import {
-  diagnoseCacheAudit,
-  readRecentCacheAuditRecordsForSession,
-  summarizeCacheAudit,
-  type CacheAuditDiagnosis,
-  type CacheAuditRecord,
-  type CacheAuditSummary,
-} from "@tokenpilot/stabilizer";
+  getProductSurfaceCacheAuditContribution,
+  type ProductSurfaceCacheAuditDiagnosis,
+  type ProductSurfaceCacheAuditRecord,
+  type ProductSurfaceCacheAuditContributionSummary,
+} from "../feature-contributions.js";
 import { readRecentReductionMetrics, summarizeRecentReductionMetrics, type RecentReductionMetricsSummary } from "../metrics.js";
 import {
   listSessionModuleObservationSummaries,
@@ -115,7 +113,7 @@ export type VisualSessionSummary = {
   tokenSavedCount?: number;
   charOptimizedTurns?: number;
   charSavedCount?: number;
-  cacheAuditSummary?: CacheAuditSummary | null;
+  cacheAuditSummary?: ProductSurfaceCacheAuditContributionSummary | null;
 };
 
 export type VisualSessionData = {
@@ -126,7 +124,7 @@ export type VisualSessionData = {
   eviction: EvictionVisualSnapshot[];
   uxAggregate?: VisualUxAggregate | null;
   recentReduction?: RecentReductionMetricsSummary | null;
-  cacheAuditSummary?: CacheAuditSummary | null;
+  cacheAuditSummary?: ProductSurfaceCacheAuditContributionSummary | null;
   cacheAuditWindow?: VisualCacheAuditEntry[];
   recentCacheAudit?: VisualCacheAuditEntry[];
   recentCacheAuditGroups?: VisualCacheAuditGroup[];
@@ -193,7 +191,7 @@ export type VisualCacheAuditEntry = {
     key: string;
     detail: string;
   }>;
-  diagnosis: CacheAuditDiagnosis;
+  diagnosis: ProductSurfaceCacheAuditDiagnosis;
 };
 
 export type VisualCacheAuditGroup = {
@@ -210,7 +208,10 @@ export type VisualCacheAuditGroup = {
   driftKeys: string[];
 };
 
-function toVisualCacheAuditEntry(record: CacheAuditRecord): VisualCacheAuditEntry {
+function toVisualCacheAuditEntry(
+  record: ProductSurfaceCacheAuditRecord,
+  diagnose: (record: ProductSurfaceCacheAuditRecord) => ProductSurfaceCacheAuditDiagnosis,
+): VisualCacheAuditEntry {
   return {
     at: record.at,
     model: record.model,
@@ -243,15 +244,7 @@ function toVisualCacheAuditEntry(record: CacheAuditRecord): VisualCacheAuditEntr
         detail: String(entry.detail || ""),
       }))
       : [],
-    diagnosis: diagnoseCacheAudit({
-      stablePrefixFingerprint: record.stablePrefixFingerprint,
-      requestPromptCacheKey: record.requestPromptCacheKey,
-      responsePromptCacheKey: record.responsePromptCacheKey,
-      cachedInputTokens: Number(record.cachedInputTokens ?? 0),
-      baselineKind: record.baselineKind ?? "none",
-      entropyFindings: Array.isArray(record.entropyFindings) ? record.entropyFindings : [],
-      driftReasons: Array.isArray(record.driftReasons) ? record.driftReasons : [],
-    }),
+    diagnosis: diagnose(record),
   };
 }
 
@@ -539,14 +532,17 @@ export async function readVisualSessionDataWithOptions(
     await readSnapshotFile<ReductionVisualSnapshot>(snapshotCandidates(stateDir, "reduction", sessionId)),
   );
   const allEviction = sortByAtDesc(await readSnapshotFile<EvictionVisualSnapshot>(snapshotCandidates(stateDir, "eviction", sessionId)));
+  const cacheAudit = getProductSurfaceCacheAuditContribution();
   const [uxAggregate, recentMetrics, cacheAuditRecords, moduleSummary] = await Promise.all([
     readJsonFile<VisualUxAggregate>(uxAggregateCandidates(stateDir, sessionId)),
     readRecentReductionMetrics(stateDir, sessionId),
-    readRecentCacheAuditRecordsForSession(stateDir, sessionId, 64),
+    cacheAudit ? cacheAudit.readRecentRecordsForSession(stateDir, sessionId, 64) : Promise.resolve([]),
     readSessionModuleObservationSummary(stateDir, sessionId),
   ]);
-  const cacheAuditSummary = cacheAuditRecords.length > 0 ? summarizeCacheAudit(cacheAuditRecords) : null;
-  const cacheAuditWindow = sortByAtDesc(cacheAuditRecords).map(toVisualCacheAuditEntry);
+  const cacheAuditSummary = cacheAudit && cacheAuditRecords.length > 0 ? cacheAudit.summarize(cacheAuditRecords) : null;
+  const cacheAuditWindow = cacheAudit
+    ? sortByAtDesc(cacheAuditRecords).map((record) => toVisualCacheAuditEntry(record, cacheAudit.diagnose))
+    : [];
   const recentCacheAudit = cacheAuditWindow.slice(0, 8);
   const allReductionCalls = groupReductionSnapshotsByRequest(allReduction);
   const stabilityLimit = Number.isFinite(options?.stabilityLimit)
@@ -685,13 +681,16 @@ export async function readVisualSessionListWithOptions(
   const paged = ordered.slice(offset, offset + limit);
   const detailsScope = options?.detailsScope === "returned" ? "returned" : "all";
   const enrichTargets = detailsScope === "returned" ? paged : ordered;
+  const cacheAudit = getProductSurfaceCacheAuditContribution();
 
   await Promise.all(enrichTargets.map(async (summary) => {
     const [uxAggregate, cacheAuditSummary] = await Promise.all([
       readJsonFile<VisualUxAggregate>(uxAggregateCandidates(stateDir, summary.sessionId)),
-      readRecentCacheAuditRecordsForSession(stateDir, summary.sessionId, 64).then((records) => (
-        records.length > 0 ? summarizeCacheAudit(records) : null
-      )),
+      cacheAudit
+        ? cacheAudit.readRecentRecordsForSession(stateDir, summary.sessionId, 64).then((records) => (
+          records.length > 0 ? cacheAudit.summarize(records) : null
+        ))
+        : Promise.resolve(null),
     ]);
     summary.cacheAuditSummary = cacheAuditSummary;
     if (!uxAggregate) return;

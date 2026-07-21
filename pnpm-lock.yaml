@@ -163,6 +163,9 @@ importers:
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
+      '@tokenpilot/product-surface':
+        specifier: workspace:*
+        version: link:../../foundation/product-surface
 
   components/tokenpilot/packages/foundation/artifact-store:
     dependencies:
@@ -195,9 +198,6 @@ importers:
       '@tokenpilot/host-adapter':
         specifier: workspace:*
         version: link:../host-adapter
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../features/stabilizer
 
   components/tokenpilot/packages/foundation/runtime-core:
     dependencies:

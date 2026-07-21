@@ -6,6 +6,7 @@ import {
   findFirstMessageText,
   recordBeforeCallVisualState,
 } from "@tokenpilot/product-surface";
+import { buildStabilityVisualSnapshotFromEnvelopes } from "@tokenpilot/stabilizer";
 import { pluginStateSubdir } from "@tokenpilot/artifact-store";
 import { summarizeResponseFunctionCalls } from "./proxy-runtime-shared.js";
 
@@ -66,7 +67,11 @@ export async function recordProxyInbound(params: {
     upstreamModel,
     preparedEnvelope: requestEnvelope,
     stability: shouldRecordStability
-      ? {
+      ? buildStabilityVisualSnapshotFromEnvelopes({
+        at: requestAt,
+        sessionId: resolvedSessionId,
+        model,
+        upstreamModel,
         originalEnvelope: {
           ...requestEnvelope,
           messages: Array.isArray(requestEnvelope?.messages) && devAndUser
@@ -101,7 +106,8 @@ export async function recordProxyInbound(params: {
         senderMetadataBlocksBefore: Number(stableRewrite.senderMetadataBlocksBefore ?? 0),
         senderMetadataBlocksAfter: Number(stableRewrite.senderMetadataBlocksAfter ?? 0),
         firstTurnCandidate,
-      }
+        preparedEnvelope: requestEnvelope,
+      })
       : undefined,
     reductionSegments:
       shouldRecordReduction && Array.isArray(reductionApplied.visualSegments)

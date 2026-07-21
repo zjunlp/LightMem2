@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import {
+  extractContentText,
+} from "@tokenpilot/kernel";
+import {
   prepareBeforeCallWithReductionSummary,
   recordUxEffect,
   type HostPayloadCodec,
@@ -7,7 +10,6 @@ import {
   type PreparedBeforeCallResult,
   type TokenPilotUxCountMode,
 } from "@tokenpilot/host-adapter";
-import { extractContentText, rewriteTextForStablePrefix } from "@tokenpilot/stabilizer";
 import {
   appendReductionVisualSnapshot,
   appendStabilityVisualSnapshot,
@@ -78,93 +80,6 @@ export function buildBeforeCallReductionRequestId(params: {
   ]);
 }
 
-export function buildStabilityVisualSnapshotFromTexts(params: {
-  at?: string;
-  sessionId: string;
-  model: string;
-  upstreamModel: string;
-  promptCacheKeyBefore: string;
-  promptCacheKeyAfter: string;
-  dynamicContextTarget: StabilityVisualSnapshot["dynamicContextTarget"];
-  developerBefore: string;
-  developerForwarded: string;
-  userBefore?: string;
-  userForwarded?: string;
-  developerCanonical?: string;
-  dynamicContextText?: string;
-  senderMetadataBlocksBefore?: number;
-  senderMetadataBlocksAfter?: number;
-  firstTurnCandidate: boolean;
-}): StabilityVisualSnapshot {
-  const rewrite = rewriteTextForStablePrefix(String(params.developerBefore ?? ""));
-  const dynamicContextText = params.dynamicContextText ?? rewrite.dynamicContextText;
-  const developerCanonical = params.developerCanonical ?? rewrite.canonicalText;
-  const userContentRewrites =
-    params.dynamicContextTarget === "user" && dynamicContextText.length > 0
-      ? Number(String(params.userForwarded ?? "") !== String(params.userBefore ?? ""))
-      : 0;
-  return {
-    kind: "stability",
-    at: params.at ?? new Date().toISOString(),
-    sessionId: params.sessionId,
-    model: params.model,
-    upstreamModel: params.upstreamModel,
-    promptCacheKeyBefore: String(params.promptCacheKeyBefore ?? ""),
-    promptCacheKeyAfter: String(params.promptCacheKeyAfter ?? ""),
-    dynamicContextTarget: params.dynamicContextTarget,
-    userContentRewrites,
-    senderMetadataBlocksBefore: Number(params.senderMetadataBlocksBefore ?? 0),
-    senderMetadataBlocksAfter: Number(params.senderMetadataBlocksAfter ?? 0),
-    developerBefore: String(params.developerBefore ?? ""),
-    developerCanonical,
-    developerForwarded: String(params.developerForwarded ?? ""),
-    dynamicContextText,
-    firstTurnCandidate: params.firstTurnCandidate,
-  };
-}
-
-export function buildStabilityVisualSnapshotFromEnvelopes(params: {
-  at?: string;
-  originalEnvelope: Pick<HostRequestEnvelope, "messages" | "metadata" | "instructions">;
-  preparedEnvelope: Pick<HostRequestEnvelope, "messages" | "metadata" | "instructions">;
-  sessionId: string;
-  model: string;
-  upstreamModel: string;
-  dynamicContextTarget: StabilityVisualSnapshot["dynamicContextTarget"];
-  getDeveloperText: (envelope: Pick<HostRequestEnvelope, "messages" | "metadata" | "instructions">) => string;
-  developerCanonical?: string;
-  developerForwarded?: string;
-  dynamicContextText?: string;
-  senderMetadataBlocksBefore?: number;
-  senderMetadataBlocksAfter?: number;
-  firstTurnCandidate?: boolean;
-}): StabilityVisualSnapshot {
-  return buildStabilityVisualSnapshotFromTexts({
-    at: params.at,
-    sessionId: params.sessionId,
-    model: params.model,
-    upstreamModel: params.upstreamModel,
-    promptCacheKeyBefore: String(params.originalEnvelope.metadata?.promptCacheKey ?? ""),
-    promptCacheKeyAfter: String(
-      params.preparedEnvelope.metadata?.frameworkStablePromptCacheKey
-      ?? params.preparedEnvelope.metadata?.promptCacheKey
-      ?? "",
-    ),
-    dynamicContextTarget: params.dynamicContextTarget,
-    developerBefore: params.getDeveloperText(params.originalEnvelope),
-    developerForwarded: params.developerForwarded ?? params.getDeveloperText(params.preparedEnvelope),
-    developerCanonical: params.developerCanonical,
-    dynamicContextText: params.dynamicContextText,
-    userBefore: findFirstUserMessageText(params.originalEnvelope),
-    userForwarded: findFirstUserMessageText(params.preparedEnvelope),
-    senderMetadataBlocksBefore: params.senderMetadataBlocksBefore,
-    senderMetadataBlocksAfter: params.senderMetadataBlocksAfter,
-    firstTurnCandidate:
-      params.firstTurnCandidate
-      ?? !String(params.originalEnvelope.metadata?.previousResponseId ?? "").trim(),
-  });
-}
-
 export async function recordBeforeCallVisualState(params: {
   stateDir: string;
   at?: string;
@@ -172,7 +87,7 @@ export async function recordBeforeCallVisualState(params: {
   model: string;
   upstreamModel: string;
   preparedEnvelope: Pick<HostRequestEnvelope, "messages" | "metadata" | "instructions">;
-  stability?: Omit<Parameters<typeof buildStabilityVisualSnapshotFromEnvelopes>[0], "at" | "sessionId" | "model" | "upstreamModel" | "preparedEnvelope">;
+  stability?: StabilityVisualSnapshot;
   reductionSegments?: SharedReductionVisualSegment[];
   reductionRequestId?: string;
 }): Promise<{ reductionRequestId?: string }> {
@@ -180,14 +95,7 @@ export async function recordBeforeCallVisualState(params: {
   if (params.stability) {
     await writeStabilityVisualSnapshot({
       stateDir: params.stateDir,
-      snapshot: buildStabilityVisualSnapshotFromEnvelopes({
-        ...params.stability,
-        at,
-        sessionId: params.sessionId,
-        model: params.model,
-        upstreamModel: params.upstreamModel,
-        preparedEnvelope: params.preparedEnvelope,
-      }),
+      snapshot: params.stability,
     });
   }
   const segments = params.reductionSegments ?? [];
@@ -217,7 +125,7 @@ export async function recordBeforeCallOptimizationState(params: {
   model: string;
   upstreamModel: string;
   preparedEnvelope: Pick<HostRequestEnvelope, "messages" | "metadata" | "instructions">;
-  stability?: Omit<Parameters<typeof buildStabilityVisualSnapshotFromEnvelopes>[0], "at" | "sessionId" | "model" | "upstreamModel" | "preparedEnvelope">;
+  stability?: StabilityVisualSnapshot;
   reduction?: BeforeCallOptimizationSummary;
   recordUxEffectNow?: boolean;
 }): Promise<{ reductionRequestId?: string }> {
@@ -266,10 +174,7 @@ export async function prepareObservedBeforeCall<TReductionSummary>(params: {
     buildStability?(args: {
       originalEnvelope: HostRequestEnvelope;
       prepared: PreparedBeforeCallResult<TReductionSummary>;
-    }): Omit<
-      Parameters<typeof recordBeforeCallOptimizationState>[0],
-      "stateDir" | "sessionId" | "model" | "upstreamModel" | "preparedEnvelope" | "reduction"
-    >["stability"];
+    }): StabilityVisualSnapshot | undefined;
     buildReduction?(summary: TReductionSummary): BeforeCallOptimizationSummary | undefined;
   };
 }): Promise<PreparedBeforeCallResult<TReductionSummary>> {

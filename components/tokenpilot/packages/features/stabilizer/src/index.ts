@@ -6,3 +6,4 @@ export * from "./stable-prefix-contract.js";
 export * from "./stable-prefix-audit.js";
 export * from "./cache-audit-diagnosis.js";
 export * from "./cache-audit-store.js";
+export * from "./product-surface.js";

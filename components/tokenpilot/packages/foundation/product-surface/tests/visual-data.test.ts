@@ -11,6 +11,9 @@ import {
   readVisualSessionList,
   readVisualSessionListWithOptions,
 } from "../src/visual/session-visual-data.js";
+import { registerTestCacheAuditContribution } from "./cache-audit-contribution-fixture.js";
+
+registerTestCacheAuditContribution();
 
 test("readVisualSessionData returns reduction snapshot route and ux aggregate", async () => {
   const root = await mkdtemp(join(tmpdir(), "tokenpilot-product-surface-visual-"));

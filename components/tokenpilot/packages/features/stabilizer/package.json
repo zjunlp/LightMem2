@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*"
+    "@tokenpilot/kernel": "workspace:*",
+    "@tokenpilot/product-surface": "workspace:*"
   }
 }

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { prepareBeforeCall } from "@tokenpilot/host-adapter";
+import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
 
 import {
   createOpenClawPayloadCodec,
@@ -105,7 +106,11 @@ test("openclaw request path canonicalizes tools before encode", async () => {
     ],
   });
 
-  const prepared = await prepareBeforeCall({ envelope: decoded, config: { mode: "normal" } });
+  const prepared = await prepareBeforeCall({
+    envelope: decoded,
+    config: { mode: "normal" },
+    helpers: { prepareStablePrefix: canonicalizeEnvelopeTools },
+  });
   const encoded = codec.encodeRequest(prepared.envelope) as any;
 
   assert.equal(Array.isArray(encoded.tools), true);

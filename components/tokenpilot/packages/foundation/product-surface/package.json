@@ -10,8 +10,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@tokenpilot/artifact-store": "workspace:*",
-    "@tokenpilot/host-adapter": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*"
+    "@tokenpilot/host-adapter": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

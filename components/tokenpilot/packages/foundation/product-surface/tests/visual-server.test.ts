@@ -4,7 +4,6 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  buildStabilityVisualSnapshotFromTexts,
   buildVisualRequestId,
   writeReductionVisualSegments,
   writeStabilityVisualSnapshot,
@@ -13,6 +12,9 @@ import {
   startMultiHostVisualServer,
   type ReductionVisualSnapshot,
 } from "../src/index.js";
+import { registerTestCacheAuditContribution } from "./cache-audit-contribution-fixture.js";
+
+registerTestCacheAuditContribution();
 
 test("visual bridge helpers persist shared stability and reduction snapshots", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tokenpilot-visual-bridge-"));
@@ -73,27 +75,6 @@ test("visual bridge helpers persist shared stability and reduction snapshots", a
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-});
-
-test("stability bridge builder derives canonical prompt and user rewrite count from shared text inputs", () => {
-  const snapshot = buildStabilityVisualSnapshotFromTexts({
-    at: "2026-06-29T13:00:00.000Z",
-    sessionId: "session-2",
-    model: "gpt-5.4-mini",
-    upstreamModel: "gpt-5.4-mini",
-    promptCacheKeyBefore: "",
-    promptCacheKeyAfter: "pk-2",
-    dynamicContextTarget: "user",
-    developerBefore: "Your working directory is: /repo/demo\nRuntime: agent=agent-1 |\nBe precise.",
-    developerForwarded: "Your working directory is: <WORKDIR>\nRuntime: agent=<AGENT_ID> |\nBe precise.",
-    userBefore: "hello",
-    userForwarded: "- WORKDIR: /repo/demo\n- AGENT_ID: agent-1\n\nhello",
-    firstTurnCandidate: true,
-  });
-
-  assert.match(snapshot.developerCanonical, /<WORKDIR>/);
-  assert.match(snapshot.dynamicContextText ?? "", /WORKDIR: \/repo\/demo/);
-  assert.equal(snapshot.userContentRewrites, 1);
 });
 
 test("multi-host visual server exposes hosts and host-scoped sessions", async () => {

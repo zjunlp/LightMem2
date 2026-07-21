@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prepareBeforeCall } from "@tokenpilot/host-adapter";
+import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
 import {
   createClaudeMessagesPayloadCodec,
   extractMessagesInputText,
@@ -116,7 +117,11 @@ test("claude request path canonicalizes tools before encode", async () => {
     metadata: { sessionId: "sess-tools" },
   });
 
-  const prepared = await prepareBeforeCall({ envelope: request, config: { mode: "normal" } });
+  const prepared = await prepareBeforeCall({
+    envelope: request,
+    config: { mode: "normal" },
+    helpers: { prepareStablePrefix: canonicalizeEnvelopeTools },
+  });
   const encoded = codec.encodeRequest(prepared.envelope) as any;
 
   assert.equal(Array.isArray(encoded.tools), true);
