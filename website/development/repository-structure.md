@@ -13,14 +13,21 @@ LightMem2/
 │       ├── products/
 │       │   ├── cli/             #   Shared lightmem2 CLI
 │       │   └── mcp/             #   Shared MCP recovery server
+│       ├── presets/
+│       │   └── tokenpilot/      #   TokenPilot feature composition policy
 │       └── packages/
-│           ├── host-adapter/    #   Shared adapter contracts
-│           ├── runtime-core/    #   Host-agnostic runtime engine
-│           ├── kernel/          #   Shared types, interfaces, events
-│           └── layers/
-│               ├── history/     #   Canonical state, turns, task registry
-│               ├── decision/    #   Policy analysis, reduction/eviction
-│               └── memory/      #   Experimental memory layer
+│           ├── foundation/      #   Shared contracts and infrastructure
+│           │   ├── kernel/
+│           │   ├── runtime-core/
+│           │   ├── host-adapter/
+│           │   ├── history/
+│           │   ├── artifact-store/
+│           │   └── product-surface/
+│           └── features/        #   Independently testable capabilities
+│               ├── stabilizer/
+│               ├── reduction/
+│               ├── eviction/
+│               └── memory/
 ├── docs/                        # Public-facing notes and helpers
 ├── experiments/                 # Benchmark adapters and scripts
 ├── website/                     # This documentation site
@@ -34,7 +41,9 @@ LightMem2/
 | :-- | :-- |
 | `components/tokenpilot/packages/foundation/kernel/` | Types, interfaces, events — the contract layer |
 | `components/tokenpilot/packages/foundation/runtime-core/` | Plugin execution engine |
-| `components/tokenpilot/packages/layers/` | Stateful processing (history, decision, memory) |
+| `components/tokenpilot/packages/foundation/` | Shared host, history, artifact, and product infrastructure |
+| `components/tokenpilot/packages/features/` | Stabilizer, Reduction, Eviction, and Memory capabilities |
+| `components/tokenpilot/presets/tokenpilot/` | TokenPilot policy and feature composition |
 | `components/tokenpilot/adapters/` | One adapter per host |
 | `components/tokenpilot/products/cli/` | The `lightmem2` CLI |
 | `components/tokenpilot/products/mcp/` | Shared MCP server |
