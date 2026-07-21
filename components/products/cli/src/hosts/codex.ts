@@ -18,19 +18,19 @@ import {
   loadTokenPilotCodexConfig,
   normalizeTokenPilotCodexConfig,
   writeTokenPilotCodexConfig,
-} from "../../../../adapters/codex/src/config.js";
-import { inspectCodexDoctor, formatCodexDoctorReport } from "../../../../adapters/codex/src/doctor.js";
+} from "../../../../tokenpilot/adapters/codex/src/config.js";
+import { inspectCodexDoctor, formatCodexDoctorReport } from "../../../../tokenpilot/adapters/codex/src/doctor.js";
 import {
   codexProductSurfaceConfigAdapter,
   resolveCodexStateDir,
-} from "../../../../adapters/codex/src/host-config-adapter.js";
+} from "../../../../tokenpilot/adapters/codex/src/host-config-adapter.js";
 import {
   resolveCanonicalCodexSessionId,
   resolveLatestCodexSessionId,
-} from "../../../../adapters/codex/src/session-state.js";
+} from "../../../../tokenpilot/adapters/codex/src/session-state.js";
 import {
   readRecentCodexCacheAuditRecordsForSession,
-} from "../../../../adapters/codex/src/cache-audit.js";
+} from "../../../../tokenpilot/adapters/codex/src/cache-audit.js";
 import {
   applyStandardRuntimeModeConfig,
   buildSessionReportResult,
