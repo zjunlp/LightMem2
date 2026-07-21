@@ -6,10 +6,31 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  DEFAULT_HOST_NEUTRAL_STATE_ROOT,
+  PLUGIN_NAMESPACE_DIR,
+  PLUGIN_STATE_DIRNAME,
+  WORKSPACE_ARCHIVE_DIRNAME,
   buildRecoveryHint,
   createFileSystemArtifactStore,
+  pluginStateSubdir,
   renderRecoveredArchive,
+  workspaceArchiveDir,
 } from "../src/index.js";
+
+test("artifact store preserves canonical state path names", () => {
+  assert.equal(DEFAULT_HOST_NEUTRAL_STATE_ROOT, ".tokenpilot");
+  assert.equal(PLUGIN_STATE_DIRNAME, "tokenpilot-plugin-state");
+  assert.equal(PLUGIN_NAMESPACE_DIR, "tokenpilot");
+  assert.equal(WORKSPACE_ARCHIVE_DIRNAME, ".tokenpilot-archives");
+  assert.equal(
+    pluginStateSubdir("/tmp/tokenpilot-state", "module-observability", "events"),
+    "/tmp/tokenpilot-state/tokenpilot/module-observability/events",
+  );
+  assert.equal(
+    workspaceArchiveDir("/tmp/workspace"),
+    "/tmp/workspace/.tokenpilot-archives",
+  );
+});
 
 test("buildRecoveryHint advertises focused line-window recovery", () => {
   const hint = buildRecoveryHint({

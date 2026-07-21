@@ -35,3 +35,36 @@ test("normalizeConfig requires both legacy eviction switches for compatibility",
     assert.equal(cfg.moduleEnablement.eviction, item.expected);
   }
 });
+
+test("normalizeConfig preserves the TokenPilot default module contract", () => {
+  const cfg = normalizeConfig({ stateDir: "/tmp/tokenpilot-config-contract" });
+
+  assert.deepEqual(cfg.moduleEnablement, {
+    stabilizer: true,
+    reduction: true,
+    eviction: false,
+  });
+  assert.deepEqual(cfg.modules, {
+    stabilizer: true,
+    policy: true,
+    reduction: true,
+    eviction: false,
+  });
+  assert.deepEqual(cfg.eviction, {
+    enabled: false,
+    policy: "noop",
+    maxCandidateBlocks: 128,
+    minBlockChars: 256,
+    replacementMode: "pointer_stub",
+  });
+  assert.equal(cfg.taskStateEstimator.batchTurns, 5);
+  assert.equal(cfg.taskStateEstimator.evictionLookaheadTurns, 3);
+  assert.equal(cfg.reduction.engine, "layered");
+  assert.equal(cfg.reduction.triggerMinChars, 2200);
+  assert.equal(cfg.reduction.maxToolChars, 1200);
+  assert.equal(cfg.stateDir, "/tmp/tokenpilot-config-contract");
+  assert.equal(
+    cfg.debugTapPath,
+    "/tmp/tokenpilot-config-contract/tokenpilot/provider-traffic.jsonl",
+  );
+});
