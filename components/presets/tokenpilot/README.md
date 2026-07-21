@@ -14,6 +14,11 @@ implementations. `components/packages/features/` remains reusable by future
 presets, while each host adapter explicitly declares its supported TokenPilot
 feature subset.
 
+The preset also owns `TOKENPILOT_PRODUCT_SURFACE_IDENTITY`, which binds the
+TokenPilot display name, primary `/tokenpilot` command, and the existing
+`/lightmem2` and `/tp` compatibility aliases to the generic product-surface
+runtime.
+
 ## Where It Fits
 
 Use the root [README.md](../../../README.md) for the fastest first-run path:

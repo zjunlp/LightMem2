@@ -100,6 +100,14 @@ These names define workspace ownership. They do not imply that every internal
 package is independently published; release entrypoints and their public
 export contracts are versioned separately.
 
+Source ownership follows the same boundary:
+
+- foundation packages expose product-neutral contracts such as
+  `ProductSurfaceHostBridge`, `StatePathResolver`, and `HostIdentity`
+- presets own branded composition and presentation identity; TokenPilot owns
+  its display name, `/tokenpilot` command, and compatibility aliases
+- adapters own host-specific compatibility paths and environment bridges
+
 At the current runtime-compatibility layer, the shipped component still uses
 the established `tokenpilot` namespace for plugin id and persisted state. On
 OpenClaw, the current public session model prefix is `lightmem2/<model>`, while
