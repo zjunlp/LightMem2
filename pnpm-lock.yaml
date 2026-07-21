@@ -18,6 +18,15 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  components/packages/features/reduction:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../foundation/artifact-store
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../foundation/kernel
+
   components/packages/features/stabilizer:
     dependencies:
       '@tokenpilot/host-adapter':
@@ -90,7 +99,7 @@ importers:
         version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
-        version: link:../../packages/features/reduction
+        version: link:../../../packages/features/reduction
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../../packages/features/stabilizer
@@ -124,7 +133,7 @@ importers:
         version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
-        version: link:../../packages/features/reduction
+        version: link:../../../packages/features/reduction
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../../packages/features/stabilizer
@@ -167,7 +176,7 @@ importers:
         version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
-        version: link:../../packages/features/reduction
+        version: link:../../../packages/features/reduction
       '@tokenpilot/runtime-core':
         specifier: workspace:*
         version: link:../../../packages/foundation/runtime-core
@@ -199,15 +208,6 @@ importers:
 
   components/tokenpilot/packages/features/memory: {}
 
-  components/tokenpilot/packages/features/reduction:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/artifact-store
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/kernel
-
   components/tokenpilot/presets/tokenpilot:
     dependencies:
       '@tokenpilot/eviction':
@@ -221,7 +221,7 @@ importers:
         version: link:../../../packages/foundation/kernel
       '@tokenpilot/reduction':
         specifier: workspace:*
-        version: link:../../packages/features/reduction
+        version: link:../../../packages/features/reduction
       '@tokenpilot/runtime-core':
         specifier: workspace:*
         version: link:../../../packages/foundation/runtime-core

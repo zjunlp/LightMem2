@@ -31,7 +31,7 @@
                 "components/packages/foundation/runtime-core/src/index.ts"
             ],
             "@tokenpilot/reduction": [
-                "components/tokenpilot/packages/features/reduction/src/index.ts"
+                "components/packages/features/reduction/src/index.ts"
             ],
             "@tokenpilot/eviction": [
                 "components/tokenpilot/packages/features/eviction/src/index.ts"
