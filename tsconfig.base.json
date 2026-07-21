@@ -37,7 +37,7 @@
                 "components/tokenpilot/packages/features/eviction/src/index.ts"
             ],
             "@tokenpilot/host-adapter": [
-                "components/tokenpilot/packages/foundation/host-adapter/src/index.ts"
+                "components/packages/foundation/host-adapter/src/index.ts"
             ],
             "@tokenpilot/stabilizer": [
                 "components/tokenpilot/packages/features/stabilizer/src/index.ts"

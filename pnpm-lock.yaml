@@ -24,6 +24,15 @@ importers:
         specifier: workspace:*
         version: link:../kernel
 
+  components/packages/foundation/host-adapter:
+    dependencies:
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      js-tiktoken:
+        specifier: ^1.0.21
+        version: 1.0.21
+
   components/packages/foundation/kernel: {}
 
   components/tokenpilot/adapters/claude-code:
@@ -33,7 +42,7 @@ importers:
         version: link:../../packages/foundation/artifact-store
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
+        version: link:../../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../../packages/foundation/kernel
@@ -67,7 +76,7 @@ importers:
         version: link:../../packages/foundation/artifact-store
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
+        version: link:../../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../../packages/foundation/kernel
@@ -110,7 +119,7 @@ importers:
         version: link:../../../packages/foundation/history
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
+        version: link:../../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../../packages/foundation/kernel
@@ -167,7 +176,7 @@ importers:
     dependencies:
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../../foundation/host-adapter
+        version: link:../../../../packages/foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../../../packages/foundation/kernel
@@ -179,16 +188,7 @@ importers:
     dependencies:
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../host-adapter
-
-  components/tokenpilot/packages/foundation/host-adapter:
-    dependencies:
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/kernel
-      js-tiktoken:
-        specifier: ^1.0.21
-        version: 1.0.21
+        version: link:../../../../packages/foundation/host-adapter
 
   components/tokenpilot/packages/foundation/product-surface:
     dependencies:
@@ -197,7 +197,7 @@ importers:
         version: link:../artifact-store
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../host-adapter
+        version: link:../../../../packages/foundation/host-adapter
 
   components/tokenpilot/packages/foundation/runtime-core:
     dependencies:
@@ -230,7 +230,7 @@ importers:
     dependencies:
       '@tokenpilot/host-adapter':
         specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
+        version: link:../../../packages/foundation/host-adapter
       '@tokenpilot/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
