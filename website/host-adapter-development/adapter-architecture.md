@@ -16,6 +16,6 @@
 
 ## 
 
-`components/tokenpilot/packages/host-adapter/`  adapter 
+`components/tokenpilot/packages/foundation/host-adapter/`  adapter 
 
  Adapter Architecture 

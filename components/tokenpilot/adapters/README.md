@@ -37,7 +37,7 @@ Keep these responsibilities in shared packages:
 - runtime contracts in `packages/foundation/kernel/`
 - host-neutral execution primitives in `packages/foundation/runtime-core/`
 - state and policy logic in `packages/layers/*`
-- host abstraction helpers in `packages/host-adapter/`
+- host abstraction helpers in `packages/foundation/host-adapter/`
 - shared command semantics in `packages/product-surface/`
 - standalone product entrypoints in `products/`
 
@@ -103,7 +103,7 @@ When adding a new host adapter, cover these surfaces explicitly:
 
 Use this order when bringing up a new adapter:
 
-1. start with the shared host envelope bridge in `packages/host-adapter/`
+1. start with the shared host envelope bridge in `packages/foundation/host-adapter/`
 2. wire one minimal request path through the host
 3. make `status` and `doctor` work first
 4. add reduction and persistence hooks
