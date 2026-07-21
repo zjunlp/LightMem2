@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 import type { CacheAuditRecord } from "@lightmem2/stabilizer";
 import {
   buildSessionReportResult,
@@ -8,7 +8,7 @@ import {
   selectLatestNonWarmCacheDiagnosisFromCacheAudit,
 } from "../src/hosts/shared.js";
 
-const passthroughConfigAdapter: TokenPilotProductSurfaceConfigAdapter = {
+const passthroughConfigAdapter: ProductSurfaceConfigAdapter = {
   pluginConfigRecord(config) {
     return (config.plugin as Record<string, unknown>) ?? {};
   },

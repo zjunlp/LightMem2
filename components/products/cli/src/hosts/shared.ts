@@ -1,7 +1,7 @@
 import type {
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductCommandResult,
-  TokenPilotProductSurfaceHostBridge,
+  ProductSurfaceConfigAdapter,
+  ProductCommandResult,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import { diagnoseCacheAudit, summarizeCacheAudit, type CacheAuditRecord } from "@lightmem2/stabilizer";
 import {
@@ -104,7 +104,7 @@ export async function resolveConfiguredPreferredSessionId(params: {
 export async function buildSessionReportResult(params: {
   currentConfig: Record<string, unknown>;
   explicitSessionId?: string;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  configAdapter: ProductSurfaceConfigAdapter;
   resolveLatestSessionId(stateDir: string): Promise<string | undefined>;
   readLatestUxEffect(stateDir: string): Promise<LatestUxEffectWithSessionId | null>;
   readSessionAggregate(stateDir: string, sessionId: string): Promise<ProductSurfaceSessionAggregate | null>;
@@ -112,7 +112,7 @@ export async function buildSessionReportResult(params: {
     stateDir: string,
     sessionId: string,
   ): Promise<CacheAuditRecord[]>;
-}): Promise<TokenPilotProductCommandResult> {
+}): Promise<ProductCommandResult> {
   const stateDir = params.configAdapter.resolveStateDir(params.currentConfig);
   if (!stateDir) {
     return { text: "TokenPilot stateDir is not configured." };
@@ -273,8 +273,8 @@ export function createRestrictedHostCommandHandler(params: {
   displayName: string;
   cliHostName: string;
   reductionPassNames: readonly string[];
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
   loadConfig(): Promise<Record<string, unknown>>;
   formatStatus(currentConfig: Record<string, unknown>): string;
   applyMode(mode: "conservative" | "normal"): Promise<void>;

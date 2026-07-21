@@ -1,4 +1,4 @@
-import type { TokenPilotProductCommandResult } from "@lightmem2/host-adapter";
+import type { ProductCommandResult } from "@lightmem2/host-adapter";
 import {
   readCliContextState,
   updateCliContextState,
@@ -129,7 +129,7 @@ async function resolveTarget(argv: string[]): Promise<{
   };
 }
 
-export async function dispatchCli(argv: string[]): Promise<TokenPilotProductCommandResult> {
+export async function dispatchCli(argv: string[]): Promise<ProductCommandResult> {
   if (argv.length === 0 || argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h") {
     return { text: formatCliUsage() };
   }

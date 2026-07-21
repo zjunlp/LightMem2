@@ -1,14 +1,14 @@
-import type { TokenPilotHostIdentity } from "../model/host-session.js";
+import type { HostIdentity } from "../model/host-session.js";
 
-export type TokenPilotStateRoots = {
+export type StateRoots = {
   stateDir: string;
   namespaceDir: string;
   workspaceArchiveDirname?: string;
 };
 
-export type TokenPilotStatePathResolver = {
-  host: TokenPilotHostIdentity;
-  roots: TokenPilotStateRoots;
+export type StatePathResolver = {
+  host: HostIdentity;
+  roots: StateRoots;
   defaultStateDir(): string;
   stateDirCandidates(explicitStateDir?: string): string[];
 };
@@ -19,7 +19,7 @@ export function createStaticStatePathResolver(params: {
   stateDir: string;
   namespaceDir: string;
   workspaceArchiveDirname?: string;
-}): TokenPilotStatePathResolver {
+}): StatePathResolver {
   const stateDir = params.stateDir.trim();
   const namespaceDir = params.namespaceDir.trim();
   return {

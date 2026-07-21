@@ -1,13 +1,13 @@
 import { join } from "node:path";
 import { appendJsonl, readJsonFile, writeJsonFileAtomic } from "./file-store.js";
 
-export type TokenPilotUxCountMode = "openai_tokens" | "chars";
+export type UxCountMode = "openai_tokens" | "chars";
 
-export type TokenPilotUxEffectRecord = {
+export type UxEffectRecord = {
   at: string;
   sessionId: string;
   model: string;
-  countMode: TokenPilotUxCountMode;
+  countMode: UxCountMode;
   beforeCount: number;
   afterCount: number;
   savedCount: number;
@@ -17,10 +17,10 @@ export type TokenPilotUxEffectRecord = {
   };
 };
 
-export type TokenPilotUxSessionAggregate = {
+export type UxSessionAggregate = {
   sessionId: string;
   turns: number;
-  latestCountMode?: TokenPilotUxCountMode;
+  latestCountMode?: UxCountMode;
   tokenOptimizedTurns: number;
   tokenSavedCount: number;
   avgSavedTokensPerOptimizedTurn: number;
@@ -42,7 +42,7 @@ export function uxHistoryPath(stateDir: string): string {
   return join(stateDir, "ux-effects", "history.jsonl");
 }
 
-function emptyAggregate(sessionId: string): TokenPilotUxSessionAggregate {
+function emptyAggregate(sessionId: string): UxSessionAggregate {
   return {
     sessionId,
     turns: 0,
@@ -57,12 +57,12 @@ function emptyAggregate(sessionId: string): TokenPilotUxSessionAggregate {
 
 export async function recordUxEffect(
   stateDir: string,
-  record: TokenPilotUxEffectRecord,
+  record: UxEffectRecord,
 ): Promise<void> {
   await appendJsonl(uxHistoryPath(stateDir), record);
   await writeJsonFileAtomic(latestUxEffectPath(stateDir), record);
 
-  const current = await readJsonFile<TokenPilotUxSessionAggregate>(sessionUxAggregatePath(stateDir, record.sessionId))
+  const current = await readJsonFile<UxSessionAggregate>(sessionUxAggregatePath(stateDir, record.sessionId))
     ?? emptyAggregate(record.sessionId);
 
   current.turns += 1;
@@ -87,13 +87,13 @@ export async function recordUxEffect(
 
 export async function readLatestUxEffect(
   stateDir: string,
-): Promise<TokenPilotUxEffectRecord | null> {
-  return readJsonFile<TokenPilotUxEffectRecord>(latestUxEffectPath(stateDir));
+): Promise<UxEffectRecord | null> {
+  return readJsonFile<UxEffectRecord>(latestUxEffectPath(stateDir));
 }
 
 export async function readUxSessionAggregate(
   stateDir: string,
   sessionId: string,
-): Promise<TokenPilotUxSessionAggregate | null> {
-  return readJsonFile<TokenPilotUxSessionAggregate>(sessionUxAggregatePath(stateDir, sessionId));
+): Promise<UxSessionAggregate | null> {
+  return readJsonFile<UxSessionAggregate>(sessionUxAggregatePath(stateDir, sessionId));
 }

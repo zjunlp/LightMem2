@@ -2,11 +2,11 @@ import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
 
-export type TokenPilotPreciseCountMode = "openai_tokens" | "chars";
+export type TextCountMode = "openai_tokens" | "chars";
 
-export type TokenPilotCountResult = {
+export type TextCountResult = {
   count: number;
-  mode: TokenPilotPreciseCountMode;
+  mode: TextCountMode;
 };
 
 type TokenEncodingName = "cl100k_base" | "o200k_base";
@@ -45,7 +45,7 @@ function resolveEncodingForModel(model: string): TokenEncodingName | null {
 export function countTextWithPreciseTokens(
   model: string,
   text: string,
-): TokenPilotCountResult {
+): TextCountResult {
   const encoding = resolveEncodingForModel(model);
   if (!encoding) {
     return {

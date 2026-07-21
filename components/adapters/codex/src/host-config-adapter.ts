@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 
 export function ensureCodexPluginConfig(config: Record<string, unknown>): Record<string, unknown> {
   return config;
@@ -21,7 +21,7 @@ export function resolveCodexStateDir(config: Record<string, unknown>): string | 
   return typeof stateDir === "string" && stateDir.trim().length > 0 ? stateDir.trim() : undefined;
 }
 
-export const codexProductSurfaceConfigAdapter: TokenPilotProductSurfaceConfigAdapter = {
+export const codexProductSurfaceConfigAdapter: ProductSurfaceConfigAdapter = {
   pluginConfigRecord: codexPluginConfigRecord,
   pluginEntryRecord: codexPluginEntryRecord,
   ensurePluginConfig: ensureCodexPluginConfig,

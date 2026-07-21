@@ -1,34 +1,34 @@
 import type {
-  TokenPilotProductCommandContext,
-  TokenPilotProductCommandResult,
-  TokenPilotProductSurfacePayload,
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductCommandContext,
+  ProductCommandResult,
+  ProductSurfacePayload,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 
 export type ProductSurfaceActionHandler = (
-  ctx: TokenPilotProductCommandContext,
+  ctx: ProductCommandContext,
   currentConfig: Record<string, unknown>,
   rest: string,
-) => Promise<TokenPilotProductCommandResult> | TokenPilotProductCommandResult;
+) => Promise<ProductCommandResult> | ProductCommandResult;
 
 export type ProductSurfaceCommandDeps = {
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
 };
 
 export function asTextResult(
   text: string,
-  payload?: TokenPilotProductSurfacePayload,
-): TokenPilotProductCommandResult {
+  payload?: ProductSurfacePayload,
+): ProductCommandResult {
   return payload ? { text, payload } : { text };
 }
 
 export async function writeUpdatedConfig(
-  bridge: TokenPilotProductSurfaceHostBridge,
+  bridge: ProductSurfaceHostBridge,
   currentConfig: Record<string, unknown>,
   mutate: (nextConfig: Record<string, unknown>) => string,
-): Promise<TokenPilotProductCommandResult> {
+): Promise<ProductCommandResult> {
   const nextConfig = structuredClone(currentConfig);
   const message = mutate(nextConfig);
   await bridge.writeConfig(nextConfig);

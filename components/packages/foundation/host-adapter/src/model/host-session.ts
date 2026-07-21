@@ -1,4 +1,4 @@
-export type TokenPilotHostIdentity = {
+export type HostIdentity = {
   hostId: string;
   displayName: string;
 };
@@ -6,7 +6,7 @@ export type TokenPilotHostIdentity = {
 export type HostSessionMode = "single" | "cross";
 
 export type HostSessionContext = {
-  host: TokenPilotHostIdentity;
+  host: HostIdentity;
   sessionId: string;
   threadId?: string;
   turnId?: string;

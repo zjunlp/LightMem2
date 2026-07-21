@@ -1,5 +1,5 @@
 import {
-  type TokenPilotProductSurfaceConfigAdapter,
+  type ProductSurfaceConfigAdapter,
 } from "@lightmem2/host-adapter";
 import {
   getNestedValue,
@@ -49,7 +49,7 @@ export function resolveStateDir(config: Record<string, unknown>): string | undef
   return typeof stateDir === "string" && stateDir.trim().length > 0 ? stateDir.trim() : undefined;
 }
 
-export const openClawProductSurfaceConfigAdapter: TokenPilotProductSurfaceConfigAdapter = {
+export const openClawProductSurfaceConfigAdapter: ProductSurfaceConfigAdapter = {
   pluginConfigRecord,
   pluginEntryRecord,
   ensurePluginConfig,

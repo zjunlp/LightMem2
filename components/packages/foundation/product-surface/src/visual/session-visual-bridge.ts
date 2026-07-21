@@ -8,7 +8,7 @@ import {
   type HostPayloadCodec,
   type HostRequestEnvelope,
   type PreparedBeforeCallResult,
-  type TokenPilotUxCountMode,
+  type UxCountMode,
 } from "@lightmem2/host-adapter";
 import {
   appendReductionVisualSnapshot,
@@ -32,7 +32,7 @@ export type SharedReductionVisualSegment = {
 };
 
 export type BeforeCallOptimizationSummary = {
-  countMode?: TokenPilotUxCountMode;
+  countMode?: UxCountMode;
   beforeCount: number;
   afterCount: number;
   savedCount: number;

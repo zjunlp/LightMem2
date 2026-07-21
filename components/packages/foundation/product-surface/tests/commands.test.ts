@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type {
-  TokenPilotProductCommandRegistrar,
-  TokenPilotRegisteredCommandSpec,
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductCommandRegistrar,
+  ProductCommandSpec,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import {
   createProductSurfaceCommandHandler,
@@ -13,7 +13,7 @@ import {
   registerProductSurfaceCommands,
 } from "../src/index.js";
 
-function createTestConfigAdapter(): TokenPilotProductSurfaceConfigAdapter {
+function createTestConfigAdapter(): ProductSurfaceConfigAdapter {
   return {
     pluginConfigRecord(config) {
       return (config.pluginConfig && typeof config.pluginConfig === "object") ? config.pluginConfig as Record<string, unknown> : undefined;
@@ -44,7 +44,7 @@ function createTestConfigAdapter(): TokenPilotProductSurfaceConfigAdapter {
   };
 }
 
-function createTestBridge(config: Record<string, unknown>): TokenPilotProductSurfaceHostBridge & {
+function createTestBridge(config: Record<string, unknown>): ProductSurfaceHostBridge & {
   writes: Record<string, unknown>[];
   reportCalls: number;
   doctorCalls: number;
@@ -91,8 +91,8 @@ function createTestBridge(config: Record<string, unknown>): TokenPilotProductSur
 test("registerProductSurfaceCommands registers default aliases with shared handler", () => {
   const configAdapter = createTestConfigAdapter();
   const bridge = createTestBridge({});
-  const specs: TokenPilotRegisteredCommandSpec[] = [];
-  const registrar: TokenPilotProductCommandRegistrar = {
+  const specs: ProductCommandSpec[] = [];
+  const registrar: ProductCommandRegistrar = {
     registerCommand(spec) {
       specs.push(spec);
     },

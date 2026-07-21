@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type {
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
-  TokenPilotRegisteredCommandSpec,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
+  ProductCommandSpec,
 } from "@lightmem2/host-adapter";
 import { registerProductSurfaceCommands } from "../src/index.js";
 
-function createTestConfigAdapter(): TokenPilotProductSurfaceConfigAdapter {
+function createTestConfigAdapter(): ProductSurfaceConfigAdapter {
   return {
     pluginConfigRecord(config) {
       return (config.pluginConfig && typeof config.pluginConfig === "object")
@@ -44,13 +44,13 @@ function createTestConfigAdapter(): TokenPilotProductSurfaceConfigAdapter {
 }
 
 function createMockHostRuntime(initialConfig: Record<string, unknown>) {
-  const registered = new Map<string, TokenPilotRegisteredCommandSpec>();
+  const registered = new Map<string, ProductCommandSpec>();
   let reportCalls = 0;
   let doctorCalls = 0;
   let visualCalls = 0;
 
   const config = structuredClone(initialConfig);
-  const bridge: TokenPilotProductSurfaceHostBridge = {
+  const bridge: ProductSurfaceHostBridge = {
     loadConfig() {
       return structuredClone(config);
     },
@@ -77,7 +77,7 @@ function createMockHostRuntime(initialConfig: Record<string, unknown>) {
   return {
     config,
     bridge,
-    registerCommand(spec: TokenPilotRegisteredCommandSpec) {
+    registerCommand(spec: ProductCommandSpec) {
       registered.set(spec.name, spec);
     },
     getCommand(name: string) {

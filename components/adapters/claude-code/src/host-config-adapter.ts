@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 
 export function ensureClaudeCodePluginConfig(config: Record<string, unknown>): Record<string, unknown> {
   return config;
@@ -21,7 +21,7 @@ export function resolveClaudeCodeStateDir(config: Record<string, unknown>): stri
   return typeof stateDir === "string" && stateDir.trim().length > 0 ? stateDir.trim() : undefined;
 }
 
-export const claudeCodeProductSurfaceConfigAdapter: TokenPilotProductSurfaceConfigAdapter = {
+export const claudeCodeProductSurfaceConfigAdapter: ProductSurfaceConfigAdapter = {
   pluginConfigRecord: claudeCodePluginConfigRecord,
   pluginEntryRecord: claudeCodePluginEntryRecord,
   ensurePluginConfig: ensureClaudeCodePluginConfig,

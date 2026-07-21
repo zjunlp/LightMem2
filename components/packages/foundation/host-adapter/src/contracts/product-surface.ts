@@ -1,6 +1,6 @@
-export type TokenPilotProductCommandContext = any;
+export type ProductCommandContext = any;
 
-export type TokenPilotProductSurfacePayload = {
+export type ProductSurfacePayload = {
   kind:
     | "text"
     | "status"
@@ -10,12 +10,12 @@ export type TokenPilotProductSurfacePayload = {
   data?: Record<string, unknown>;
 };
 
-export type TokenPilotProductCommandResult = {
+export type ProductCommandResult = {
   text: string;
-  payload?: TokenPilotProductSurfacePayload;
+  payload?: ProductSurfacePayload;
 };
 
-export type TokenPilotProductSurfaceConfigAdapter = {
+export type ProductSurfaceConfigAdapter = {
   pluginConfigRecord(config: Record<string, unknown>): Record<string, unknown> | undefined;
   pluginEntryRecord(config: Record<string, unknown>): Record<string, unknown> | undefined;
   ensurePluginConfig(config: Record<string, unknown>): Record<string, unknown>;
@@ -24,49 +24,49 @@ export type TokenPilotProductSurfaceConfigAdapter = {
   setRuntimeHostDefaults?(config: Record<string, unknown>): void;
 };
 
-export type TokenPilotProductSurfaceConfigStore = {
+export type ProductSurfaceConfigStore = {
   loadConfig(): Promise<Record<string, unknown>> | Record<string, unknown>;
   writeConfig(nextConfig: Record<string, unknown>): Promise<void>;
 };
 
-export type TokenPilotProductSurfaceHostFeatures = {
+export type ProductSurfaceHostFeatures = {
   buildReportPayload?(
-    ctx: TokenPilotProductCommandContext,
+    ctx: ProductCommandContext,
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductSurfacePayload> | TokenPilotProductSurfacePayload;
+  ): Promise<ProductSurfacePayload> | ProductSurfacePayload;
   handleReport?(
-    ctx: TokenPilotProductCommandContext,
+    ctx: ProductCommandContext,
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductCommandResult> | TokenPilotProductCommandResult;
+  ): Promise<ProductCommandResult> | ProductCommandResult;
   buildDoctorPayload?(
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductSurfacePayload> | TokenPilotProductSurfacePayload;
+  ): Promise<ProductSurfacePayload> | ProductSurfacePayload;
   handleDoctor?(
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductCommandResult> | TokenPilotProductCommandResult;
+  ): Promise<ProductCommandResult> | ProductCommandResult;
   buildVisualPayload?(
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductSurfacePayload> | TokenPilotProductSurfacePayload;
+  ): Promise<ProductSurfacePayload> | ProductSurfacePayload;
   handleVisual?(
     currentConfig: Record<string, unknown>,
-  ): Promise<TokenPilotProductCommandResult> | TokenPilotProductCommandResult;
+  ): Promise<ProductCommandResult> | ProductCommandResult;
 };
 
-export type TokenPilotProductSurfaceHostBridge =
-  & TokenPilotProductSurfaceConfigStore
-  & TokenPilotProductSurfaceHostFeatures;
+export type ProductSurfaceHostBridge =
+  & ProductSurfaceConfigStore
+  & ProductSurfaceHostFeatures;
 
-export type TokenPilotProductCommandHandler = (
-  ctx: TokenPilotProductCommandContext,
-) => Promise<TokenPilotProductCommandResult> | TokenPilotProductCommandResult;
+export type ProductCommandHandler = (
+  ctx: ProductCommandContext,
+) => Promise<ProductCommandResult> | ProductCommandResult;
 
-export type TokenPilotRegisteredCommandSpec = {
+export type ProductCommandSpec = {
   name: string;
   description: string;
   acceptsArgs?: boolean;
-  handler: TokenPilotProductCommandHandler;
+  handler: ProductCommandHandler;
 };
 
-export type TokenPilotProductCommandRegistrar = {
-  registerCommand(spec: TokenPilotRegisteredCommandSpec): void;
+export type ProductCommandRegistrar = {
+  registerCommand(spec: ProductCommandSpec): void;
 };

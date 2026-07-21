@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type {
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import { handleVisual as handleSharedVisual } from "@lightmem2/product-surface";
 import { readLatestUxEffect, readSessionUxAggregate } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
@@ -77,12 +77,12 @@ export function createOpenClawCliBridge(target: {
   host: "openclaw";
   sessionId?: string;
 }): {
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
   maybeResolveLatestSessionId(): Promise<string | undefined>;
   resolveSessionId(sessionId?: string): Promise<string | undefined>;
 } {
-  const bridge: TokenPilotProductSurfaceHostBridge = {
+  const bridge: ProductSurfaceHostBridge = {
     loadConfig,
     writeConfig,
     async handleDoctor(currentConfig) {

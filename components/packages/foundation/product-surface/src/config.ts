@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 
 export const REDUCTION_PASS_PATHS: Record<string, string[]> = {
   readStateCompaction: ["reduction", "passes", "readStateCompaction"],
@@ -195,7 +195,7 @@ export function formatOnOff(value: unknown): string {
 export function applyReductionPreset(
   config: Record<string, unknown>,
   presetName: string,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): void {
   const preset = REDUCTION_PRESETS[presetName];
   if (!preset) return;
@@ -213,7 +213,7 @@ export function applyReductionPreset(
 export function applyRuntimeMode(
   config: Record<string, unknown>,
   modeName: string,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): void {
   const preset = RUNTIME_MODE_PRESETS[modeName];
   if (!preset) return;

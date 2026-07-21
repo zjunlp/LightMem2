@@ -1,7 +1,7 @@
 import type {
-  TokenPilotProductCommandRegistrar,
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductCommandRegistrar,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import { createProductSurfaceCommandHandler } from "./commands.js";
 
@@ -26,9 +26,9 @@ export const DEFAULT_TOKENPILOT_COMMAND_ALIASES: TokenPilotCommandAliasSpec[] = 
 ];
 
 export function registerProductSurfaceCommands(params: {
-  registrar: TokenPilotProductCommandRegistrar;
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  registrar: ProductCommandRegistrar;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
   aliases?: TokenPilotCommandAliasSpec[];
 }): void {
   const handler = createProductSurfaceCommandHandler({

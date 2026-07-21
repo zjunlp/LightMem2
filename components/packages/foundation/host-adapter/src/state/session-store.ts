@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { appendJsonl, readJsonFile, readRecentJsonlEntries, writeJsonFileAtomic } from "./file-store.js";
 
-export type TokenPilotLatestSessionRef = {
+export type LatestSessionRef = {
   sessionId: string;
   updatedAt: string;
 };
@@ -34,13 +34,13 @@ export async function writeLatestSessionRef(
   await writeJsonFileAtomic(latestSessionPath(stateDir), {
     sessionId,
     updatedAt,
-  } satisfies TokenPilotLatestSessionRef);
+  } satisfies LatestSessionRef);
 }
 
 export async function readLatestSessionRef(
   stateDir: string,
-): Promise<TokenPilotLatestSessionRef | null> {
-  return readJsonFile<TokenPilotLatestSessionRef>(latestSessionPath(stateDir));
+): Promise<LatestSessionRef | null> {
+  return readJsonFile<LatestSessionRef>(latestSessionPath(stateDir));
 }
 
 export async function resolveLatestSessionId(stateDir: string): Promise<string | undefined> {

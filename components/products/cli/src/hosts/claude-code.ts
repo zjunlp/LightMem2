@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
   readLatestUxEffect,
   readUxSessionAggregate,
 } from "@lightmem2/host-adapter";
@@ -104,14 +104,14 @@ export function createClaudeCodeCliBridge(target: {
   sessionId?: string;
   pathOverrides?: CliHostPathOverrides;
 }): {
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
   maybeResolveLatestSessionId(): Promise<string | undefined>;
   resolveSessionId(sessionId?: string): Promise<string | undefined>;
   handleCommand(ctx: { args: string; sessionId?: string }): Promise<{ text: string }>;
 } {
   const paths = resolveClaudeCodePaths(target.pathOverrides);
-  const bridge: TokenPilotProductSurfaceHostBridge = {
+  const bridge: ProductSurfaceHostBridge = {
     loadConfig() {
       return loadConfig(target.pathOverrides);
     },

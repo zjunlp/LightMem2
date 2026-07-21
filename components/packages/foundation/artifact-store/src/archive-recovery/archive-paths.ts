@@ -1,24 +1,24 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { TokenPilotStatePathResolver } from "@lightmem2/host-adapter";
+import type { StatePathResolver } from "@lightmem2/host-adapter";
 
 export const PLUGIN_STATE_DIRNAME = "tokenpilot-plugin-state";
 export const PLUGIN_NAMESPACE_DIR = "tokenpilot";
 export const WORKSPACE_ARCHIVE_DIRNAME = ".tokenpilot-archives";
 export const DEFAULT_HOST_NEUTRAL_STATE_ROOT = ".tokenpilot";
 
-let statePathResolver: TokenPilotStatePathResolver | null = null;
+let statePathResolver: StatePathResolver | null = null;
 
 export function sanitizePathPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
-export function configureStatePathResolver(resolver: TokenPilotStatePathResolver | null): void {
+export function configureStatePathResolver(resolver: StatePathResolver | null): void {
   statePathResolver = resolver;
 }
 
-export function currentStatePathResolver(): TokenPilotStatePathResolver | null {
+export function currentStatePathResolver(): StatePathResolver | null {
   return statePathResolver;
 }
 

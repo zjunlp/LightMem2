@@ -1,4 +1,4 @@
-import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
 import {
   TOKENPILOT_FEATURE_MODULE_IDS,
   type SessionModuleObservationSummary,
@@ -251,7 +251,7 @@ export function formatTokenPilotHelp(section?: string): string {
 
 export function summarizeTokenPilotStatus(
   cfg: Record<string, unknown>,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): string {
   const entry = adapter.pluginEntryRecord(cfg);
   const pluginCfg = adapter.pluginConfigRecord(cfg);
@@ -295,7 +295,7 @@ export function summarizeTokenPilotStatus(
 
 export function summarizeStabilizerStatus(
   cfg: Record<string, unknown>,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): string {
   const pluginCfg = adapter.pluginConfigRecord(cfg);
   return [
@@ -308,7 +308,7 @@ export function summarizeStabilizerStatus(
 
 export function summarizeReductionStatus(
   cfg: Record<string, unknown>,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): string {
   const pluginCfg = adapter.pluginConfigRecord(cfg);
   const passSummary = Object.keys(REDUCTION_PASS_PATHS)
@@ -327,7 +327,7 @@ export function summarizeReductionStatus(
 
 export function summarizeEvictionStatus(
   cfg: Record<string, unknown>,
-  adapter: TokenPilotProductSurfaceConfigAdapter,
+  adapter: ProductSurfaceConfigAdapter,
 ): string {
   const pluginCfg = adapter.pluginConfigRecord(cfg);
   return [

@@ -1,14 +1,14 @@
 import type {
-  TokenPilotProductSurfaceConfigAdapter,
-  TokenPilotProductSurfaceHostBridge,
+  ProductSurfaceConfigAdapter,
+  ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import { parseCommandAction } from "./config.js";
 import { formatTokenPilotHelp, summarizeTokenPilotStatus } from "./presentation.js";
 import { createProductSurfaceActionHandlers } from "./command-actions.js";
 
 export function createProductSurfaceCommandHandler(params: {
-  bridge: TokenPilotProductSurfaceHostBridge;
-  configAdapter: TokenPilotProductSurfaceConfigAdapter;
+  bridge: ProductSurfaceHostBridge;
+  configAdapter: ProductSurfaceConfigAdapter;
 }) {
   const { bridge, configAdapter } = params;
   const actionHandlers = createProductSurfaceActionHandlers({
