@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@tokenpilot/artifact-store": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*"
+    "@tokenpilot/kernel": "workspace:*"
   }
 }

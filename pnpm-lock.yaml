@@ -207,9 +207,6 @@ importers:
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../features/reduction
 
   components/tokenpilot/presets/tokenpilot:
     dependencies:
