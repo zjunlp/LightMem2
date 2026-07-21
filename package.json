@@ -23,6 +23,10 @@
         "@types/node": "^24.3.0"
     },
     "workspaces": [
+        "components/packages/*/*",
+        "components/presets/*",
+        "components/adapters/*",
+        "components/products/*",
         "components/tokenpilot/packages/*",
         "components/tokenpilot/packages/*/*",
         "components/tokenpilot/presets/*",

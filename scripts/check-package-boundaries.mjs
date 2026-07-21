@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const componentDir = path.join(rootDir, "components", "tokenpilot");
+const componentDir = path.join(rootDir, "components");
 const validRoles = new Set(["foundation", "feature", "preset", "adapter", "product"]);
 const allowedDependencies = {
   foundation: new Set(["foundation"]),

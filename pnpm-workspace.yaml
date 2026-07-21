@@ -1,4 +1,8 @@
 packages:
+  - "components/packages/*/*"
+  - "components/presets/*"
+  - "components/adapters/*"
+  - "components/products/*"
   - "components/tokenpilot/packages/*"
   - "components/tokenpilot/packages/*/*"
   - "components/tokenpilot/presets/*"
