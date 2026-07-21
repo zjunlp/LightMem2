@@ -12,7 +12,7 @@ import {
 import {
   asObjectRecord,
   scanInstalledHookEvents,
-} from "../../shared/doctor-shared.js";
+} from "../../../../adapters/shared/doctor-shared.js";
 import {
   CLAUDE_TOOL_SEARCH_DEFAULT,
   CLAUDE_TOOL_SEARCH_ENV,

@@ -8,7 +8,7 @@ import {
 import {
   asObjectRecord,
   scanInstalledHookEvents,
-} from "../../shared/doctor-shared.js";
+} from "../../../../adapters/shared/doctor-shared.js";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   readCodexMcpServerFromToml,

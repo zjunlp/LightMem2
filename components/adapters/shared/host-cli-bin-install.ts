@@ -1,6 +1,6 @@
 import { chmod, mkdir, symlink, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import type { CliHostId } from "../../../products/cli/src/hosts/registry.js";
+import type { CliHostId } from "../../products/cli/src/hosts/registry.js";
 
 function hostCliDistPathFromAdapterRoot(adapterRoot: string): string {
   return resolve(adapterRoot, "dist", "cli.js");
