@@ -71,6 +71,9 @@ import { registerLayeredContextEngine, registerToolCallHooks, registerToolResult
 import { __testHooks, contextSafeRecovery, proxyRuntimeHelpers } from "./plugin-test-support.js";
 import { createWorkspaceHintStore } from "./plugin-workspace-hints.js";
 import { createOpenClawStatePathResolver } from "./context-stack/integration/host-adapter.js";
+import { initializeOpenClawTokenPilotPreset } from "./preset.js";
+
+export { OPENCLAW_TOKENPILOT_HOST_BINDING } from "./preset.js";
 
 module.exports = {
   id: "tokenpilot",
@@ -78,6 +81,7 @@ module.exports = {
   __testHooks,
 
   register(api: any) {
+    initializeOpenClawTokenPilotPreset();
     const logger = makeLogger(api?.logger);
     configureStatePathResolver(createOpenClawStatePathResolver());
     const cfg = normalizeConfig(api?.pluginConfig);

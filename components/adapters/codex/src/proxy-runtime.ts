@@ -52,6 +52,7 @@ import {
 import { snapshotCodexResponsesStream } from "./stream-observer.js";
 import { appendTrace } from "./trace.js";
 import { appendCodexCacheAuditRecord, buildCodexCacheAuditSnapshot } from "./cache-audit.js";
+import { initializeCodexTokenPilotPreset } from "./preset.js";
 
 export type CodexProxyRuntime = {
   baseUrl: string;
@@ -107,6 +108,7 @@ export async function startCodexResponsesProxy(params: {
   logger: TokenPilotCodexLogger;
   codexConfigPath?: string;
 }): Promise<CodexProxyRuntime> {
+  initializeCodexTokenPilotPreset();
   const { config, logger } = params;
   if (!config.enabled) {
     throw new Error("TokenPilot Codex adapter is disabled by config");

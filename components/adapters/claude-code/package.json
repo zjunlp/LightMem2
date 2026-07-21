@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@tokenpilot/artifact-store": "workspace:*",
+    "@tokenpilot/decision": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",
     "@tokenpilot/mcp": "workspace:*",

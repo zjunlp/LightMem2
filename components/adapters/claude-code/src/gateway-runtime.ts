@@ -36,6 +36,7 @@ import { createClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./u
 import { appendClaudeCodeCacheAuditRecord, buildClaudeCodeCacheAuditSnapshot } from "./cache-audit.js";
 import { buildAnthropicGatewayModelList, mapClaudeVisibleModelToUpstreamModel } from "./provider-profile.js";
 import { resolveLatestClaudeCodeSessionId } from "./session-state.js";
+import { initializeClaudeCodeTokenPilotPreset } from "./preset.js";
 
 export type ClaudeCodeGatewayRuntime = {
   baseUrl: string;
@@ -191,6 +192,7 @@ export async function startClaudeCodeGatewayRuntime(params: {
   forwarder?: HostGatewayForwarder;
   streamObserver?: HostGatewayStreamObserver;
 }): Promise<ClaudeCodeGatewayRuntime> {
+  initializeClaudeCodeTokenPilotPreset();
   const { config, logger } = params;
   if (!config.enabled) {
     throw new Error("TokenPilot Claude Code adapter is disabled by config");
