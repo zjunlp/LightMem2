@@ -73,8 +73,6 @@ import { createWorkspaceHintStore } from "./plugin-workspace-hints.js";
 import { createOpenClawStatePathResolver } from "./context-stack/integration/host-adapter.js";
 import { initializeOpenClawTokenPilotPreset } from "./preset.js";
 
-export { OPENCLAW_TOKENPILOT_HOST_BINDING } from "./preset.js";
-
 module.exports = {
   id: "tokenpilot",
   name: "TokenPilot Runtime Optimizer",
