@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { createCodexCliBridge } from "../../../../products/cli/src/hosts/codex.js";
+import { createCodexCliBridge } from "../../../products/cli/src/hosts/codex.js";
 import { loadTokenPilotCodexConfig, defaultTokenPilotConfigPath } from "../src/config.js";
 import { indexCodexHostSessionAlias } from "../src/session-state.js";
 

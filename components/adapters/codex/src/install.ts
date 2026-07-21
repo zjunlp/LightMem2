@@ -9,7 +9,7 @@ import {
   resolveTokenPilotMcpProbeServerSpec,
   resolveTokenPilotMcpServerSpec,
   type TokenPilotMcpServerSpec,
-} from "../../../../products/mcp/src/index.js";
+} from "../../../products/mcp/src/index.js";
 import {
   defaultCodexConfigPath,
   defaultHooksConfigPath,
@@ -24,10 +24,10 @@ import { stopDaemon } from "./daemon.js";
 import {
   defaultCodexSkillBridgeDir,
   installCommandSkillBridge,
-} from "../../../../adapters/shared/command-skill-bridge.js";
-import { installLightmem2CliBin } from "../../../../adapters/shared/cli-bin-install.js";
-import { rememberCliHostPathOverrides } from "../../../../adapters/shared/cli-context.js";
-import { installHostCliBin } from "../../../../adapters/shared/host-cli-bin-install.js";
+} from "../../shared/command-skill-bridge.js";
+import { installLightmem2CliBin } from "../../shared/cli-bin-install.js";
+import { rememberCliHostPathOverrides } from "../../shared/cli-context.js";
+import { installHostCliBin } from "../../shared/host-cli-bin-install.js";
 
 function quoteToml(value: string): string {
   return JSON.stringify(value);

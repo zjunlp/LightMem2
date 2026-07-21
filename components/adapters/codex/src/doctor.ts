@@ -4,11 +4,11 @@ import {
   DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
   inspectTokenPilotMcpHealth,
   TOKENPILOT_MCP_SERVER_NAME,
-} from "../../../../products/mcp/src/index.js";
+} from "../../../products/mcp/src/index.js";
 import {
   asObjectRecord,
   scanInstalledHookEvents,
-} from "../../../../adapters/shared/doctor-shared.js";
+} from "../../shared/doctor-shared.js";
 import type { TokenPilotCodexConfig } from "./config.js";
 import {
   readCodexMcpServerFromToml,

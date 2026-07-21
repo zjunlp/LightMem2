@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { indexCodexHostSessionAlias } from "../../../tokenpilot/adapters/codex/src/session-state.js";
+import { indexCodexHostSessionAlias } from "../../../adapters/codex/src/session-state.js";
 import { readCliContextState } from "../src/context-store.js";
 import { dispatchCli } from "../src/dispatch.js";
 

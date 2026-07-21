@@ -5,7 +5,7 @@ import { chmod, lstat, mkdtemp, mkdir, readFile, readlink, rm, stat, writeFile }
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
-import { readCliContextState } from "../../../../products/cli/src/context-store.js";
+import { readCliContextState } from "../../../products/cli/src/context-store.js";
 import {
   loadTokenPilotCodexConfig,
   normalizeTokenPilotCodexConfig,

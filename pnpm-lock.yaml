@@ -18,6 +18,40 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  components/adapters/codex:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@tokenpilot/mcp':
+        specifier: workspace:*
+        version: link:../../products/mcp
+      '@tokenpilot/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
+      '@tokenpilot/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
+      '@tokenpilot/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.10
+        version: 0.25.12
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   components/packages/features/eviction:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -151,40 +185,6 @@ importers:
         version: 5.9.3
 
   components/tokenpilot/adapters/claude-code:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/artifact-store
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/kernel
-      '@tokenpilot/mcp':
-        specifier: workspace:*
-        version: link:../../../products/mcp
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/product-surface
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../../packages/features/reduction
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../../packages/features/stabilizer
-    devDependencies:
-      esbuild:
-        specifier: ^0.25.10
-        version: 0.25.12
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  components/tokenpilot/adapters/codex:
     dependencies:
       '@tokenpilot/artifact-store':
         specifier: workspace:*
