@@ -38,7 +38,7 @@ Keep these responsibilities in shared packages:
 - host-neutral execution primitives in `packages/foundation/runtime-core/`
 - state and policy logic in `packages/layers/*`
 - host abstraction helpers in `packages/foundation/host-adapter/`
-- shared command semantics in `packages/product-surface/`
+- shared command semantics in `packages/foundation/product-surface/`
 - standalone product entrypoints in `products/`
 
 ## Recommended Adapter Shape

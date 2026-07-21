@@ -43,7 +43,7 @@
                 "components/tokenpilot/packages/features/stabilizer/src/index.ts"
             ],
             "@tokenpilot/product-surface": [
-                "components/tokenpilot/packages/product-surface/src/index.ts"
+                "components/tokenpilot/packages/foundation/product-surface/src/index.ts"
             ],
             "@tokenpilot/mcp": [
                 "components/tokenpilot/products/mcp/src/index.ts"
