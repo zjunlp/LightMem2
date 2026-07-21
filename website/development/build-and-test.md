@@ -25,7 +25,7 @@ npm --prefix components/tokenpilot/adapters/claude-code run build
 pnpm typecheck
 
 # Typecheck specific package
-npm --prefix components/tokenpilot/packages/runtime-core run typecheck
+npm --prefix components/tokenpilot/packages/foundation/runtime-core run typecheck
 ```
 
 ## Test

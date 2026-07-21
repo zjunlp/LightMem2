@@ -45,7 +45,7 @@ pnpm lightmem2:test
 npm --prefix components/tokenpilot/adapters/openclaw run build
 
 # Typecheck a specific package
-npm --prefix components/tokenpilot/packages/runtime-core run typecheck
+npm --prefix components/tokenpilot/packages/foundation/runtime-core run typecheck
 ```
 
 ## Documentation Site

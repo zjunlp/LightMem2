@@ -117,7 +117,7 @@ importers:
         version: link:../../packages/features/reduction
       '@tokenpilot/runtime-core':
         specifier: workspace:*
-        version: link:../../packages/runtime-core
+        version: link:../../packages/foundation/runtime-core
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
@@ -175,6 +175,18 @@ importers:
 
   components/tokenpilot/packages/foundation/kernel: {}
 
+  components/tokenpilot/packages/foundation/runtime-core:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@tokenpilot/reduction':
+        specifier: workspace:*
+        version: link:../../features/reduction
+
   components/tokenpilot/packages/host-adapter:
     dependencies:
       '@tokenpilot/kernel':
@@ -213,18 +225,6 @@ importers:
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../features/stabilizer
-
-  components/tokenpilot/packages/runtime-core:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../foundation/artifact-store
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../foundation/kernel
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../features/reduction
 
   components/tokenpilot/products/cli:
     dependencies:
