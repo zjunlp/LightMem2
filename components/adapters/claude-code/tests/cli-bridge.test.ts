@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { createClaudeCodeCliBridge } from "../../../../products/cli/src/hosts/claude-code.js";
+import { createClaudeCodeCliBridge } from "../../../products/cli/src/hosts/claude-code.js";
 import {
   defaultTokenPilotClaudeCodeConfigPath,
   loadTokenPilotClaudeCodeConfig,

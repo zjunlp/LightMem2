@@ -8,11 +8,11 @@ import {
   type TokenPilotObservedMcpConfig,
   inspectClaudeMcpServerConfig,
   listClaudeMcpConfigCandidates,
-} from "../../../../products/mcp/src/index.js";
+} from "../../../products/mcp/src/index.js";
 import {
   asObjectRecord,
   scanInstalledHookEvents,
-} from "../../../../adapters/shared/doctor-shared.js";
+} from "../../shared/doctor-shared.js";
 import {
   CLAUDE_TOOL_SEARCH_DEFAULT,
   CLAUDE_TOOL_SEARCH_ENV,

@@ -18,19 +18,19 @@ import {
   loadTokenPilotClaudeCodeConfig,
   normalizeTokenPilotClaudeCodeConfig,
   writeTokenPilotClaudeCodeConfig,
-} from "../../../../tokenpilot/adapters/claude-code/src/config.js";
+} from "../../../../adapters/claude-code/src/config.js";
 import {
   inspectClaudeCodeDoctor,
   formatClaudeCodeDoctorReport,
-} from "../../../../tokenpilot/adapters/claude-code/src/doctor.js";
+} from "../../../../adapters/claude-code/src/doctor.js";
 import {
   claudeCodeProductSurfaceConfigAdapter,
   resolveClaudeCodeStateDir,
-} from "../../../../tokenpilot/adapters/claude-code/src/host-config-adapter.js";
-import { resolveLatestClaudeCodeSessionId } from "../../../../tokenpilot/adapters/claude-code/src/session-state.js";
+} from "../../../../adapters/claude-code/src/host-config-adapter.js";
+import { resolveLatestClaudeCodeSessionId } from "../../../../adapters/claude-code/src/session-state.js";
 import {
   readRecentClaudeCodeCacheAuditRecordsForSession,
-} from "../../../../tokenpilot/adapters/claude-code/src/cache-audit.js";
+} from "../../../../adapters/claude-code/src/cache-audit.js";
 import {
   applyStandardRuntimeModeConfig,
   buildSessionReportResult,

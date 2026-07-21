@@ -5,7 +5,7 @@ import type { VisualHostSource } from "@tokenpilot/product-surface";
 import {
   defaultTokenPilotClaudeCodeConfigPath,
   loadTokenPilotClaudeCodeConfig,
-} from "../../../../tokenpilot/adapters/claude-code/src/config.js";
+} from "../../../../adapters/claude-code/src/config.js";
 import {
   defaultTokenPilotConfigPath,
   loadTokenPilotCodexConfig,

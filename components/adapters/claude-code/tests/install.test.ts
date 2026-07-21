@@ -3,7 +3,7 @@ import test from "node:test";
 import { lstat, mkdtemp, readFile, readlink, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { readCliContextState } from "../../../../products/cli/src/context-store.js";
+import { readCliContextState } from "../../../products/cli/src/context-store.js";
 import { installClaudeCodeTokenPilot, resolveClaudeCodeHookCommandForInstall } from "../src/install.js";
 import { proxyBaseUrlForPort } from "../src/config.js";
 

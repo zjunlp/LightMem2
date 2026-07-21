@@ -10,7 +10,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/zjunlp/LightMem2.git",
-    "directory": "components/tokenpilot/adapters/claude-code"
+    "directory": "components/adapters/claude-code"
   },
   "engines": {
     "node": ">=20.0.0"
