@@ -86,6 +86,52 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  components/adapters/openclaw:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
+      '@tokenpilot/decision':
+        specifier: workspace:*
+        version: link:../../presets/tokenpilot
+      '@tokenpilot/eviction':
+        specifier: workspace:*
+        version: link:../../packages/features/eviction
+      '@tokenpilot/history':
+        specifier: workspace:*
+        version: link:../../packages/foundation/history
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../packages/foundation/kernel
+      '@tokenpilot/memory':
+        specifier: workspace:*
+        version: link:../../packages/features/memory
+      '@tokenpilot/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
+      '@tokenpilot/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
+      '@tokenpilot/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/foundation/runtime-core
+      '@tokenpilot/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.10
+        version: 0.25.12
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   components/packages/features/eviction:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -207,52 +253,6 @@ importers:
       '@tokenpilot/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
-    devDependencies:
-      esbuild:
-        specifier: ^0.25.10
-        version: 0.25.12
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  components/tokenpilot/adapters/openclaw:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/artifact-store
-      '@tokenpilot/decision':
-        specifier: workspace:*
-        version: link:../../../presets/tokenpilot
-      '@tokenpilot/eviction':
-        specifier: workspace:*
-        version: link:../../../packages/features/eviction
-      '@tokenpilot/history':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/history
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/host-adapter
-      '@tokenpilot/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/kernel
-      '@tokenpilot/memory':
-        specifier: workspace:*
-        version: link:../../../packages/features/memory
-      '@tokenpilot/product-surface':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/product-surface
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../../packages/features/reduction
-      '@tokenpilot/runtime-core':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/runtime-core
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10

@@ -5,13 +5,13 @@ import type {
   TokenPilotProductSurfaceHostBridge,
 } from "@tokenpilot/host-adapter";
 import { handleVisual as handleSharedVisual } from "@tokenpilot/product-surface";
-import { readLatestUxEffect, readSessionUxAggregate } from "../../../../tokenpilot/adapters/openclaw/src/context-stack/integration/ux-effects.js";
+import { readLatestUxEffect, readSessionUxAggregate } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
 import {
   readRecentOpenClawCacheAuditRecordsForSession,
-} from "../../../../tokenpilot/adapters/openclaw/src/cache-audit.js";
-import { resolveOpenClawConfigPath } from "../../../../tokenpilot/adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
-import { openClawProductSurfaceConfigAdapter, resolveStateDir } from "../../../../tokenpilot/adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
-import { formatOpenClawDoctorReport, inspectOpenClawDoctor } from "../../../../tokenpilot/adapters/openclaw/src/commands/tokenpilot/openclaw-doctor.js";
+} from "../../../../adapters/openclaw/src/cache-audit.js";
+import { resolveOpenClawConfigPath } from "../../../../adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
+import { openClawProductSurfaceConfigAdapter, resolveStateDir } from "../../../../adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
+import { formatOpenClawDoctorReport, inspectOpenClawDoctor } from "../../../../adapters/openclaw/src/commands/tokenpilot/openclaw-doctor.js";
 import { buildSessionReportResult, resolveConfiguredPreferredSessionId } from "./shared.js";
 import {
   ensureDetachedVisualDaemon,

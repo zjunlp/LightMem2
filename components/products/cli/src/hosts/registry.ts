@@ -10,9 +10,9 @@ import {
   defaultTokenPilotConfigPath,
   loadTokenPilotCodexConfig,
 } from "../../../../adapters/codex/src/config.js";
-import { readLatestUxEffect as readOpenClawLatestUxEffect } from "../../../../tokenpilot/adapters/openclaw/src/context-stack/integration/ux-effects.js";
-import { resolveOpenClawConfigPath } from "../../../../tokenpilot/adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
-import { resolveStateDir as resolveOpenClawStateDir } from "../../../../tokenpilot/adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
+import { readLatestUxEffect as readOpenClawLatestUxEffect } from "../../../../adapters/openclaw/src/context-stack/integration/ux-effects.js";
+import { resolveOpenClawConfigPath } from "../../../../adapters/openclaw/src/context-stack/integration/openclaw-paths.js";
+import { resolveStateDir as resolveOpenClawStateDir } from "../../../../adapters/openclaw/src/commands/tokenpilot/host-config-adapter.js";
 
 export const CLI_HOSTS = [
   {

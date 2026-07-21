@@ -12,10 +12,10 @@
         "lightmem2:install": "npm --prefix components/products/cli run install:bin",
         "lightmem2:typecheck": "npm --prefix components/products/cli run typecheck",
         "lightmem2:test": "npm --prefix components/products/cli test",
-        "component:pack:tokenpilot:openclaw": "npm --prefix components/tokenpilot/adapters/openclaw run pack:release",
-        "component:install:tokenpilot:openclaw": "npm --prefix components/tokenpilot/adapters/openclaw run install:release",
-        "plugin:pack:release": "npm --prefix components/tokenpilot/adapters/openclaw run pack:release",
-        "plugin:install:release": "npm --prefix components/tokenpilot/adapters/openclaw run install:release"
+        "component:pack:tokenpilot:openclaw": "npm --prefix components/adapters/openclaw run pack:release",
+        "component:install:tokenpilot:openclaw": "npm --prefix components/adapters/openclaw run install:release",
+        "plugin:pack:release": "npm --prefix components/adapters/openclaw run pack:release",
+        "plugin:install:release": "npm --prefix components/adapters/openclaw run install:release"
     },
     "devDependencies": {
         "typescript": "^5.9.3",

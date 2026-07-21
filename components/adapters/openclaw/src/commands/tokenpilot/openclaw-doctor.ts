@@ -34,7 +34,7 @@ function remediationLines(report: OpenClawDoctorReport): string[] {
   const fixes: string[] = [];
 
   if (failing.has("config")) {
-    fixes.push("- run `npm run install:release` in `components/tokenpilot/adapters/openclaw` to recreate the OpenClaw TokenPilot install");
+    fixes.push("- run `npm run install:release` in `components/adapters/openclaw` to recreate the OpenClaw TokenPilot install");
     return fixes;
   }
   if (failing.has("extensionPath")) {
