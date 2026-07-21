@@ -1,6 +1,6 @@
 import { dispatchCli } from "./dispatch.js";
 import { maybeRunVisualDaemon } from "./hosts/visual.js";
-import { initializeTokenPilotPreset } from "@tokenpilot/decision";
+import { initializeTokenPilotPreset } from "@lightmem2/tokenpilot";
 import { CODEX_TOKENPILOT_HOST_BINDING } from "../../../adapters/codex/src/preset.js";
 
 initializeTokenPilotPreset(CODEX_TOKENPILOT_HOST_BINDING);

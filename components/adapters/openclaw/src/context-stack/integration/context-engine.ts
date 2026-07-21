@@ -5,7 +5,7 @@ import { appendModuleObservation } from "@lightmem2/product-surface";
 import { enqueueEvictedTasksForProceduralMemory } from "./procedural-memory.js";
 import { runHistoryEvictionIfEnabled } from "./history-eviction-runner.js";
 import { runHistoryModules } from "./module-orchestrator.js";
-import { TOKENPILOT_HISTORY_MODULE_IDS } from "@tokenpilot/decision";
+import { TOKENPILOT_HISTORY_MODULE_IDS } from "@lightmem2/tokenpilot";
 
 export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
   const canonicalMessageTaskIdsBound = (message: Record<string, unknown>): string[] =>

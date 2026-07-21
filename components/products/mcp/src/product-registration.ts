@@ -2,7 +2,7 @@ import { defineProductRegistration } from "@lightmem2/product-surface";
 import {
   TOKENPILOT_PRESET_ID,
   TOKENPILOT_PRESET_VERSION,
-} from "@tokenpilot/decision";
+} from "@lightmem2/tokenpilot";
 
 export const TOKENPILOT_RECOVERY_MCP_PRODUCT = defineProductRegistration({
   productId: "tokenpilot-memory-fault-recover",

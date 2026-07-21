@@ -18,7 +18,7 @@
             "@lightmem2/artifact-store": [
                 "components/packages/foundation/artifact-store/src/index.ts"
             ],
-            "@tokenpilot/decision": [
+            "@lightmem2/tokenpilot": [
                 "components/presets/tokenpilot/src/index.ts"
             ],
             "@lightmem2/history": [

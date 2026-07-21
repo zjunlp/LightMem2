@@ -1,5 +1,5 @@
 import type { RuntimeModule, RuntimeModuleRuntime, RuntimeTurnContext } from "@lightmem2/kernel";
-import type { PolicyModuleConfig } from "@tokenpilot/decision";
+import type { PolicyModuleConfig } from "@lightmem2/tokenpilot";
 import { applyPolicyMonitors } from "./runtime-policy-monitors.js";
 import { asRecord, type NormalizedPluginRuntimeConfig, type PluginLogger } from "./config-types.js";
 import type { UpstreamConfig } from "./upstream-types.js";

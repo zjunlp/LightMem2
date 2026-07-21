@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@lightmem2/artifact-store": "workspace:*",
-    "@tokenpilot/decision": "workspace:*",
+    "@lightmem2/tokenpilot": "workspace:*",
     "@lightmem2/product-surface": "workspace:*"
   },
   "devDependencies": {

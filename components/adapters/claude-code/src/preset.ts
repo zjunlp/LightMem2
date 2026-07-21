@@ -1,7 +1,7 @@
 import {
   createTokenPilotHostBinding,
   initializeTokenPilotPreset,
-} from "@tokenpilot/decision";
+} from "@lightmem2/tokenpilot";
 
 export const CLAUDE_CODE_TOKENPILOT_HOST_BINDING = createTokenPilotHostBinding({
   hostId: "claude-code",

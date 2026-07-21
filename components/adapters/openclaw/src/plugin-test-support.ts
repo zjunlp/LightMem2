@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createPolicyModule } from "@tokenpilot/decision";
+import { createPolicyModule } from "@lightmem2/tokenpilot";
 import {
   estimatePayloadInputChars,
   extractInputText,

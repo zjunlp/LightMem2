@@ -313,7 +313,7 @@ test("applyProxyReductionToInput still runs with policy-only before-call modules
     },
   });
 
-  const { createPolicyModule } = await import("@tokenpilot/decision");
+  const { createPolicyModule } = await import("@lightmem2/tokenpilot");
 
   const payload: any = {
     model: "tokenpilot/gpt-5.4-mini",

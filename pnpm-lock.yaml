@@ -38,7 +38,7 @@ importers:
       '@lightmem2/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
-      '@tokenpilot/decision':
+      '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
       '@tokenpilot/mcp':
@@ -75,7 +75,7 @@ importers:
       '@lightmem2/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
-      '@tokenpilot/decision':
+      '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
       '@tokenpilot/mcp':
@@ -124,7 +124,7 @@ importers:
       '@lightmem2/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
-      '@tokenpilot/decision':
+      '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
     devDependencies:
@@ -246,7 +246,7 @@ importers:
       '@lightmem2/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
-      '@tokenpilot/decision':
+      '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
     devDependencies:
@@ -268,7 +268,7 @@ importers:
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
-      '@tokenpilot/decision':
+      '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
     devDependencies:

@@ -19,7 +19,7 @@ import {
 } from "./lifecycle-planning-runner.js";
 import { runPrefixIfEnabled } from "./prefix-runner.js";
 import { runRequestModules, type ModuleExecutionRecord } from "./module-orchestrator.js";
-import { TOKENPILOT_REQUEST_MODULE_IDS } from "@tokenpilot/decision";
+import { TOKENPILOT_REQUEST_MODULE_IDS } from "@lightmem2/tokenpilot";
 
 type ProxyRequestPreparation = {
   payload: any;
