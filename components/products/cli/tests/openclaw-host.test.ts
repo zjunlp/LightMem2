@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createProductSurfaceCommandHandler } from "@lightmem2/product-surface";
+import { TOKENPILOT_PRODUCT_SURFACE_IDENTITY } from "@lightmem2/tokenpilot";
 import { createOpenClawCliBridge } from "../src/hosts/openclaw.js";
 
 test("openclaw CLI bridge reports empty-state and supported shared commands", async () => {
@@ -18,6 +19,7 @@ test("openclaw CLI bridge reports empty-state and supported shared commands", as
     const handleCommand = createProductSurfaceCommandHandler({
       bridge: bridge.bridge,
       configAdapter: bridge.configAdapter,
+      identity: TOKENPILOT_PRODUCT_SURFACE_IDENTITY,
     });
 
     const status = await handleCommand({ args: "status" });
@@ -84,6 +86,7 @@ test("openclaw CLI bridge resolves explicit session stats and missing aggregate 
     const handleCommand = createProductSurfaceCommandHandler({
       bridge: bridge.bridge,
       configAdapter: bridge.configAdapter,
+      identity: TOKENPILOT_PRODUCT_SURFACE_IDENTITY,
     });
 
     await writeFile(

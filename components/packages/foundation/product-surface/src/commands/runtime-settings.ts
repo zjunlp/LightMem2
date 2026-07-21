@@ -3,7 +3,7 @@ import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./s
 import { writeUpdatedConfig } from "./shared.js";
 
 export function createSettingsHandler(params: ProductSurfaceCommandDeps): ProductSurfaceActionHandler {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
 
   return async (_ctx, currentConfig, rest) => {
     const args = splitArgs(rest);
@@ -13,7 +13,7 @@ export function createSettingsHandler(params: ProductSurfaceCommandDeps): Produc
       const pluginCfg = configAdapter.pluginConfigRecord(currentConfig);
       return {
         text: [
-          "TokenPilot settings:",
+          `${identity.displayName} settings:`,
           `- details: ${formatOnOff(getNestedValue(pluginCfg, ["ux", "details"]))}`,
         ].join("\n"),
       };
@@ -22,7 +22,7 @@ export function createSettingsHandler(params: ProductSurfaceCommandDeps): Produc
     if (key === "details") {
       const value = parseBooleanWord(args[1] ?? "");
       if (value === undefined) {
-        return { text: "Usage: /tokenpilot settings details <on|off>" };
+        return { text: `Usage: /${identity.commandName} settings details <on|off>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -31,6 +31,6 @@ export function createSettingsHandler(params: ProductSurfaceCommandDeps): Produc
       });
     }
 
-    return { text: "Usage: /tokenpilot settings details <on|off>" };
+    return { text: `Usage: /${identity.commandName} settings details <on|off>` };
   };
 }

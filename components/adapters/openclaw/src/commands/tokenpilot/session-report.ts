@@ -175,6 +175,7 @@ export async function handleReport(ctx: any, currentConfig: Record<string, unkno
   return {
     text: await renderSessionReport({
       stateDir,
+      title: "TokenPilot report:",
       sessionId,
       detailsEnabled,
       cacheAuditSummary,

@@ -7,6 +7,7 @@ import type {
   ProductCommandSpec,
 } from "@lightmem2/host-adapter";
 import { registerProductSurfaceCommands } from "../src/index.js";
+import { TEST_PRODUCT_SURFACE_IDENTITY } from "./product-identity-fixture.js";
 
 function createTestConfigAdapter(): ProductSurfaceConfigAdapter {
   return {
@@ -105,6 +106,7 @@ test("mock host e2e registers aliases and executes mode command through register
   });
 
   registerProductSurfaceCommands({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     registrar: {
       registerCommand(spec) {
         host.registerCommand(spec);
@@ -139,6 +141,7 @@ test("mock host e2e executes feature commands through registered alias handlers"
   });
 
   registerProductSurfaceCommands({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     registrar: {
       registerCommand(spec) {
         host.registerCommand(spec);
@@ -172,6 +175,7 @@ test("mock host e2e preserves shared handler semantics across aliases", async ()
   });
 
   registerProductSurfaceCommands({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     registrar: {
       registerCommand(spec) {
         host.registerCommand(spec);

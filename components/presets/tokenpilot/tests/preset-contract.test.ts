@@ -7,6 +7,7 @@ import {
   TOKENPILOT_MODULE_COMBINATIONS,
   TOKENPILOT_PRESET_ID,
   TOKENPILOT_PRESET_VERSION,
+  TOKENPILOT_PRODUCT_SURFACE_IDENTITY,
   TOKENPILOT_REQUEST_MODULE_ORDER,
   buildTokenPilotCombinationConfig,
   createTokenPilotHostBinding,
@@ -30,6 +31,15 @@ test("TokenPilot preset freezes identity, feature membership, and execution orde
     "memory-consumer",
     "canonical-persistence",
   ]);
+});
+
+test("TokenPilot preset owns its product surface identity and compatibility aliases", () => {
+  assert.equal(TOKENPILOT_PRODUCT_SURFACE_IDENTITY.displayName, "TokenPilot");
+  assert.equal(TOKENPILOT_PRODUCT_SURFACE_IDENTITY.commandName, "tokenpilot");
+  assert.deepEqual(
+    TOKENPILOT_PRODUCT_SURFACE_IDENTITY.aliases.map(({ name }) => name),
+    ["tokenpilot", "lightmem2", "tp"],
+  );
 });
 
 test("TokenPilot preset exposes the complete three-feature combination matrix", () => {

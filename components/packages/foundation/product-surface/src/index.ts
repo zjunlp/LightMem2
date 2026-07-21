@@ -1,4 +1,5 @@
 export * from "./config.js";
+export * from "./identity.js";
 export * from "./presentation.js";
 export * from "./command-actions.js";
 export * from "./commands.js";

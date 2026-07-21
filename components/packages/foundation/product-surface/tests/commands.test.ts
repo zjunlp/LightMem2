@@ -9,9 +9,9 @@ import type {
 } from "@lightmem2/host-adapter";
 import {
   createProductSurfaceCommandHandler,
-  DEFAULT_TOKENPILOT_COMMAND_ALIASES,
   registerProductSurfaceCommands,
 } from "../src/index.js";
+import { TEST_PRODUCT_SURFACE_IDENTITY } from "./product-identity-fixture.js";
 
 function createTestConfigAdapter(): ProductSurfaceConfigAdapter {
   return {
@@ -99,6 +99,7 @@ test("registerProductSurfaceCommands registers default aliases with shared handl
   };
 
   registerProductSurfaceCommands({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     registrar,
     bridge,
     configAdapter,
@@ -106,7 +107,7 @@ test("registerProductSurfaceCommands registers default aliases with shared handl
 
   assert.deepEqual(
     specs.map((spec) => spec.name),
-    DEFAULT_TOKENPILOT_COMMAND_ALIASES.map((alias) => alias.name),
+    TEST_PRODUCT_SURFACE_IDENTITY.aliases.map((alias) => alias.name),
   );
   assert.ok(specs.every((spec) => spec.acceptsArgs === true));
   assert.ok(specs.every((spec) => spec.handler === specs[0]?.handler));
@@ -118,6 +119,7 @@ test("createProductSurfaceCommandHandler applies runtime mode and host defaults"
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge(config),
     configAdapter: createTestConfigAdapter(),
   });
@@ -146,6 +148,7 @@ test("createProductSurfaceCommandHandler returns shared payload for built-only h
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: {
       loadConfig() {
         return structuredClone(config);
@@ -181,6 +184,7 @@ test("createProductSurfaceCommandHandler returns built host payloads for report 
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: {
       loadConfig() {
         return structuredClone(config);
@@ -234,6 +238,7 @@ test("createProductSurfaceCommandHandler updates reduction pass and settings det
   };
   const bridge = createTestBridge(config);
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge,
     configAdapter: createTestConfigAdapter(),
   });
@@ -258,6 +263,7 @@ test("createProductSurfaceCommandHandler applies reduction mode presets", async 
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge(config),
     configAdapter: createTestConfigAdapter(),
   });
@@ -306,6 +312,7 @@ test("createProductSurfaceCommandHandler updates stabilizer hook and target", as
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge(config),
     configAdapter: createTestConfigAdapter(),
   });
@@ -326,6 +333,7 @@ test("createProductSurfaceCommandHandler updates eviction estimator and set valu
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge(config),
     configAdapter: createTestConfigAdapter(),
   });
@@ -349,6 +357,7 @@ test("createProductSurfaceCommandHandler toggles eviction and estimator linkage"
     pluginEntry: {},
   };
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge(config),
     configAdapter: createTestConfigAdapter(),
   });
@@ -370,6 +379,7 @@ test("createProductSurfaceCommandHandler toggles eviction and estimator linkage"
 
 test("createProductSurfaceCommandHandler returns usage text for invalid stabilizer and eviction args", async () => {
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge({ pluginConfig: {}, pluginEntry: {} }),
     configAdapter: createTestConfigAdapter(),
   });
@@ -392,6 +402,7 @@ test("createProductSurfaceCommandHandler routes host feature commands", async ()
   };
   const bridge = createTestBridge(config);
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge,
     configAdapter: createTestConfigAdapter(),
   });
@@ -410,6 +421,7 @@ test("createProductSurfaceCommandHandler routes host feature commands", async ()
 
 test("createProductSurfaceCommandHandler falls back to help for unknown actions", async () => {
   const handler = createProductSurfaceCommandHandler({
+    identity: TEST_PRODUCT_SURFACE_IDENTITY,
     bridge: createTestBridge({ pluginConfig: {}, pluginEntry: {} }),
     configAdapter: createTestConfigAdapter(),
   });

@@ -3,17 +3,20 @@ import type {
   ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
 import { parseCommandAction } from "./config.js";
-import { formatTokenPilotHelp, summarizeTokenPilotStatus } from "./presentation.js";
+import { formatProductHelp, summarizeProductStatus } from "./presentation.js";
 import { createProductSurfaceActionHandlers } from "./command-actions.js";
+import type { ProductSurfaceIdentity } from "./identity.js";
 
 export function createProductSurfaceCommandHandler(params: {
   bridge: ProductSurfaceHostBridge;
   configAdapter: ProductSurfaceConfigAdapter;
+  identity: ProductSurfaceIdentity;
 }) {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
   const actionHandlers = createProductSurfaceActionHandlers({
     bridge,
     configAdapter,
+    identity,
   });
 
   return async (ctx: any) => {
@@ -24,12 +27,12 @@ export function createProductSurfaceCommandHandler(params: {
     if (!action || action === "help") {
       return action === "help"
         ? actionHandlers.help(ctx, currentConfig, rest)
-        : { text: `${summarizeTokenPilotStatus(currentConfig, configAdapter)}\n\n${formatTokenPilotHelp()}` };
+        : { text: `${summarizeProductStatus(currentConfig, configAdapter, identity)}\n\n${formatProductHelp(identity)}` };
     }
 
     const handler = actionHandlers[action];
     if (!handler) {
-      return { text: formatTokenPilotHelp() };
+      return { text: formatProductHelp(identity) };
     }
 
     return handler(ctx, currentConfig, rest);

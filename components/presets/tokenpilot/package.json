@@ -17,6 +17,7 @@
     "@lightmem2/eviction": "workspace:*",
     "@lightmem2/history": "workspace:*",
     "@lightmem2/kernel": "workspace:*",
+    "@lightmem2/product-surface": "workspace:*",
     "@lightmem2/reduction": "workspace:*",
     "@lightmem2/runtime-core": "workspace:*",
     "@lightmem2/stabilizer": "workspace:*"

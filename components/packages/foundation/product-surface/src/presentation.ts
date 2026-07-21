@@ -1,4 +1,5 @@
 import type { ProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
+import { productCommand, type ProductSurfaceIdentity } from "./identity.js";
 import {
   OBSERVABLE_FEATURE_MODULE_IDS,
   type SessionModuleObservationSummary,
@@ -151,15 +152,16 @@ function formatModuleObservationLine(
   return `- ${moduleId}: enabled=${enabled}, executions=${formatInt(module.executions)}, changes=${formatInt(module.changes)}, ${accounting}`;
 }
 
-export function formatTokenPilotHelp(section?: string): string {
+export function formatProductHelp(identity: ProductSurfaceIdentity, section?: string): string {
+  const command = productCommand(identity);
   if (section === "stabilizer") {
     return [
       "Prefix Stabilization commands:",
-      "/tokenpilot stabilizer",
-      "/tokenpilot stabilizer on",
-      "/tokenpilot stabilizer off",
-      "/tokenpilot stabilizer hook <on|off>",
-      "/tokenpilot stabilizer target <developer|user>",
+      `${command} stabilizer`,
+      `${command} stabilizer on`,
+      `${command} stabilizer off`,
+      `${command} stabilizer hook <on|off>`,
+      `${command} stabilizer target <developer|user>`,
       "",
       "Knobs:",
       "- modules.stabilizer",
@@ -171,12 +173,12 @@ export function formatTokenPilotHelp(section?: string): string {
   if (section === "reduction") {
     return [
       "Observation Reduction commands:",
-      "/tokenpilot reduction",
-      "/tokenpilot reduction on",
-      "/tokenpilot reduction off",
-      "/tokenpilot reduction mode <light|balanced|aggressive>",
-      "/tokenpilot reduction pass <name> <on|off>",
-      "/tokenpilot reduction set <triggerMinChars|maxToolChars> <number>",
+      `${command} reduction`,
+      `${command} reduction on`,
+      `${command} reduction off`,
+      `${command} reduction mode <light|balanced|aggressive>`,
+      `${command} reduction pass <name> <on|off>`,
+      `${command} reduction set <triggerMinChars|maxToolChars> <number>`,
       "",
       "Pass names:",
       "- readStateCompaction",
@@ -195,11 +197,11 @@ export function formatTokenPilotHelp(section?: string): string {
   if (section === "eviction") {
     return [
       "Lifecycle-Aware Eviction commands:",
-      "/tokenpilot eviction",
-      "/tokenpilot eviction on",
-      "/tokenpilot eviction off",
-      "/tokenpilot eviction estimator <on|off>",
-      "/tokenpilot eviction set <key> <value>",
+      `${command} eviction`,
+      `${command} eviction on`,
+      `${command} eviction off`,
+      `${command} eviction estimator <on|off>`,
+      `${command} eviction set <key> <value>`,
       "",
       "Keys:",
       "- policy: noop|lru|lfu|gdsf|model_scored",
@@ -217,18 +219,18 @@ export function formatTokenPilotHelp(section?: string): string {
   }
 
   return [
-    "TokenPilot commands:",
+    `${identity.displayName} commands:`,
     "",
-    "/tokenpilot status",
-    "/tokenpilot doctor",
-    "/tokenpilot help [stabilizer|reduction|eviction]",
-    "/tokenpilot report",
-    "/tokenpilot visual",
-    "/tokenpilot mode <conservative|normal|aggressive>",
-    "/tokenpilot settings details <on|off>",
-    "/tokenpilot stabilizer ...",
-    "/tokenpilot reduction ...",
-    "/tokenpilot eviction ...",
+    `${command} status`,
+    `${command} doctor`,
+    `${command} help [stabilizer|reduction|eviction]`,
+    `${command} report`,
+    `${command} visual`,
+    `${command} mode <conservative|normal|aggressive>`,
+    `${command} settings details <on|off>`,
+    `${command} stabilizer ...`,
+    `${command} reduction ...`,
+    `${command} eviction ...`,
     "",
     "Core modules:",
     "- Prefix Stabilization: prompt stability and dynamic context target",
@@ -236,22 +238,23 @@ export function formatTokenPilotHelp(section?: string): string {
     "- Lifecycle-Aware Eviction: eviction policy and task-state lifecycle knobs",
     "",
     "Examples:",
-    "/tokenpilot report",
-    "/tokenpilot doctor",
-    "/tokenpilot visual",
-    "/tokenpilot mode normal",
-    "/tokenpilot settings details on",
-    "/tokenpilot reduction mode balanced",
-    "/tokenpilot reduction pass toolPayloadTrim off",
-    "/tokenpilot eviction on",
-    "/tokenpilot eviction set minBlockChars 512",
-    "/tokenpilot stabilizer target developer",
+    `${command} report`,
+    `${command} doctor`,
+    `${command} visual`,
+    `${command} mode normal`,
+    `${command} settings details on`,
+    `${command} reduction mode balanced`,
+    `${command} reduction pass toolPayloadTrim off`,
+    `${command} eviction on`,
+    `${command} eviction set minBlockChars 512`,
+    `${command} stabilizer target developer`,
   ].join("\n");
 }
 
-export function summarizeTokenPilotStatus(
+export function summarizeProductStatus(
   cfg: Record<string, unknown>,
   adapter: ProductSurfaceConfigAdapter,
+  identity: ProductSurfaceIdentity,
 ): string {
   const entry = adapter.pluginEntryRecord(cfg);
   const pluginCfg = adapter.pluginConfigRecord(cfg);
@@ -279,7 +282,7 @@ export function summarizeTokenPilotStatus(
   })?.[0] ?? "custom";
 
   return [
-    "TokenPilot status:",
+    `${identity.displayName} status:`,
     `- entry.enabled: ${formatOnOff(entry?.enabled)}`,
     `- config.enabled: ${formatOnOff(pluginCfg?.enabled)}`,
     `- mode: ${modeLabel}`,
@@ -379,7 +382,7 @@ export function formatSessionReport(params: {
     : aggregate.avgSavedTokensPerOptimizedTurn;
   const lines = [
     ...(overview ?? []).map((item) => `${item.label}: ${item.value}`),
-    title ?? "TokenPilot report:",
+    title ?? "Optimization report:",
     `- session: ${sessionId}`,
     ...(moduleSummary ? [`- module mode: ${moduleSummary.mode}`] : []),
     `- count mode: ${countModeDescription(latestCountMode)}`,
@@ -488,7 +491,7 @@ export function buildSessionReportText(params: ProductSurfaceSessionReportData):
   if (!aggregate) {
     const lines = [
       ...(overview ?? []).map((item) => `${item.label}: ${item.value}`),
-      title ?? "TokenPilot report:",
+      title ?? "Optimization report:",
       `- session: ${sessionId}`,
       ...(moduleSummary ? [`- module mode: ${moduleSummary.mode}`] : []),
       emptyMessage ?? "- no savings recorded yet",

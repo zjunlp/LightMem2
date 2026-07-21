@@ -8,12 +8,12 @@ import {
   setNestedValue,
   splitArgs,
 } from "../config.js";
-import { formatTokenPilotHelp, summarizeReductionStatus } from "../presentation.js";
+import { formatProductHelp, summarizeReductionStatus } from "../presentation.js";
 import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./shared.js";
 import { writeUpdatedConfig } from "./shared.js";
 
 export function createReductionHandler(params: ProductSurfaceCommandDeps): ProductSurfaceActionHandler {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
 
   return async (_ctx, currentConfig, rest) => {
     const args = splitArgs(rest);
@@ -24,7 +24,7 @@ export function createReductionHandler(params: ProductSurfaceCommandDeps): Produ
     }
 
     if (action === "help") {
-      return { text: formatTokenPilotHelp("reduction") };
+      return { text: formatProductHelp(identity, "reduction") };
     }
 
     const toggleValue = parseBooleanWord(action);
@@ -39,7 +39,7 @@ export function createReductionHandler(params: ProductSurfaceCommandDeps): Produ
     if (action === "mode") {
       const presetName = parseStringValue(args[1] ?? "").toLowerCase();
       if (!REDUCTION_PRESETS[presetName]) {
-        return { text: "Usage: /tokenpilot reduction mode <light|balanced|aggressive>" };
+        return { text: `Usage: /${identity.commandName} reduction mode <light|balanced|aggressive>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         applyReductionPreset(nextConfig, presetName, configAdapter);
@@ -52,7 +52,7 @@ export function createReductionHandler(params: ProductSurfaceCommandDeps): Produ
       const passPath = REDUCTION_PASS_PATHS[passName];
       const value = parseBooleanWord(args[2] ?? "");
       if (!passPath || value === undefined) {
-        return { text: "Usage: /tokenpilot reduction pass <name> <on|off>" };
+        return { text: `Usage: /${identity.commandName} reduction pass <name> <on|off>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -65,7 +65,7 @@ export function createReductionHandler(params: ProductSurfaceCommandDeps): Produ
       const key = args[1] ?? "";
       const value = parseNumberWord(args[2] ?? "");
       if ((key !== "triggerMinChars" && key !== "maxToolChars") || value === undefined) {
-        return { text: "Usage: /tokenpilot reduction set <triggerMinChars|maxToolChars> <number>" };
+        return { text: `Usage: /${identity.commandName} reduction set <triggerMinChars|maxToolChars> <number>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -74,6 +74,6 @@ export function createReductionHandler(params: ProductSurfaceCommandDeps): Produ
       });
     }
 
-    return { text: formatTokenPilotHelp("reduction") };
+    return { text: formatProductHelp(identity, "reduction") };
   };
 }

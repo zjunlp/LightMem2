@@ -225,6 +225,9 @@ importers:
       '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../packages/foundation/kernel
+      '@lightmem2/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       '@lightmem2/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction

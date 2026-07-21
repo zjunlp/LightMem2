@@ -285,11 +285,12 @@ export function assertStablePrefixRewrite(params: {
 
 export function assertReportText(params: {
   text: string;
+  headerPattern?: RegExp;
   sessionId?: string;
   unitLabel?: "chars" | "tokens";
   optimizedTurns?: number;
 }): void {
-  assert.match(params.text, /TokenPilot report:/);
+  assert.match(params.text, params.headerPattern ?? /report:/i);
   if (params.sessionId) {
     assert.match(params.text, new RegExp(`session: ${escapeRegExp(params.sessionId)}`));
   }

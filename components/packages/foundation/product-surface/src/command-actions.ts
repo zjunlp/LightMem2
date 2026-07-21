@@ -1,4 +1,5 @@
 import type { ProductSurfaceConfigAdapter, ProductSurfaceHostBridge } from "@lightmem2/host-adapter";
+import type { ProductSurfaceIdentity } from "./identity.js";
 import { createEvictionHandler } from "./commands/runtime-eviction.js";
 import { createModeHandler } from "./commands/runtime-mode.js";
 import { createReductionHandler } from "./commands/runtime-reduction.js";
@@ -10,6 +11,7 @@ import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./c
 export function createProductSurfaceActionHandlers(params: {
   bridge: ProductSurfaceHostBridge;
   configAdapter: ProductSurfaceConfigAdapter;
+  identity: ProductSurfaceIdentity;
 }): Record<string, ProductSurfaceActionHandler> {
   const deps: ProductSurfaceCommandDeps = params;
 

@@ -1,10 +1,10 @@
 import { parseBooleanWord, parseStringValue, setNestedValue, splitArgs } from "../config.js";
-import { formatTokenPilotHelp, summarizeStabilizerStatus } from "../presentation.js";
+import { formatProductHelp, summarizeStabilizerStatus } from "../presentation.js";
 import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./shared.js";
 import { writeUpdatedConfig } from "./shared.js";
 
 export function createStabilizerHandler(params: ProductSurfaceCommandDeps): ProductSurfaceActionHandler {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
 
   return async (_ctx, currentConfig, rest) => {
     const args = splitArgs(rest);
@@ -15,7 +15,7 @@ export function createStabilizerHandler(params: ProductSurfaceCommandDeps): Prod
     }
 
     if (action === "help") {
-      return { text: formatTokenPilotHelp("stabilizer") };
+      return { text: formatProductHelp(identity, "stabilizer") };
     }
 
     const toggleValue = parseBooleanWord(action);
@@ -33,7 +33,7 @@ export function createStabilizerHandler(params: ProductSurfaceCommandDeps): Prod
     if (action === "hook") {
       const value = parseBooleanWord(args[1] ?? "");
       if (value === undefined) {
-        return { text: "Usage: /tokenpilot stabilizer hook <on|off>" };
+        return { text: `Usage: /${identity.commandName} stabilizer hook <on|off>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -45,7 +45,7 @@ export function createStabilizerHandler(params: ProductSurfaceCommandDeps): Prod
     if (action === "target") {
       const target = parseStringValue(args[1] ?? "").toLowerCase();
       if (target !== "developer" && target !== "user") {
-        return { text: "Usage: /tokenpilot stabilizer target <developer|user>" };
+        return { text: `Usage: /${identity.commandName} stabilizer target <developer|user>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -54,6 +54,6 @@ export function createStabilizerHandler(params: ProductSurfaceCommandDeps): Prod
       });
     }
 
-    return { text: formatTokenPilotHelp("stabilizer") };
+    return { text: formatProductHelp(identity, "stabilizer") };
   };
 }

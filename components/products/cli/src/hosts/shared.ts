@@ -16,6 +16,7 @@ import {
   type ProductSurfaceLatestUxEffect,
   type ProductSurfaceSessionAggregate,
 } from "@lightmem2/product-surface";
+import { TOKENPILOT_PRODUCT_SURFACE_IDENTITY } from "@lightmem2/tokenpilot";
 
 type LatestUxEffectWithSessionId = ProductSurfaceLatestUxEffect & {
   sessionId?: string | null;
@@ -145,6 +146,7 @@ export async function buildSessionReportResult(params: {
   }
   return {
     text: buildSessionReportText({
+      title: "TokenPilot report:",
       sessionId,
       aggregate,
       latest,
@@ -282,6 +284,7 @@ export function createRestrictedHostCommandHandler(params: {
   const sharedHandler = createProductSurfaceCommandHandler({
     bridge: params.bridge,
     configAdapter: params.configAdapter,
+    identity: TOKENPILOT_PRODUCT_SURFACE_IDENTITY,
   });
 
   function isReductionPassName(value: string): boolean {

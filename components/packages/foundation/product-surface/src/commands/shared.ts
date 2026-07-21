@@ -5,6 +5,7 @@ import type {
   ProductSurfaceConfigAdapter,
   ProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
+import type { ProductSurfaceIdentity } from "../identity.js";
 
 export type ProductSurfaceActionHandler = (
   ctx: ProductCommandContext,
@@ -15,6 +16,7 @@ export type ProductSurfaceActionHandler = (
 export type ProductSurfaceCommandDeps = {
   bridge: ProductSurfaceHostBridge;
   configAdapter: ProductSurfaceConfigAdapter;
+  identity: ProductSurfaceIdentity;
 };
 
 export function asTextResult(

@@ -1002,7 +1002,7 @@ async function loadSessions() {
   if (state.activeSessionId) {
     await loadSession(state.activeSessionId);
   } else {
-    renderEmpty("No visual snapshots yet. Run a few TokenPilot turns first, then refresh this page.");
+    renderEmpty("No visual snapshots yet. Run a few LightMem2-enabled turns, then refresh this page.");
   }
 }
 

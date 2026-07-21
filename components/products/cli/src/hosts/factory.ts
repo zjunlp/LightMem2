@@ -1,4 +1,5 @@
 import { createProductSurfaceCommandHandler } from "@lightmem2/product-surface";
+import { TOKENPILOT_PRODUCT_SURFACE_IDENTITY } from "@lightmem2/tokenpilot";
 import type { CliHostPathOverrides } from "../context-store.js";
 import { createClaudeCodeCliBridge } from "./claude-code.js";
 import { createCodexCliBridge } from "./codex.js";
@@ -36,6 +37,7 @@ const CLI_HOST_REGISTRATIONS: CliHostRegistration[] = CLI_HOSTS.map((host) => ({
     const handler = createProductSurfaceCommandHandler({
       bridge: bridge.bridge,
       configAdapter: bridge.configAdapter,
+      identity: TOKENPILOT_PRODUCT_SURFACE_IDENTITY,
     });
     return {
       handleCommand(ctx) {

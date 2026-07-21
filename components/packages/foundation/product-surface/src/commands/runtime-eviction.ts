@@ -1,10 +1,10 @@
 import { parseBooleanWord, parseNumberWord, parseStringValue, setNestedValue, splitArgs } from "../config.js";
-import { formatTokenPilotHelp, summarizeEvictionStatus } from "../presentation.js";
+import { formatProductHelp, summarizeEvictionStatus } from "../presentation.js";
 import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./shared.js";
 import { writeUpdatedConfig } from "./shared.js";
 
 export function createEvictionHandler(params: ProductSurfaceCommandDeps): ProductSurfaceActionHandler {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
 
   return async (_ctx, currentConfig, rest) => {
     const args = splitArgs(rest);
@@ -15,7 +15,7 @@ export function createEvictionHandler(params: ProductSurfaceCommandDeps): Produc
     }
 
     if (action === "help") {
-      return { text: formatTokenPilotHelp("eviction") };
+      return { text: formatProductHelp(identity, "eviction") };
     }
 
     const toggleValue = parseBooleanWord(action);
@@ -32,7 +32,7 @@ export function createEvictionHandler(params: ProductSurfaceCommandDeps): Produc
     if (action === "estimator") {
       const value = parseBooleanWord(args[1] ?? "");
       if (value === undefined) {
-        return { text: "Usage: /tokenpilot eviction estimator <on|off>" };
+        return { text: `Usage: /${identity.commandName} eviction estimator <on|off>` };
       }
       return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {
         const pluginCfg = configAdapter.ensurePluginConfig(nextConfig);
@@ -56,14 +56,14 @@ export function createEvictionHandler(params: ProductSurfaceCommandDeps): Produc
       const enumKeys = new Set(["policy", "replacementMode", "inputMode", "lifecycleMode", "evidenceMode"]);
 
       if (!numericKeys.has(key) && !enumKeys.has(key)) {
-        return { text: "Usage: /tokenpilot eviction set <key> <value>" };
+        return { text: `Usage: /${identity.commandName} eviction set <key> <value>` };
       }
 
       let parsedValue: string | number | undefined;
       if (numericKeys.has(key)) parsedValue = parseNumberWord(rawValue);
       if (enumKeys.has(key)) parsedValue = parseStringValue(rawValue);
       if (parsedValue === undefined || parsedValue === "") {
-        return { text: "Usage: /tokenpilot eviction set <key> <value>" };
+        return { text: `Usage: /${identity.commandName} eviction set <key> <value>` };
       }
 
       const targetPath = key === "policy" || key === "replacementMode" || key === "minBlockChars" || key === "maxCandidateBlocks"
@@ -77,6 +77,6 @@ export function createEvictionHandler(params: ProductSurfaceCommandDeps): Produc
       });
     }
 
-    return { text: formatTokenPilotHelp("eviction") };
+    return { text: formatProductHelp(identity, "eviction") };
   };
 }

@@ -3,12 +3,12 @@ import type { ProductSurfaceActionHandler, ProductSurfaceCommandDeps } from "./s
 import { writeUpdatedConfig } from "./shared.js";
 
 export function createModeHandler(params: ProductSurfaceCommandDeps): ProductSurfaceActionHandler {
-  const { bridge, configAdapter } = params;
+  const { bridge, configAdapter, identity } = params;
 
   return async (_ctx, currentConfig, rest) => {
     const modeName = splitArgs(rest)[0]?.toLowerCase() ?? "";
     if (!RUNTIME_MODE_PRESETS[modeName]) {
-      return { text: "Usage: /tokenpilot mode <conservative|normal|aggressive>" };
+      return { text: `Usage: /${identity.commandName} mode <conservative|normal|aggressive>` };
     }
 
     return writeUpdatedConfig(bridge, currentConfig, (nextConfig) => {

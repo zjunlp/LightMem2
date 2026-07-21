@@ -321,7 +321,7 @@ export async function handleVisual(
   const visualServer = await ensureVisualServer(stateDir);
   const sessions = await readVisualSessionList(stateDir);
   const lines = [
-    `TokenPilot visual: ${visualServer.url}`,
+    `LightMem2 visual: ${visualServer.url}`,
     `- sessions with snapshots: ${sessions.length}`,
     "- open this URL in your browser to inspect reduction and eviction before/after views",
   ];
