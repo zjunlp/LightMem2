@@ -157,7 +157,7 @@ function isCodexAdapterRoot(candidate: string): boolean {
   }
   try {
     const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { name?: string };
-    return parsed.name === "@tokenpilot/codex-adapter";
+    return parsed.name === "@lightmem2/codex-adapter";
   } catch {
     return false;
   }

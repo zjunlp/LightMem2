@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/claude-code-adapter",
+  "name": "@lightmem2/claude-code-adapter",
   "version": "0.1.0",
   "description": "TokenPilot adapter for Claude Code via an Anthropic-compatible gateway.",
   "lightmem2": {
@@ -20,7 +20,7 @@
     "@lightmem2/tokenpilot": "workspace:*",
     "@lightmem2/host-adapter": "workspace:*",
     "@lightmem2/kernel": "workspace:*",
-    "@tokenpilot/mcp": "workspace:*",
+    "@lightmem2/mcp": "workspace:*",
     "@lightmem2/product-surface": "workspace:*",
     "@lightmem2/reduction": "workspace:*",
     "@lightmem2/stabilizer": "workspace:*"

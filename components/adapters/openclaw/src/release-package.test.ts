@@ -23,12 +23,12 @@ test("release package loads without monorepo workspace dependencies", async () =
       },
     });
     archivePath = result.stdout.trim().split("\n").at(-1) ?? "";
-    assert.match(archivePath, /tokenpilot-.*\.tgz$/);
+    assert.match(archivePath, /lightmem2-tokenpilot-openclaw-.*\.tgz$/);
 
     await execFileAsync("tar", ["-xzf", archivePath, "-C", extractDir]);
     const installedDir = join(extractDir, "package");
     const manifest = JSON.parse(await readFile(join(installedDir, "package.json"), "utf8"));
-    assert.equal(manifest.name, "tokenpilot");
+    assert.equal(manifest.name, "@lightmem2/tokenpilot-openclaw");
     assert.equal(manifest.dependencies, undefined);
     assert.equal(manifest.devDependencies, undefined);
 

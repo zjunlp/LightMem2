@@ -6,7 +6,7 @@ PLUGIN_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${PLUGIN_DIR}"
 
-rm -f tokenpilot-*.tgz
+rm -f lightmem2-tokenpilot-openclaw-*.tgz tokenpilot-*.tgz
 npm run build >/dev/null 2>&1
 
 NPM_CACHE_DIR="${NPM_CACHE_DIR:-/tmp/tokenpilot-npm-cache}"

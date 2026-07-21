@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/codex-adapter",
+  "name": "@lightmem2/codex-adapter",
   "version": "0.1.0",
   "description": "TokenPilot adapter for Codex via an OpenAI-compatible Responses proxy.",
   "lightmem2": {
@@ -23,7 +23,7 @@
     "@lightmem2/tokenpilot": "workspace:*",
     "@lightmem2/host-adapter": "workspace:*",
     "@lightmem2/kernel": "workspace:*",
-    "@tokenpilot/mcp": "workspace:*",
+    "@lightmem2/mcp": "workspace:*",
     "@lightmem2/product-surface": "workspace:*",
     "@lightmem2/reduction": "workspace:*",
     "@lightmem2/stabilizer": "workspace:*"

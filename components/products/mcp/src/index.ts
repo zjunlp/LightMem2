@@ -66,7 +66,7 @@ function isTokenPilotMcpPackageRoot(candidate: string): boolean {
   }
   try {
     const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { name?: string };
-    return parsed.name === "@tokenpilot/mcp";
+    return parsed.name === "@lightmem2/mcp";
   } catch {
     return false;
   }
@@ -131,7 +131,7 @@ export function resolveTokenPilotMcpServerSpec(params?: {
   const distEntryPath = join(packageRoot, "dist", "server.js");
   if (params?.requireBuild !== false && !existsSync(distEntryPath)) {
     throw new Error(
-      `TokenPilot MCP server is not built yet: ${distEntryPath}. Run \`pnpm --dir <repo> --filter @tokenpilot/mcp build\` first.`,
+      `TokenPilot MCP server is not built yet: ${distEntryPath}. Run \`pnpm --dir <repo> --filter @lightmem2/mcp build\` first.`,
     );
   }
   return buildTokenPilotMcpServerSpec(distEntryPath, params?.stateDir);
@@ -176,7 +176,7 @@ export function resolveTokenPilotMcpProbeServerSpec(params?: {
   }
   if (params?.requireBuild !== false) {
     throw new Error(
-      `TokenPilot MCP server is not built yet: ${distEntryPath}. Run \`pnpm --dir <repo> --filter @tokenpilot/mcp build\` first.`,
+      `TokenPilot MCP server is not built yet: ${distEntryPath}. Run \`pnpm --dir <repo> --filter @lightmem2/mcp build\` first.`,
     );
   }
   return buildTokenPilotMcpServerSpec(distEntryPath, params?.stateDir);

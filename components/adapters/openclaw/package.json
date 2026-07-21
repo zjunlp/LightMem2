@@ -1,5 +1,5 @@
 {
-  "name": "tokenpilot",
+  "name": "@lightmem2/tokenpilot-openclaw",
   "version": "0.1.0",
   "description": "TokenPilot plugin for OpenClaw: routing hooks and token-efficiency runtime controls.",
   "lightmem2": {

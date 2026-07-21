@@ -43,7 +43,7 @@ function isClaudeCodeAdapterRoot(candidate: string): boolean {
   }
   try {
     const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { name?: string };
-    return parsed.name === "@tokenpilot/claude-code-adapter";
+    return parsed.name === "@lightmem2/claude-code-adapter";
   } catch {
     return false;
   }

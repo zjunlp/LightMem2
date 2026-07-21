@@ -29,6 +29,9 @@ importers:
       '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../packages/foundation/kernel
+      '@lightmem2/mcp':
+        specifier: workspace:*
+        version: link:../../products/mcp
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
@@ -41,9 +44,6 @@ importers:
       '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/mcp':
-        specifier: workspace:*
-        version: link:../../products/mcp
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -66,6 +66,9 @@ importers:
       '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../packages/foundation/kernel
+      '@lightmem2/mcp':
+        specifier: workspace:*
+        version: link:../../products/mcp
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
@@ -78,9 +81,6 @@ importers:
       '@lightmem2/tokenpilot':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/mcp':
-        specifier: workspace:*
-        version: link:../../products/mcp
     devDependencies:
       esbuild:
         specifier: ^0.25.10

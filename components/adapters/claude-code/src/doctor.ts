@@ -75,7 +75,7 @@ async function checkHealth(baseUrl: string): Promise<boolean> {
 function remediationLines(report: ClaudeCodeDoctorReport): string[] {
   const fixes: string[] = [];
   if (!report.settingsInstalled) {
-    fixes.push("- run `pnpm --filter @tokenpilot/claude-code-adapter install:claude-code` to create Claude settings and gateway routing");
+    fixes.push("- run `pnpm --filter @lightmem2/claude-code-adapter install:claude-code` to create Claude settings and gateway routing");
     return fixes;
   }
   if (!report.routedViaGateway || !report.toolSearchEnabled) {

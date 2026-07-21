@@ -45,7 +45,7 @@
             "@lightmem2/product-surface": [
                 "components/packages/foundation/product-surface/src/index.ts"
             ],
-            "@tokenpilot/mcp": [
+            "@lightmem2/mcp": [
                 "components/products/mcp/src/index.ts"
             ]
         },
