@@ -25,7 +25,7 @@
                 "components/packages/foundation/history/src/index.ts"
             ],
             "@tokenpilot/memory": [
-                "components/tokenpilot/packages/features/memory/src/index.ts"
+                "components/packages/features/memory/src/index.ts"
             ],
             "@tokenpilot/runtime-core": [
                 "components/packages/foundation/runtime-core/src/index.ts"
