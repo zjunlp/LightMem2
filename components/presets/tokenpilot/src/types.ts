@@ -47,7 +47,7 @@ export type {
   ReductionDecision,
   ReductionInstruction,
   ReductionStrategy,
-} from "@tokenpilot/reduction";
+} from "@lightmem2/reduction";
 
 export type {
   EvictionBlock,
@@ -60,4 +60,4 @@ export type {
   TaskStateEstimatorInput,
   TaskStateEstimatorOutput,
   TaskStateTransition,
-} from "@tokenpilot/eviction";
+} from "@lightmem2/eviction";

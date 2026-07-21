@@ -1,5 +1,5 @@
 {
-  "name": "@tokenpilot/eviction",
+  "name": "@lightmem2/eviction",
   "version": "0.1.0",
   "private": true,
   "lightmem2": { "role": "feature" },

@@ -48,7 +48,7 @@ import {
   createOpenClawPayloadCodec,
   createOpenClawSessionResolver,
 } from "./context-stack/integration/openclaw-host-adapter.js";
-import { isReductionPassEnabled } from "@tokenpilot/reduction";
+import { isReductionPassEnabled } from "@lightmem2/reduction";
 import { loadOrderedTurnAnchors, loadSegmentAnchorByCallId } from "@lightmem2/history";
 import {
   appendJsonl,

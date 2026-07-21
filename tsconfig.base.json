@@ -24,22 +24,22 @@
             "@lightmem2/history": [
                 "components/packages/foundation/history/src/index.ts"
             ],
-            "@tokenpilot/memory": [
+            "@lightmem2/memory": [
                 "components/packages/features/memory/src/index.ts"
             ],
             "@lightmem2/runtime-core": [
                 "components/packages/foundation/runtime-core/src/index.ts"
             ],
-            "@tokenpilot/reduction": [
+            "@lightmem2/reduction": [
                 "components/packages/features/reduction/src/index.ts"
             ],
-            "@tokenpilot/eviction": [
+            "@lightmem2/eviction": [
                 "components/packages/features/eviction/src/index.ts"
             ],
             "@lightmem2/host-adapter": [
                 "components/packages/foundation/host-adapter/src/index.ts"
             ],
-            "@tokenpilot/stabilizer": [
+            "@lightmem2/stabilizer": [
                 "components/packages/features/stabilizer/src/index.ts"
             ],
             "@lightmem2/product-surface": [

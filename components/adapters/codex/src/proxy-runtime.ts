@@ -33,7 +33,7 @@ import {
 import {
   buildStabilityVisualSnapshotFromEnvelopes,
   canonicalizeEnvelopeTools,
-} from "@tokenpilot/stabilizer";
+} from "@lightmem2/stabilizer";
 import { prepareCodexStablePrefix } from "./stable-prefix.js";
 import {
   requestUpstreamResponses,

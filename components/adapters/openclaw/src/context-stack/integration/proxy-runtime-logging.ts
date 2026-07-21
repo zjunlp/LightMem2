@@ -6,7 +6,7 @@ import {
   findFirstMessageText,
   recordBeforeCallVisualState,
 } from "@lightmem2/product-surface";
-import { buildStabilityVisualSnapshotFromEnvelopes } from "@tokenpilot/stabilizer";
+import { buildStabilityVisualSnapshotFromEnvelopes } from "@lightmem2/stabilizer";
 import { pluginStateSubdir } from "@lightmem2/artifact-store";
 import { summarizeResponseFunctionCalls } from "./proxy-runtime-shared.js";
 

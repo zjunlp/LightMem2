@@ -6,7 +6,7 @@ import {
   analyzeToolPayloadTrim,
   resolveReductionPasses,
   runReductionBeforeCall,
-} from "@tokenpilot/reduction";
+} from "@lightmem2/reduction";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 import { loadClaudeCodeSessionSnapshot } from "./session-state.js";
 

@@ -3,7 +3,7 @@ import {
   applyStablePrefixToInstructions,
   extractContentText,
   replaceContentText,
-} from "@tokenpilot/stabilizer";
+} from "@lightmem2/stabilizer";
 import type { HostRequestEnvelope } from "@lightmem2/host-adapter";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 

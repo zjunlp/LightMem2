@@ -30,7 +30,7 @@ import { prepareClaudeStablePrefix } from "./stable-prefix.js";
 import {
   buildStabilityVisualSnapshotFromEnvelopes,
   canonicalizeEnvelopeTools,
-} from "@tokenpilot/stabilizer";
+} from "@lightmem2/stabilizer";
 import { appendClaudeCodeTrace } from "./trace.js";
 import { createClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./upstream.js";
 import { appendClaudeCodeCacheAuditRecord, buildClaudeCodeCacheAuditSnapshot } from "./cache-audit.js";

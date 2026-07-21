@@ -29,15 +29,15 @@
   "dependencies": {
     "@lightmem2/artifact-store": "workspace:*",
     "@tokenpilot/decision": "workspace:*",
-    "@tokenpilot/eviction": "workspace:*",
+    "@lightmem2/eviction": "workspace:*",
     "@lightmem2/host-adapter": "workspace:*",
     "@lightmem2/history": "workspace:*",
     "@lightmem2/kernel": "workspace:*",
-    "@tokenpilot/memory": "workspace:*",
+    "@lightmem2/memory": "workspace:*",
     "@lightmem2/product-surface": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*",
+    "@lightmem2/reduction": "workspace:*",
     "@lightmem2/runtime-core": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*"
+    "@lightmem2/stabilizer": "workspace:*"
   },
   "scripts": {
     "build": "tsx build.ts",

@@ -2,9 +2,9 @@ import type { RuntimeModule } from "@lightmem2/kernel";
 import {
   buildLifecyclePolicyContext,
   type LifecyclePlanningResult,
-} from "@tokenpilot/eviction";
+} from "@lightmem2/eviction";
 
-export type { LifecyclePlanningResult } from "@tokenpilot/eviction";
+export type { LifecyclePlanningResult } from "@lightmem2/eviction";
 
 export async function runLifecyclePlanningIfEnabled(params: {
   cfg: any;

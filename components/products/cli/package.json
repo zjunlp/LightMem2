@@ -20,7 +20,7 @@
     "@tokenpilot/decision": "workspace:*",
     "@lightmem2/host-adapter": "workspace:*",
     "@lightmem2/product-surface": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*"
+    "@lightmem2/stabilizer": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.25.10",

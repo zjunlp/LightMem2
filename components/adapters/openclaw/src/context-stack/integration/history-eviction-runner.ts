@@ -1,7 +1,7 @@
 import type { CanonicalTranscriptState } from "@lightmem2/history";
-import type { HistoryEvictionResult } from "@tokenpilot/eviction";
+import type { HistoryEvictionResult } from "@lightmem2/eviction";
 
-export type { HistoryEvictionResult } from "@tokenpilot/eviction";
+export type { HistoryEvictionResult } from "@lightmem2/eviction";
 
 export async function runHistoryEvictionIfEnabled(params: {
   cfg: any;

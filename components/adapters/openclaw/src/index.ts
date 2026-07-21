@@ -3,7 +3,7 @@ import {
   runReductionAfterCall as runLayerReductionAfterCall,
   runReductionBeforeCall as runLayerReductionBeforeCall,
   resolveReductionPasses as resolveLayerReductionPasses,
-} from "@tokenpilot/reduction";
+} from "@lightmem2/reduction";
 import { configureStatePathResolver } from "@lightmem2/artifact-store";
 import {
   extractInputText,

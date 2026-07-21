@@ -32,18 +32,18 @@ importers:
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
+      '@lightmem2/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
+      '@lightmem2/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../packages/features/reduction
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -69,18 +69,18 @@ importers:
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
+      '@lightmem2/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
+      '@lightmem2/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
       '@tokenpilot/mcp':
         specifier: workspace:*
         version: link:../../products/mcp
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../packages/features/reduction
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -97,6 +97,9 @@ importers:
       '@lightmem2/artifact-store':
         specifier: workspace:*
         version: link:../../packages/foundation/artifact-store
+      '@lightmem2/eviction':
+        specifier: workspace:*
+        version: link:../../packages/features/eviction
       '@lightmem2/history':
         specifier: workspace:*
         version: link:../../packages/foundation/history
@@ -106,27 +109,24 @@ importers:
       '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../packages/foundation/kernel
+      '@lightmem2/memory':
+        specifier: workspace:*
+        version: link:../../packages/features/memory
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
+      '@lightmem2/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
       '@lightmem2/runtime-core':
         specifier: workspace:*
         version: link:../../packages/foundation/runtime-core
+      '@lightmem2/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/eviction':
-        specifier: workspace:*
-        version: link:../../packages/features/eviction
-      '@tokenpilot/memory':
-        specifier: workspace:*
-        version: link:../../packages/features/memory
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../packages/features/reduction
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10
@@ -216,22 +216,22 @@ importers:
 
   components/presets/tokenpilot:
     dependencies:
+      '@lightmem2/eviction':
+        specifier: workspace:*
+        version: link:../../packages/features/eviction
       '@lightmem2/history':
         specifier: workspace:*
         version: link:../../packages/foundation/history
       '@lightmem2/kernel':
         specifier: workspace:*
         version: link:../../packages/foundation/kernel
+      '@lightmem2/reduction':
+        specifier: workspace:*
+        version: link:../../packages/features/reduction
       '@lightmem2/runtime-core':
         specifier: workspace:*
         version: link:../../packages/foundation/runtime-core
-      '@tokenpilot/eviction':
-        specifier: workspace:*
-        version: link:../../packages/features/eviction
-      '@tokenpilot/reduction':
-        specifier: workspace:*
-        version: link:../../packages/features/reduction
-      '@tokenpilot/stabilizer':
+      '@lightmem2/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
 
@@ -243,12 +243,12 @@ importers:
       '@lightmem2/product-surface':
         specifier: workspace:*
         version: link:../../packages/foundation/product-surface
+      '@lightmem2/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../presets/tokenpilot
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../packages/features/stabilizer
     devDependencies:
       esbuild:
         specifier: ^0.25.10

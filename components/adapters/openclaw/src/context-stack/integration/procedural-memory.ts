@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prependTextToContent } from "../request-preprocessing/root-prompt-stabilizer.js";
-import { formatProceduralMemoryInjection, createLocalProceduralMemoryBackend, loadSkills, runProceduralMemoryBatch } from "@tokenpilot/memory";
+import { formatProceduralMemoryInjection, createLocalProceduralMemoryBackend, loadSkills, runProceduralMemoryBatch } from "@lightmem2/memory";
 import {
   adaptProceduralMemoryInjection,
   createConfiguredDistiller,

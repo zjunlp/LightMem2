@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { prepareBeforeCall } from "@lightmem2/host-adapter";
-import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
+import { canonicalizeEnvelopeTools } from "@lightmem2/stabilizer";
 
 import {
   createOpenClawPayloadCodec,

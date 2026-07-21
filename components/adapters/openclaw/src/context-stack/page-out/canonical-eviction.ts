@@ -3,7 +3,7 @@ import {
   applyCanonicalEviction as applyCanonicalEvictionBase,
   computeClosureDeferredTaskInfo,
   type EvictionHelpers,
-} from "@tokenpilot/eviction";
+} from "@lightmem2/eviction";
 import { pluginStateSubdir } from "@lightmem2/artifact-store";
 
 export { computeClosureDeferredTaskInfo, type EvictionHelpers };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { TokenPilotProductSurfaceConfigAdapter } from "@lightmem2/host-adapter";
-import type { CacheAuditRecord } from "@tokenpilot/stabilizer";
+import type { CacheAuditRecord } from "@lightmem2/stabilizer";
 import {
   buildSessionReportResult,
   resolvePreferredSessionId,

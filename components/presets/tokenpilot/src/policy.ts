@@ -25,7 +25,7 @@ import {
   analyzePathTruncation,
   analyzeImageDownsample,
   analyzeLineNumberStrip,
-} from "@tokenpilot/reduction";
+} from "@lightmem2/reduction";
 import {
   analyzeEvictionFromTaskRegistry,
   createApiTaskStateEstimator,
@@ -36,7 +36,7 @@ import {
   type TaskStateEstimator,
   type TaskStateEstimatorApiConfig,
   type TaskStateTransition,
-} from "@tokenpilot/eviction";
+} from "@lightmem2/eviction";
 import {
   applySessionTaskRegistryPatch,
   buildDeltaViewFromRawSemanticSnapshot,

@@ -3,7 +3,7 @@ import type {
   TokenPilotProductCommandResult,
   TokenPilotProductSurfaceHostBridge,
 } from "@lightmem2/host-adapter";
-import { diagnoseCacheAudit, summarizeCacheAudit, type CacheAuditRecord } from "@tokenpilot/stabilizer";
+import { diagnoseCacheAudit, summarizeCacheAudit, type CacheAuditRecord } from "@lightmem2/stabilizer";
 import {
   buildSessionReportText,
   createProductSurfaceCommandHandler,

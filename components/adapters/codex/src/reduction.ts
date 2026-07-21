@@ -6,7 +6,7 @@ import {
   analyzeToolPayloadTrim,
   resolveReductionPasses,
   runReductionBeforeCall,
-} from "@tokenpilot/reduction";
+} from "@lightmem2/reduction";
 import type { TokenPilotCodexConfig } from "./config.js";
 import { loadCodexSessionSnapshot } from "./session-state.js";
 

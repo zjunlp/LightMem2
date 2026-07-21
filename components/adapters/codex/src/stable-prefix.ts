@@ -5,7 +5,7 @@ import {
   extractContentText,
   findFirstUserMessageIndex,
   rewriteTextForStablePrefix,
-} from "@tokenpilot/stabilizer";
+} from "@lightmem2/stabilizer";
 import type { HostRequestEnvelope } from "@lightmem2/host-adapter";
 import type { TokenPilotCodexConfig } from "./config.js";
 

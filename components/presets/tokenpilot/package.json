@@ -14,11 +14,11 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/eviction": "workspace:*",
+    "@lightmem2/eviction": "workspace:*",
     "@lightmem2/history": "workspace:*",
     "@lightmem2/kernel": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*",
+    "@lightmem2/reduction": "workspace:*",
     "@lightmem2/runtime-core": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*"
+    "@lightmem2/stabilizer": "workspace:*"
   }
 }

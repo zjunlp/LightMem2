@@ -8,7 +8,7 @@ import {
   type CacheAuditRecord,
   type CacheAuditSnapshot,
   type CacheAuditSummary,
-} from "@tokenpilot/stabilizer";
+} from "@lightmem2/stabilizer";
 
 export type CodexCacheAuditRecord = CacheAuditRecord;
 export type CodexCacheAuditSummary = CacheAuditSummary;

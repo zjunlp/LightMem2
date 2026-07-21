@@ -22,8 +22,8 @@
     "@lightmem2/kernel": "workspace:*",
     "@tokenpilot/mcp": "workspace:*",
     "@lightmem2/product-surface": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*"
+    "@lightmem2/reduction": "workspace:*",
+    "@lightmem2/stabilizer": "workspace:*"
   },
   "scripts": {
     "build": "tsx build.ts",
