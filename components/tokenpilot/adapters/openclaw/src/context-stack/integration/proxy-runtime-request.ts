@@ -19,6 +19,7 @@ import {
 } from "./lifecycle-planning-runner.js";
 import { runPrefixIfEnabled } from "./prefix-runner.js";
 import { runRequestModules, type ModuleExecutionRecord } from "./module-orchestrator.js";
+import { TOKENPILOT_REQUEST_MODULE_IDS } from "@tokenpilot/decision";
 
 type ProxyRequestPreparation = {
   payload: any;
@@ -284,7 +285,7 @@ export async function prepareProxyRequest(args: {
     context: requestModuleContext,
     modules: [
       {
-        id: "stabilizer",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.stabilizer,
         enabled: () => stabilizerEnabled,
         run: () => {
           requestModuleContext.prefixRun = runPrefixIfEnabled({
@@ -301,7 +302,7 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "memory-injection",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.memoryInjection,
         enabled: () => !proxyPureForward,
         run: async () => {
           requestModuleContext.memoryInjection = await injectProceduralMemoryHints({
@@ -314,7 +315,7 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "stabilizer-trace",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.stabilizerTrace,
         enabled: () => stabilizerEnabled && Boolean(cfg.stateDir),
         run: async () => {
           const { prefixRun, memoryInjection } = requestModuleContext;
@@ -334,7 +335,7 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "reduction-snapshot",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.reductionSnapshot,
         enabled: () => true,
         run: () => {
           requestModuleContext.beforeReductionInputCount = Array.isArray(payload?.input)
@@ -345,7 +346,7 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "lifecycle-planning",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.lifecyclePlanning,
         enabled: () => cfg.moduleEnablement.eviction,
         run: async () => {
           requestModuleContext.lifecycleRun = await runLifecyclePlanningIfEnabled({
@@ -381,7 +382,7 @@ export async function prepareProxyRequest(args: {
         },
       },
       {
-        id: "reduction",
+        id: TOKENPILOT_REQUEST_MODULE_IDS.reduction,
         enabled: () => reductionEnabled,
         run: async () => {
           requestModuleContext.reductionApplied = await runReductionIfEnabled(

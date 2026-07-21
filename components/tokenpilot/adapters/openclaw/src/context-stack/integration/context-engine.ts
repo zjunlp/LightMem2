@@ -5,6 +5,7 @@ import { appendModuleObservation } from "@tokenpilot/product-surface";
 import { enqueueEvictedTasksForProceduralMemory } from "./procedural-memory.js";
 import { runHistoryEvictionIfEnabled } from "./history-eviction-runner.js";
 import { runHistoryModules } from "./module-orchestrator.js";
+import { TOKENPILOT_HISTORY_MODULE_IDS } from "@tokenpilot/decision";
 
 export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
   const canonicalMessageTaskIdsBound = (message: Record<string, unknown>): string[] =>
@@ -19,7 +20,7 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
       context,
       modules: [
         {
-          id: "canonical-sync",
+          id: TOKENPILOT_HISTORY_MODULE_IDS.canonicalSync,
           enabled: () => true,
           run: async () => {
             context.synced = await syncCanonicalStateFromTranscript({
@@ -36,7 +37,7 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
           },
         },
         {
-          id: "eviction",
+          id: TOKENPILOT_HISTORY_MODULE_IDS.eviction,
           enabled: () => cfg.moduleEnablement.eviction,
           run: async () => {
             context.eviction = await runHistoryEvictionIfEnabled({
@@ -63,7 +64,7 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
           },
         },
         {
-          id: "memory-consumer",
+          id: TOKENPILOT_HISTORY_MODULE_IDS.memoryConsumer,
           enabled: () => Boolean(context.eviction?.appliedTaskIds.length),
           run: async () => enqueueEvictedTasksForProceduralMemory({
             cfg,
@@ -75,7 +76,7 @@ export function createPluginContextEngine(cfg: any, logger: any, deps: any) {
           }),
         },
         {
-          id: "canonical-persistence",
+          id: TOKENPILOT_HISTORY_MODULE_IDS.canonicalPersistence,
           enabled: () => Boolean(context.synced?.changed || context.eviction?.changed),
           run: async () => saveCanonicalState(
             cfg.stateDir,

@@ -17,6 +17,7 @@
     "@tokenpilot/eviction": "workspace:*",
     "@tokenpilot/history": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*"
+    "@tokenpilot/reduction": "workspace:*",
+    "@tokenpilot/runtime-core": "workspace:*"
   }
 }

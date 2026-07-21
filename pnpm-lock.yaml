@@ -222,6 +222,9 @@ importers:
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
+      '@tokenpilot/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/foundation/runtime-core
 
   components/tokenpilot/products/cli:
     dependencies:

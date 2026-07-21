@@ -1,71 +1,21 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import {
+  TOKENPILOT_MODULE_COMBINATIONS,
+  buildTokenPilotCombinationConfig,
+  type TokenPilotFeatureModule,
+  type TokenPilotModuleCombination,
+  type TokenPilotModuleEnablement,
+} from "@tokenpilot/decision";
 
-export type TokenPilotFeatureModule = "stabilizer" | "reduction" | "eviction";
-
-export type ModuleEnablement = Record<TokenPilotFeatureModule, boolean>;
-
-export type ModuleCombination = {
-  id:
-    | "none"
-    | "stabilizer-only"
-    | "reduction-only"
-    | "eviction-only"
-    | "stabilizer-reduction"
-    | "stabilizer-eviction"
-    | "reduction-eviction"
-    | "all";
-  enablement: ModuleEnablement;
-};
-
-export const MODULE_COMBINATIONS: readonly ModuleCombination[] = [
-  {
-    id: "none",
-    enablement: { stabilizer: false, reduction: false, eviction: false },
-  },
-  {
-    id: "stabilizer-only",
-    enablement: { stabilizer: true, reduction: false, eviction: false },
-  },
-  {
-    id: "reduction-only",
-    enablement: { stabilizer: false, reduction: true, eviction: false },
-  },
-  {
-    id: "eviction-only",
-    enablement: { stabilizer: false, reduction: false, eviction: true },
-  },
-  {
-    id: "stabilizer-reduction",
-    enablement: { stabilizer: true, reduction: true, eviction: false },
-  },
-  {
-    id: "stabilizer-eviction",
-    enablement: { stabilizer: true, reduction: false, eviction: true },
-  },
-  {
-    id: "reduction-eviction",
-    enablement: { stabilizer: false, reduction: true, eviction: true },
-  },
-  {
-    id: "all",
-    enablement: { stabilizer: true, reduction: true, eviction: true },
-  },
-] as const;
+export type { TokenPilotFeatureModule };
+export type ModuleEnablement = TokenPilotModuleEnablement;
+export type ModuleCombination = TokenPilotModuleCombination;
+export const MODULE_COMBINATIONS = TOKENPILOT_MODULE_COMBINATIONS;
 
 export function buildModuleCombinationConfig(enablement: ModuleEnablement) {
-  return {
-    modules: {
-      stabilizer: enablement.stabilizer,
-      policy: enablement.eviction,
-      reduction: enablement.reduction,
-      eviction: enablement.eviction,
-    },
-    eviction: {
-      enabled: enablement.eviction,
-    },
-  };
+  return buildTokenPilotCombinationConfig(enablement);
 }
 
 export type PayloadDiffEntry = {
