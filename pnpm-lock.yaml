@@ -41,6 +41,15 @@ importers:
 
   components/packages/foundation/kernel: {}
 
+  components/packages/foundation/product-surface:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../host-adapter
+
   components/packages/foundation/runtime-core:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -66,7 +75,7 @@ importers:
         version: link:../../products/mcp
       '@tokenpilot/product-surface':
         specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
+        version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
@@ -100,7 +109,7 @@ importers:
         version: link:../../products/mcp
       '@tokenpilot/product-surface':
         specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
+        version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
@@ -143,7 +152,7 @@ importers:
         version: link:../../packages/features/memory
       '@tokenpilot/product-surface':
         specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
+        version: link:../../../packages/foundation/product-surface
       '@tokenpilot/reduction':
         specifier: workspace:*
         version: link:../../packages/features/reduction
@@ -197,16 +206,7 @@ importers:
         version: link:../../../../packages/foundation/kernel
       '@tokenpilot/product-surface':
         specifier: workspace:*
-        version: link:../../foundation/product-surface
-
-  components/tokenpilot/packages/foundation/product-surface:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/artifact-store
-      '@tokenpilot/host-adapter':
-        specifier: workspace:*
-        version: link:../../../../packages/foundation/host-adapter
+        version: link:../../../../packages/foundation/product-surface
 
   components/tokenpilot/presets/tokenpilot:
     dependencies:
@@ -233,7 +233,7 @@ importers:
         version: link:../../../packages/foundation/host-adapter
       '@tokenpilot/product-surface':
         specifier: workspace:*
-        version: link:../../packages/foundation/product-surface
+        version: link:../../../packages/foundation/product-surface
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../packages/features/stabilizer
