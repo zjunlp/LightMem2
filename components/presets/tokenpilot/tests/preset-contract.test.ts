@@ -9,7 +9,8 @@ import {
   TOKENPILOT_PRESET_VERSION,
   TOKENPILOT_REQUEST_MODULE_ORDER,
   buildTokenPilotCombinationConfig,
-} from "../src/preset-contract.js";
+  createTokenPilotHostBinding,
+} from "../src/index.js";
 
 test("TokenPilot preset freezes identity, feature membership, and execution order", () => {
   assert.equal(TOKENPILOT_PRESET_ID, "tokenpilot");
@@ -63,4 +64,23 @@ test("shared registry deduplicates eviction across TokenPilot and future writeba
     tokenPilotEviction,
   );
   assert.equal(registry.list().filter(({ id }) => id === "eviction").length, 1);
+});
+
+test("TokenPilot host binding declares an explicit supported feature subset", () => {
+  assert.deepEqual(
+    createTokenPilotHostBinding({
+      hostId: "codex",
+      supportedFeatures: ["stabilizer", "reduction", "stabilizer"],
+    }),
+    {
+      hostId: "codex",
+      presetId: "tokenpilot",
+      presetVersion: "1",
+      supportedFeatures: ["stabilizer", "reduction"],
+    },
+  );
+  assert.throws(
+    () => createTokenPilotHostBinding({ hostId: " ", supportedFeatures: [] }),
+    /non-empty hostId/,
+  );
 });

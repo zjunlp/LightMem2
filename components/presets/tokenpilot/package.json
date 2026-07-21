@@ -18,6 +18,7 @@
     "@tokenpilot/history": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",
     "@tokenpilot/reduction": "workspace:*",
-    "@tokenpilot/runtime-core": "workspace:*"
+    "@tokenpilot/runtime-core": "workspace:*",
+    "@tokenpilot/stabilizer": "workspace:*"
   }
 }

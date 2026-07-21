@@ -225,6 +225,9 @@ importers:
       '@tokenpilot/runtime-core':
         specifier: workspace:*
         version: link:../../packages/foundation/runtime-core
+      '@tokenpilot/stabilizer':
+        specifier: workspace:*
+        version: link:../../packages/features/stabilizer
 
   components/products/cli:
     dependencies:

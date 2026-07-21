@@ -126,5 +126,3 @@ export function buildStabilityVisualSnapshotFromEnvelopes(params: {
       ?? !String(params.originalEnvelope.metadata?.previousResponseId ?? "").trim(),
   });
 }
-
-registerStabilizerProductSurfaceContribution();

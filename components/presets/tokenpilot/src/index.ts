@@ -4,4 +4,5 @@ export * from "@tokenpilot/reduction";
 export * from "@tokenpilot/eviction";
 export * from "./types.js";
 export * from "./preset-contract.js";
+export * from "./host-binding.js";
 export type { PolicyModuleConfig } from "./policy.js";
