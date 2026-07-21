@@ -13,7 +13,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/kernel": "workspace:*"
   }
 }

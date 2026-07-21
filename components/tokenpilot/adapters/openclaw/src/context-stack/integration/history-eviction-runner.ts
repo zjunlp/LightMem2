@@ -1,19 +1,7 @@
 import type { CanonicalTranscriptState } from "@tokenpilot/history";
+import type { HistoryEvictionResult } from "@tokenpilot/eviction";
 
-export type HistoryEvictionResult = {
-  state: CanonicalTranscriptState;
-  enabled: boolean;
-  changed: boolean;
-  appliedTaskIds: string[];
-  savedChars: number;
-  diagnostics: {
-    beforeMessageCount: number;
-    afterMessageCount: number;
-    beforeChars: number;
-    afterChars: number;
-    skippedReason?: "module_disabled";
-  };
-};
+export type { HistoryEvictionResult } from "@tokenpilot/eviction";
 
 export async function runHistoryEvictionIfEnabled(params: {
   cfg: any;

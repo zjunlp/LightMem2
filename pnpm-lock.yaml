@@ -94,6 +94,9 @@ importers:
       '@tokenpilot/decision':
         specifier: workspace:*
         version: link:../../packages/layers/decision
+      '@tokenpilot/eviction':
+        specifier: workspace:*
+        version: link:../../packages/features/eviction
       '@tokenpilot/history':
         specifier: workspace:*
         version: link:../../packages/layers/history
@@ -128,6 +131,18 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  components/tokenpilot/packages/features/eviction:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../foundation/artifact-store
+      '@tokenpilot/history':
+        specifier: workspace:*
+        version: link:../../layers/history
+      '@tokenpilot/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
 
   components/tokenpilot/packages/features/reduction:
     dependencies:
@@ -166,6 +181,9 @@ importers:
 
   components/tokenpilot/packages/layers/decision:
     dependencies:
+      '@tokenpilot/eviction':
+        specifier: workspace:*
+        version: link:../../features/eviction
       '@tokenpilot/history':
         specifier: workspace:*
         version: link:../history
@@ -178,9 +196,6 @@ importers:
 
   components/tokenpilot/packages/layers/history:
     dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../foundation/artifact-store
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../kernel

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
+import { buildLifecyclePolicyContext } from "../src/lifecycle-policy-context.js";
 
 test("lifecycle policy context does not construct reduction segments", () => {
   const context = buildLifecyclePolicyContext({

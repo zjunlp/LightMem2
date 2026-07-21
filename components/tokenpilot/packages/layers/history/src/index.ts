@@ -3,7 +3,6 @@ export * from "./page-out-types.js";
 export * from "./canonical-state.js";
 export * from "./canonical-anchors.js";
 export * from "./canonical-rewrite.js";
-export * from "./canonical-eviction.js";
 export * from "./chunking.js";
 export * from "./signals.js";
 export * from "./lifecycle.js";

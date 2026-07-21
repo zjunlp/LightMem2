@@ -28,10 +28,15 @@ import {
 } from "@tokenpilot/reduction";
 import {
   analyzeEvictionFromTaskRegistry,
+  createApiTaskStateEstimator,
   type EvictionBlock,
   type EvictionInstruction,
   type EvictionPolicy,
-} from "./eviction/index.js";
+  type SemanticTaskUpdate,
+  type TaskStateEstimator,
+  type TaskStateEstimatorApiConfig,
+  type TaskStateTransition,
+} from "@tokenpilot/eviction";
 import {
   applySessionTaskRegistryPatch,
   buildDeltaViewFromRawSemanticSnapshot,
@@ -48,8 +53,6 @@ import {
   type TaskLifecycle,
   type TaskState,
 } from "@tokenpilot/history";
-import { createApiTaskStateEstimator } from "./task-state-estimator.js";
-import type { SemanticTaskUpdate, TaskStateEstimator, TaskStateEstimatorApiConfig, TaskStateTransition } from "./types.js";
 
 export type PolicyModuleConfig = {
   localityEnabled?: boolean;

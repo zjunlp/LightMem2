@@ -1,23 +1,10 @@
 import type { RuntimeModule } from "@tokenpilot/kernel";
+import {
+  buildLifecyclePolicyContext,
+  type LifecyclePlanningResult,
+} from "@tokenpilot/eviction";
 
-import { buildLifecyclePolicyContext } from "./lifecycle-policy-context.js";
-
-export type LifecyclePlanningResult = {
-  enabled: boolean;
-  executed: boolean;
-  registryChanged?: boolean;
-  planCreated?: boolean;
-  plannedSavedChars?: number;
-  plannedInstructionCount?: number;
-  estimatorUsage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    costUsd?: number;
-  };
-  skippedReason?: "module_disabled" | "policy_module_unavailable";
-  policyMetadata?: unknown;
-};
+export type { LifecyclePlanningResult } from "@tokenpilot/eviction";
 
 export async function runLifecyclePlanningIfEnabled(params: {
   cfg: any;

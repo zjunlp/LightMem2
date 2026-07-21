@@ -29,6 +29,7 @@
   "dependencies": {
     "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/decision": "workspace:*",
+    "@tokenpilot/eviction": "workspace:*",
     "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/history": "workspace:*",
     "@tokenpilot/kernel": "workspace:*",

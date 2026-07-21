@@ -1,10 +1,8 @@
 {
-  "name": "@tokenpilot/decision",
+  "name": "@tokenpilot/eviction",
   "version": "0.1.0",
   "private": true,
-  "lightmem2": {
-    "role": "feature"
-  },
+  "lightmem2": { "role": "feature" },
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -14,9 +12,8 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@tokenpilot/eviction": "workspace:*",
+    "@tokenpilot/artifact-store": "workspace:*",
     "@tokenpilot/history": "workspace:*",
-    "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/reduction": "workspace:*"
+    "@tokenpilot/kernel": "workspace:*"
   }
 }

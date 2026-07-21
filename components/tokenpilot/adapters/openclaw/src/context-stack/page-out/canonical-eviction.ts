@@ -3,7 +3,7 @@ import {
   applyCanonicalEviction as applyCanonicalEvictionBase,
   computeClosureDeferredTaskInfo,
   type EvictionHelpers,
-} from "@tokenpilot/history";
+} from "@tokenpilot/eviction";
 import { pluginStateSubdir } from "@tokenpilot/artifact-store";
 
 export { computeClosureDeferredTaskInfo, type EvictionHelpers };
