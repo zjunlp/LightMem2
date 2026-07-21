@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { RuntimeModuleRegistry } from "../src/module-registry.js";
 import { runHistoryModules, runRequestModules } from "../src/module-orchestrator.js";
 
 test("request modules preserve declared order and record disabled modules", async () => {
@@ -81,5 +82,25 @@ test("module execution fails fast by default", async () => {
       ],
     }),
     /prefix failed/,
+  );
+});
+
+test("module registry reuses one instance for the same stable id and version", () => {
+  const registry = new RuntimeModuleRegistry();
+  const first = { name: "eviction-first" };
+  const second = { name: "eviction-second" };
+
+  assert.equal(registry.register({ id: "eviction", version: "1", instance: first }), first);
+  assert.equal(registry.register({ id: "eviction", version: "1", instance: second }), first);
+  assert.equal(registry.list().length, 1);
+});
+
+test("module registry rejects incompatible versions for the same stable id", () => {
+  const registry = new RuntimeModuleRegistry();
+  registry.register({ id: "eviction", version: "1", instance: {} });
+
+  assert.throws(
+    () => registry.register({ id: "eviction", version: "2", instance: {} }),
+    /module_registry_version_conflict:eviction:1:2/,
   );
 });
