@@ -1,11 +1,9 @@
 import type {
-  CacheAuditRecord,
   TokenPilotProductSurfaceConfigAdapter,
   TokenPilotProductCommandResult,
   TokenPilotProductSurfaceHostBridge,
 } from "@tokenpilot/host-adapter";
-import { summarizeCacheAudit } from "@tokenpilot/host-adapter";
-import { diagnoseCacheAudit } from "@tokenpilot/stabilizer";
+import { diagnoseCacheAudit, summarizeCacheAudit, type CacheAuditRecord } from "@tokenpilot/stabilizer";
 import {
   buildSessionReportText,
   createProductSurfaceCommandHandler,

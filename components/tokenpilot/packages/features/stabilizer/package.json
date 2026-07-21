@@ -14,6 +14,7 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@tokenpilot/host-adapter": "workspace:*",
     "@tokenpilot/kernel": "workspace:*"
   }
 }

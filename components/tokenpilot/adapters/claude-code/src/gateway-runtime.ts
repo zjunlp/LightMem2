@@ -27,6 +27,7 @@ import {
   upsertClaudeCodeSessionSnapshot,
 } from "./session-state.js";
 import { prepareClaudeStablePrefix } from "./stable-prefix.js";
+import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
 import { appendClaudeCodeTrace } from "./trace.js";
 import { createClaudeCodeGatewayForwarder, resolveClaudeCodeUpstream } from "./upstream.js";
 import { appendClaudeCodeCacheAuditRecord, buildClaudeCodeCacheAuditSnapshot } from "./cache-audit.js";
@@ -307,7 +308,7 @@ export async function startClaudeCodeGatewayRuntime(params: {
         codec,
         config: { mode: "normal" },
         prepareStablePrefix(nextEnvelope) {
-          return prepareClaudeStablePrefix(nextEnvelope, config);
+          return prepareClaudeStablePrefix(canonicalizeEnvelopeTools(nextEnvelope), config);
         },
         async applyBeforeCallReduction({ envelope: nextEnvelope, codec: nextCodec }) {
           return reduceClaudeRequestEnvelope({

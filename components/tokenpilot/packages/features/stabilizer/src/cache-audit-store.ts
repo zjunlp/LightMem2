@@ -1,17 +1,16 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { appendJsonl, readRecentJsonlEntries } from "./file-store.js";
-import { readCachedInputTokens } from "./cache-usage.js";
+import { appendJsonl, readCachedInputTokens, readRecentJsonlEntries } from "@tokenpilot/host-adapter";
 import {
   extractStablePrefixContract,
   fingerprintStablePrefixEnvelope,
   serializeStablePrefixContract,
-} from "@tokenpilot/stabilizer";
+} from "./stable-prefix-contract.js";
 import {
   auditStablePrefixEntropy,
   diffStablePrefixSerialized,
-} from "@tokenpilot/stabilizer";
-import type { HostRequestEnvelope } from "../model/host-request.js";
+} from "./stable-prefix-audit.js";
+import type { StabilizerRequestEnvelope } from "./contracts.js";
 
 export type CacheAuditBaselineKind = "identity" | "request_key" | "session" | "none";
 
@@ -195,7 +194,7 @@ export function summarizeCacheAudit<T extends CacheAuditRecord>(
 }
 
 export function buildCacheAuditSnapshot(params: {
-  envelope: HostRequestEnvelope;
+  envelope: StabilizerRequestEnvelope;
   sessionId: string;
   model: string;
   stream: boolean;

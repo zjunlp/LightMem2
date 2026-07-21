@@ -5,12 +5,6 @@ import {
 import {
   injectRecoveryProtocolEnvelope,
 } from "./recovery.js";
-import {
-  prepareStablePrefixEnvelope,
-} from "@tokenpilot/stabilizer";
-import {
-  canonicalizeEnvelopeTools,
-} from "@tokenpilot/stabilizer";
 import type {
   BeforeCallDiagnostics,
   HostPipelineConfig,
@@ -26,16 +20,13 @@ export async function prepareBeforeCall(params: {
   diagnostics: BeforeCallDiagnostics;
 }> {
   const diagnostics: BeforeCallDiagnostics = { notes: [] };
-  const normalizedToolsEnvelope = canonicalizeEnvelopeTools(params.envelope);
-
-  const stable = prepareStablePrefixEnvelope(
-    normalizedToolsEnvelope,
-    params.helpers?.prepareStablePrefix,
-  );
-  diagnostics.stablePrefixApplied = stable.applied;
+  const stableEnvelope = params.helpers?.prepareStablePrefix
+    ? params.helpers.prepareStablePrefix(params.envelope)
+    : params.envelope;
+  diagnostics.stablePrefixApplied = stableEnvelope !== params.envelope;
 
   const recovery = injectRecoveryProtocolEnvelope(
-    stable.envelope,
+    stableEnvelope,
     params.helpers?.injectRecoveryProtocol,
   );
   diagnostics.recoveryInjected = recovery.applied;

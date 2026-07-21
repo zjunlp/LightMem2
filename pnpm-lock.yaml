@@ -157,6 +157,9 @@ importers:
 
   components/tokenpilot/packages/features/stabilizer:
     dependencies:
+      '@tokenpilot/host-adapter':
+        specifier: workspace:*
+        version: link:../../foundation/host-adapter
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../../foundation/kernel
@@ -178,9 +181,6 @@ importers:
       '@tokenpilot/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@tokenpilot/stabilizer':
-        specifier: workspace:*
-        version: link:../../features/stabilizer
       js-tiktoken:
         specifier: ^1.0.21
         version: 1.0.21

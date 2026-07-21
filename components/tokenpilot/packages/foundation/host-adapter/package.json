@@ -10,7 +10,6 @@
   "types": "src/index.ts",
   "dependencies": {
     "@tokenpilot/kernel": "workspace:*",
-    "@tokenpilot/stabilizer": "workspace:*",
     "js-tiktoken": "^1.0.21"
   },
   "scripts": {

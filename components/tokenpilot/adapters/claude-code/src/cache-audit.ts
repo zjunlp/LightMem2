@@ -8,7 +8,7 @@ import {
   type CacheAuditRecord,
   type CacheAuditSnapshot,
   type CacheAuditSummary,
-} from "@tokenpilot/host-adapter";
+} from "@tokenpilot/stabilizer";
 
 export type ClaudeCodeCacheAuditRecord = CacheAuditRecord;
 export type ClaudeCodeCacheAuditSummary = CacheAuditSummary;

@@ -30,6 +30,7 @@ import {
   type CodexReductionSummary,
   reduceCodexRequestEnvelope,
 } from "./reduction.js";
+import { canonicalizeEnvelopeTools } from "@tokenpilot/stabilizer";
 import { prepareCodexStablePrefix } from "./stable-prefix.js";
 import {
   requestUpstreamResponses,
@@ -169,7 +170,7 @@ export async function startCodexResponsesProxy(params: {
         codec,
         config: { mode: "normal" },
         prepareStablePrefix(nextEnvelope) {
-          return prepareCodexStablePrefix(nextEnvelope, config);
+          return prepareCodexStablePrefix(canonicalizeEnvelopeTools(nextEnvelope), config);
         },
         async applyBeforeCallReduction({ envelope: nextEnvelope, codec: nextCodec }) {
           return reduceCodexRequestEnvelope({

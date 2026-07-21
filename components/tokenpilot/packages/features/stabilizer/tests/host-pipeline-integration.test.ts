@@ -4,16 +4,20 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { HostRequestEnvelope } from "../src/model/host-request.js";
-import { prepareBeforeCall } from "../src/pipeline/before-call.js";
-import { prepareBeforeCallWithReductionSummary } from "../src/pipeline/before-call-shared.js";
-import { runBeforeCallReductionOrchestrator } from "../src/pipeline/reduction-orchestrator.js";
-import { stripInternalPayloadFields } from "../src/pipeline/recovery.js";
+import {
+  prepareBeforeCall,
+  prepareBeforeCallWithReductionSummary,
+  runBeforeCallReductionOrchestrator,
+  stripInternalPayloadFields,
+  type HostRequestEnvelope,
+} from "@tokenpilot/host-adapter";
 import {
   applyStablePrefixToInstructions,
   applyStablePrefixToMessage,
   auditStablePrefixEntropy,
+  canonicalizeEnvelopeTools,
   canonicalizeTools,
+  defaultPrepareStablePrefix,
   diffStablePrefixSerialized,
   extractStablePrefixContract,
   fingerprintStablePrefixEnvelope,
@@ -22,7 +26,7 @@ import {
   rewriteTextForStablePrefix,
   serializeStablePrefixEnvelope,
   type SerializedStablePrefixContract,
-} from "@tokenpilot/stabilizer";
+} from "../src/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -84,6 +88,11 @@ test("prepareBeforeCall default pipeline canonicalizes root prompt and injects r
   const result = await prepareBeforeCall({
     envelope: input,
     config: { mode: "normal" },
+    helpers: {
+      prepareStablePrefix(envelope) {
+        return defaultPrepareStablePrefix(canonicalizeEnvelopeTools(envelope));
+      },
+    },
   });
 
   assert.deepEqual(result.envelope, expected);
@@ -428,7 +437,7 @@ test("extractStablePrefixContract serializes tools deterministically for stable 
   assert.equal(toolsA, toolsB);
 });
 
-test("prepareBeforeCall canonicalizes tool order before forwarding", async () => {
+test("prepareBeforeCall applies explicitly injected tool canonicalization", async () => {
   const envelope: HostRequestEnvelope = {
     session: {
       host: { hostId: "codex", displayName: "Codex" },
@@ -445,7 +454,13 @@ test("prepareBeforeCall canonicalizes tool order before forwarding", async () =>
     rawPayload: {},
   };
 
-  const prepared = await prepareBeforeCall({ envelope, config: { mode: "normal" } });
+  const prepared = await prepareBeforeCall({
+    envelope,
+    config: { mode: "normal" },
+    helpers: {
+      prepareStablePrefix: canonicalizeEnvelopeTools,
+    },
+  });
   const tools = prepared.envelope.tools as Array<Record<string, any>>;
 
   assert.equal(Array.isArray(tools), true);

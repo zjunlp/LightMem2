@@ -8,15 +8,15 @@ import {
   appendCacheAuditRecord,
   buildCacheAuditSnapshot,
   readRecentCacheAuditRecordsForSession,
-} from "../src/state/cache-audit.js";
-import type { HostRequestEnvelope } from "../src/model/host-request.js";
+} from "../src/cache-audit-store.js";
+import type { StabilizerRequestEnvelope } from "../src/contracts.js";
 
 function envelope(params: {
   sessionId: string;
   instructions: string;
   requestPromptCacheKey: string;
 }): {
-  envelope: HostRequestEnvelope;
+  envelope: StabilizerRequestEnvelope;
   sessionId: string;
   requestPromptCacheKey: string;
 } {
@@ -24,13 +24,8 @@ function envelope(params: {
     sessionId: params.sessionId,
     requestPromptCacheKey: params.requestPromptCacheKey,
     envelope: {
-      session: {
-        host: { hostId: "codex", displayName: "Codex" },
-        sessionId: params.sessionId,
-        sessionMode: "single",
-      },
+      session: { host: { hostId: "codex" } },
       model: "gpt-5.4",
-      stream: false,
       instructions: params.instructions,
       messages: [
         {
@@ -38,10 +33,6 @@ function envelope(params: {
           content: "hello",
         },
       ],
-      rawPayload: {},
-      metadata: {
-        promptCacheKey: params.requestPromptCacheKey,
-      },
     },
   };
 }
