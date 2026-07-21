@@ -196,7 +196,7 @@ test("MCP package root resolver does not confuse bundled CLI dist with the MCP p
     cwd: process.cwd(),
   });
 
-  assert.match(packageRoot, /components[\/\\]tokenpilot[\/\\]products[\/\\]mcp$/);
+  assert.match(packageRoot, /components[\/\\]products[\/\\]mcp$/);
 });
 
 test("MCP package root resolver honors explicit override", () => {
