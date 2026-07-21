@@ -68,7 +68,9 @@ test("local backend deduplicates queue entries and persists completed skills", a
     });
     assert.equal(hits.length, 1);
     assert.equal(hits[0]?.skill.skillId, skill.skillId);
-    assert.match(formatProceduralMemoryInjection(hits), /Skill: Memory queue repair/);
+    const injection = formatProceduralMemoryInjection(hits);
+    assert.match(injection, /^\[Procedural Memory\]/);
+    assert.match(injection, /Skill: Memory queue repair/);
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }
