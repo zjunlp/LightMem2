@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildRecoveryHint, renderRecoveredArchive } from "../src/index.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import {
+  buildRecoveryHint,
+  createFileSystemArtifactStore,
+  renderRecoveredArchive,
+} from "../src/index.js";
 
 test("buildRecoveryHint advertises focused line-window recovery", () => {
   const hint = buildRecoveryHint({
@@ -53,4 +61,27 @@ test("renderRecoveredArchive returns focused line-window content with recovery m
   assert.equal(result.details.recoveredStartLine, 2);
   assert.equal(result.details.recoveredEndLine, 4);
   assert.equal(result.details.recoveredLineCount, 3);
+});
+
+test("file system artifact store preserves archive and lookup behavior", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "tokenpilot-artifact-store-"));
+  const archiveDir = join(stateDir, "tokenpilot", "tool-result-archives", "session-1");
+  const store = createFileSystemArtifactStore();
+
+  try {
+    const location = await store.archive({
+      sessionId: "session-1",
+      segmentId: "segment-1",
+      sourcePass: "test",
+      toolName: "read",
+      dataKey: "repo:file.ts",
+      originalText: "const value = 1;",
+      archiveDir,
+    });
+
+    assert.equal(await store.resolve({ dataKey: "repo:file.ts", stateDir, sessionId: "session-1" }), location.archivePath);
+    assert.equal((await store.read(location.archivePath))?.originalText, "const value = 1;");
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });

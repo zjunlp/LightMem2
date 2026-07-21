@@ -37,7 +37,7 @@ export type RecoveredArchiveRenderResult = {
   };
 };
 
-type ArchiveContentParams = {
+export type ArchiveContentParams = {
   sessionId: string;
   segmentId: string;
   sourcePass: string;
@@ -49,11 +49,16 @@ type ArchiveContentParams = {
   metadata?: Record<string, unknown>;
 };
 
-type ArchiveLocationParams = {
+export type ArchiveLocationParams = {
   sessionId: string;
   segmentId: string;
   workspaceDir?: string;
   archiveDir?: string;
+};
+
+export type ArchiveLocation = {
+  archivePath: string;
+  archiveDir: string;
 };
 
 const TRUE_ENV_VALUES = new Set(["1", "true", "yes", "on"]);
@@ -130,10 +135,7 @@ export function renderRecoveredArchive(params: {
   };
 }
 
-export async function archiveContent(params: ArchiveContentParams): Promise<{
-  archivePath: string;
-  archiveDir: string;
-}> {
+export async function archiveContent(params: ArchiveContentParams): Promise<ArchiveLocation> {
   const entry: GenericArchiveEntry = {
     schemaVersion: 1,
     kind: `${params.sourcePass}_archive`,
@@ -162,10 +164,7 @@ export async function archiveContent(params: ArchiveContentParams): Promise<{
   return primary;
 }
 
-export function buildArchiveLocation(params: ArchiveLocationParams): {
-  archiveDir: string;
-  archivePath: string;
-} {
+export function buildArchiveLocation(params: ArchiveLocationParams): ArchiveLocation {
   const archiveDir = params.archiveDir ?? defaultArchiveDir(params.sessionId, params.workspaceDir);
   const timestamp = Date.now();
   const fileName = `${timestamp}-${sanitizePathPart(params.segmentId)}.json`;
