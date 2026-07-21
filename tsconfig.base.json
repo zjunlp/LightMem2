@@ -46,7 +46,7 @@
                 "components/packages/foundation/product-surface/src/index.ts"
             ],
             "@tokenpilot/mcp": [
-                "components/tokenpilot/products/mcp/src/index.ts"
+                "components/products/mcp/src/index.ts"
             ]
         },
         "types": [

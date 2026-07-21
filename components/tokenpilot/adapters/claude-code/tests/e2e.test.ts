@@ -15,7 +15,7 @@ import {
   type HostGatewayForwarder,
 } from "@tokenpilot/host-adapter";
 import { readVisualSessionData, readVisualSessionList } from "@tokenpilot/product-surface";
-import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../products/mcp/src/index.js";
+import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../../products/mcp/src/index.js";
 import {
   defaultTokenPilotClaudeCodeConfigPath,
   loadTokenPilotClaudeCodeConfig,

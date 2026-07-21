@@ -112,6 +112,22 @@ importers:
         specifier: workspace:*
         version: link:../../packages/foundation/runtime-core
 
+  components/products/mcp:
+    dependencies:
+      '@tokenpilot/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/foundation/artifact-store
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.10
+        version: 0.25.12
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   components/tokenpilot/adapters/claude-code:
     dependencies:
       '@tokenpilot/artifact-store':
@@ -125,7 +141,7 @@ importers:
         version: link:../../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
-        version: link:../../products/mcp
+        version: link:../../../products/mcp
       '@tokenpilot/product-surface':
         specifier: workspace:*
         version: link:../../../packages/foundation/product-surface
@@ -159,7 +175,7 @@ importers:
         version: link:../../../packages/foundation/kernel
       '@tokenpilot/mcp':
         specifier: workspace:*
-        version: link:../../products/mcp
+        version: link:../../../products/mcp
       '@tokenpilot/product-surface':
         specifier: workspace:*
         version: link:../../../packages/foundation/product-surface
@@ -237,22 +253,6 @@ importers:
       '@tokenpilot/stabilizer':
         specifier: workspace:*
         version: link:../../../packages/features/stabilizer
-    devDependencies:
-      esbuild:
-        specifier: ^0.25.10
-        version: 0.25.12
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  components/tokenpilot/products/mcp:
-    dependencies:
-      '@tokenpilot/artifact-store':
-        specifier: workspace:*
-        version: link:../../../packages/foundation/artifact-store
     devDependencies:
       esbuild:
         specifier: ^0.25.10

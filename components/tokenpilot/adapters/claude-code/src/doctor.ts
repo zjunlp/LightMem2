@@ -8,7 +8,7 @@ import {
   type TokenPilotObservedMcpConfig,
   inspectClaudeMcpServerConfig,
   listClaudeMcpConfigCandidates,
-} from "../../../products/mcp/src/index.js";
+} from "../../../../products/mcp/src/index.js";
 import {
   asObjectRecord,
   scanInstalledHookEvents,

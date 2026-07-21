@@ -16,7 +16,7 @@ import {
   withTempHome,
 } from "@tokenpilot/host-adapter";
 import { readVisualSessionData, readVisualSessionList } from "@tokenpilot/product-surface";
-import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../products/mcp/src/index.js";
+import { MEMORY_FAULT_RECOVER_TOOL_NAME, handleMcpRequest } from "../../../../products/mcp/src/index.js";
 import { createCodexCliBridge } from "../../../products/cli/src/hosts/codex.js";
 import {
   defaultCodexConfigPath,

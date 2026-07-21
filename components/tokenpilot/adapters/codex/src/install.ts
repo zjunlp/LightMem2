@@ -9,7 +9,7 @@ import {
   resolveTokenPilotMcpProbeServerSpec,
   resolveTokenPilotMcpServerSpec,
   type TokenPilotMcpServerSpec,
-} from "../../../products/mcp/src/index.js";
+} from "../../../../products/mcp/src/index.js";
 import {
   defaultCodexConfigPath,
   defaultHooksConfigPath,

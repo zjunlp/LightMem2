@@ -4,7 +4,7 @@ import {
   DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
   inspectTokenPilotMcpHealth,
   TOKENPILOT_MCP_SERVER_NAME,
-} from "../../../products/mcp/src/index.js";
+} from "../../../../products/mcp/src/index.js";
 import {
   asObjectRecord,
   scanInstalledHookEvents,

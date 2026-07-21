@@ -8,7 +8,7 @@ import {
   resolveTokenPilotMcpProbeServerSpec,
   resolveTokenPilotMcpServerSpec,
   type TokenPilotMcpServerSpec,
-} from "../../../products/mcp/src/index.js";
+} from "../../../../products/mcp/src/index.js";
 import {
   CLAUDE_TOOL_SEARCH_DEFAULT,
   CLAUDE_TOOL_SEARCH_ENV,
