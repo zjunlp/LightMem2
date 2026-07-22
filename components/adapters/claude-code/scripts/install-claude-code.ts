@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { installClaudeCodeTokenPilot } from "../src/install.js";
 
 async function main() {

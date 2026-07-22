@@ -2,7 +2,12 @@ import { build } from "esbuild";
 
 async function main() {
   await build({
-    entryPoints: ["src/index.ts", "src/cli.ts", "src/hooks-handler.ts"],
+    entryPoints: {
+      index: "src/index.ts",
+      cli: "src/cli.ts",
+      "hooks-handler": "src/hooks-handler.ts",
+      "install-claude-code": "scripts/install-claude-code.ts",
+    },
     bundle: true,
     outdir: "dist",
     platform: "node",

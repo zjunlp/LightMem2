@@ -3,6 +3,8 @@ import { chmod, mkdir, symlink, unlink } from "node:fs/promises";
 import { join, resolve, delimiter } from "node:path";
 
 function cliDistPathFromAdapterRoot(adapterRoot: string): string {
+  const bundledPath = resolve(adapterRoot, "dist", "lightmem2.js");
+  if (existsSync(bundledPath)) return bundledPath;
   return resolve(adapterRoot, "..", "..", "products", "cli", "dist", "cli.js");
 }
 

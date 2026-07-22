@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -40,6 +41,8 @@ const READ_ONLY_SKILLS: SkillSpec[] = [
 ];
 
 function cliDistPathFromAdapterRoot(adapterRoot: string): string {
+  const bundledPath = resolve(adapterRoot, "dist", "lightmem2.js");
+  if (existsSync(bundledPath)) return bundledPath;
   return resolve(adapterRoot, "..", "..", "products", "cli", "dist", "cli.js");
 }
 

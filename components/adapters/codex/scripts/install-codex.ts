@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { installCodexTokenPilot } from "../src/install.js";
 
 installCodexTokenPilot({

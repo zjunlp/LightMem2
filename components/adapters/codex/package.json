@@ -7,7 +7,8 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "tokenpilot-codex": "dist/cli.js"
+    "tokenpilot-codex": "dist/cli.js",
+    "lightmem2-install-codex": "dist/install-codex.js"
   },
   "license": "MIT",
   "repository": {
@@ -34,6 +35,7 @@
     "doctor:codex": "node --import tsx scripts/doctor-codex.ts",
     "report-cache-audit:codex": "node --import tsx scripts/report-cache-audit-codex.ts",
     "install:codex": "node --import tsx scripts/install-codex.ts",
+    "pack:release": "bash ./scripts/pack_release.sh",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"

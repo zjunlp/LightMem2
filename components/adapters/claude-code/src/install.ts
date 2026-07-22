@@ -99,15 +99,25 @@ export function resolveClaudeCodeHookCommandForInstall(moduleDir = __dirname): s
 }
 
 export function resolveClaudeCodeMcpServerSpecForInstall(stateDir: string): TokenPilotMcpServerSpec {
-  return resolveTokenPilotMcpServerSpec({
+  const fallback = resolveTokenPilotMcpServerSpec({
     stateDir,
+    requireBuild: false,
   });
+  const bundledEntryPath = join(adapterRootFromHere(), "dist", "mcp-server.js");
+  return existsSync(bundledEntryPath)
+    ? { ...fallback, args: [bundledEntryPath], entryPath: bundledEntryPath }
+    : fallback;
 }
 
 export function resolveClaudeCodeMcpServerSpecForProbe(stateDir: string): TokenPilotMcpServerSpec {
-  return resolveTokenPilotMcpProbeServerSpec({
+  const fallback = resolveTokenPilotMcpProbeServerSpec({
     stateDir,
+    requireBuild: false,
   });
+  const bundledEntryPath = join(adapterRootFromHere(), "dist", "mcp-server.js");
+  return existsSync(bundledEntryPath)
+    ? { ...fallback, command: process.execPath, args: [bundledEntryPath], entryPath: bundledEntryPath }
+    : fallback;
 }
 
 function isTokenPilotHookEntry(entry: unknown): boolean {

@@ -6,6 +6,10 @@
     "role": "adapter"
   },
   "main": "dist/index.js",
+  "bin": {
+    "tokenpilot-claude-code": "dist/cli.js",
+    "lightmem2-install-claude-code": "dist/install-claude-code.js"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,6 +33,7 @@
     "build": "tsx build.ts",
     "doctor:claude-code": "node --import tsx scripts/doctor-claude-code.ts",
     "install:claude-code": "node --import tsx scripts/install-claude-code.ts",
+    "pack:release": "bash ./scripts/pack_release.sh",
     "report-cache-audit:claude-code": "node --import tsx scripts/report-cache-audit-claude-code.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
