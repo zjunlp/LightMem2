@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { LIGHTMEM2_VERSION } from "@lightmem2/kernel";
 import {
   buildRecoveryContextSafePatch,
   MEMORY_FAULT_RECOVER_TOOL_NAME,
@@ -277,7 +278,7 @@ export async function probeTokenPilotMcpServer(
 ): Promise<TokenPilotMcpProbeResult> {
   const timeoutMs = params?.timeoutMs ?? DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS;
   const clientName = params?.clientName?.trim() || "tokenpilot-mcp-probe";
-  const clientVersion = params?.clientVersion?.trim() || "0.1.0";
+  const clientVersion = params?.clientVersion?.trim() || LIGHTMEM2_VERSION;
   const protocol = params?.protocol ?? "newline_json";
 
   return new Promise((resolve) => {
@@ -524,7 +525,7 @@ export async function handleMcpRequest(message: McpRequest, params?: {
         },
         serverInfo: {
           name: TOKENPILOT_RECOVERY_MCP_PRODUCT.productId,
-          version: "0.1.0",
+          version: LIGHTMEM2_VERSION,
         },
       },
     };

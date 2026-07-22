@@ -1,6 +1,6 @@
 {
   "name": "@lightmem2/openclaw-adapter",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "LightMem2 adapter for OpenClaw, currently binding the TokenPilot preset.",
   "lightmem2": {
     "role": "adapter"

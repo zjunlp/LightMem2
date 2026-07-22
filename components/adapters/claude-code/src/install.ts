@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { LIGHTMEM2_VERSION } from "@lightmem2/kernel";
 import {
   DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS,
   DEFAULT_TOKENPILOT_MCP_STARTUP_TIMEOUT_SEC,
@@ -318,7 +319,7 @@ export async function installClaudeCodeTokenPilot(params?: {
     : await probeTokenPilotMcpServer(mcpProbeServer, {
       timeoutMs: DEFAULT_TOKENPILOT_MCP_INSTALL_PROBE_TIMEOUT_MS,
       clientName: "tokenpilot-claude-code-install",
-      clientVersion: "0.1.0",
+      clientVersion: LIGHTMEM2_VERSION,
     });
   return {
     settingsPath,

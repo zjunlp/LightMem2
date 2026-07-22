@@ -1,7 +1,7 @@
 {
     "name": "lightmem2",
     "private": true,
-    "version": "0.1.0",
+    "version": "0.1.0-beta.1",
     "description": "LightMem2: a modular framework for long-running agent memory and context management, with TokenPilot as the current OpenClaw runtime component",
     "scripts": {
         "build": "pnpm -r build",

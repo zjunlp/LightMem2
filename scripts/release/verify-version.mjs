@@ -61,10 +61,17 @@ if (pluginManifest.version !== expectedVersion) {
   mismatches.push(`OpenClaw plugin manifest: ${pluginManifest.version} (${pluginManifestPath})`);
 }
 
+const versionSourcePath = join(repoRoot, "components", "packages", "foundation", "kernel", "src", "version.ts");
+const versionSource = await readFile(versionSourcePath, "utf8");
+const versionMatch = /LIGHTMEM2_VERSION\s*=\s*["']([^"']+)["']/.exec(versionSource);
+if (versionMatch?.[1] !== expectedVersion) {
+  mismatches.push(`LIGHTMEM2_VERSION: ${versionMatch?.[1] ?? "missing"} (${versionSourcePath})`);
+}
+
 if (mismatches.length > 0) {
   throw new Error(`Release version ${expectedVersion} is not synchronized:\n- ${mismatches.join("\n- ")}`);
 }
 
 process.stdout.write(
-  `Release version verified: ${expectedVersion} (${packages.length} workspace packages + OpenClaw manifest).\n`,
+  `Release version verified: ${expectedVersion} (${packages.length} workspace packages + OpenClaw manifest + runtime constant).\n`,
 );

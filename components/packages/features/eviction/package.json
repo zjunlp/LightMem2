@@ -1,6 +1,6 @@
 {
   "name": "@lightmem2/eviction",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "private": true,
   "lightmem2": { "role": "feature" },
   "type": "module",

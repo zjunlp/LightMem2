@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { archiveContent } from "@lightmem2/artifact-store";
+import { LIGHTMEM2_VERSION } from "@lightmem2/kernel";
 import {
   encodeMcpMessage,
   handleMcpRequest,
@@ -260,8 +261,9 @@ test("MCP server responds to newline-delimited JSON-RPC stdio", async () => {
     });
 
     const firstLine = response.trim().split("\n")[0] ?? "";
-    const parsed = JSON.parse(firstLine) as { result?: { serverInfo?: { name?: string } } };
+    const parsed = JSON.parse(firstLine) as { result?: { serverInfo?: { name?: string; version?: string } } };
     assert.equal(parsed.result?.serverInfo?.name, "tokenpilot-memory-fault-recover");
+    assert.equal(parsed.result?.serverInfo?.version, LIGHTMEM2_VERSION);
   } finally {
     child.kill();
   }
