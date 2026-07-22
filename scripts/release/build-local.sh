@@ -28,29 +28,58 @@ pnpm -r build
 rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 
-ARCHIVE_PATH="$(bash "${REPO_ROOT}/components/adapters/openclaw/scripts/pack_release.sh" | tail -n 1)"
-if [[ ! -f "${ARCHIVE_PATH}" ]]; then
-  printf 'Release archive was not created: %s\n' "${ARCHIVE_PATH}" >&2
-  exit 1
-fi
+declare -a ARCHIVE_NAMES=()
 
-ARCHIVE_NAME="$(basename "${ARCHIVE_PATH}")"
-cp "${ARCHIVE_PATH}" "${OUTPUT_DIR}/${ARCHIVE_NAME}"
-rm -f "${ARCHIVE_PATH}"
+pack_adapter() {
+  local host="$1"
+  local pack_script="$2"
+  local archive_path
+  local archive_name
 
-node "${SCRIPT_DIR}/smoke-openclaw-package.mjs" "${OUTPUT_DIR}/${ARCHIVE_NAME}" "${VERSION}"
+  archive_path="$(bash "${pack_script}" | tail -n 1)"
+  if [[ ! -f "${archive_path}" ]]; then
+    printf 'Release archive was not created for %s: %s\n' "${host}" "${archive_path}" >&2
+    exit 1
+  fi
+
+  archive_name="$(basename "${archive_path}")"
+  cp "${archive_path}" "${OUTPUT_DIR}/${archive_name}"
+  rm -f "${archive_path}"
+  ARCHIVE_NAMES+=("${archive_name}")
+
+  if [[ "${host}" == "openclaw" ]]; then
+    node "${SCRIPT_DIR}/smoke-openclaw-package.mjs" "${OUTPUT_DIR}/${archive_name}" "${VERSION}"
+  else
+    node "${SCRIPT_DIR}/smoke-host-package.mjs" "${OUTPUT_DIR}/${archive_name}" "${host}" "${VERSION}"
+  fi
+}
+
+pack_adapter "openclaw" "${REPO_ROOT}/components/adapters/openclaw/scripts/pack_release.sh"
+pack_adapter "codex" "${REPO_ROOT}/components/adapters/codex/scripts/pack_release.sh"
+pack_adapter "claude-code" "${REPO_ROOT}/components/adapters/claude-code/scripts/pack_release.sh"
 
 (
   cd "${OUTPUT_DIR}"
-  sha256sum "${ARCHIVE_NAME}" > SHA256SUMS
+  sha256sum "${ARCHIVE_NAMES[@]}" > SHA256SUMS
 )
 
 COMMIT="$(git rev-parse HEAD)"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-node - "${OUTPUT_DIR}/release-manifest.json" "${VERSION}" "${COMMIT}" "${BUILT_AT}" "${ARCHIVE_NAME}" "${DIRTY}" <<'NODE'
+node - "${OUTPUT_DIR}/release-manifest.json" "${VERSION}" "${COMMIT}" "${BUILT_AT}" "${DIRTY}" "${ARCHIVE_NAMES[@]}" <<'NODE'
 const fs = require("node:fs");
-const [path, version, commit, builtAt, archive, dirty] = process.argv.slice(2);
+const [path, version, commit, builtAt, dirty, ...archives] = process.argv.slice(2);
+const packageByFile = {
+  openclaw: "@lightmem2/openclaw-adapter",
+  codex: "@lightmem2/codex-adapter",
+  "claude-code": "@lightmem2/claude-code-adapter",
+};
+const hostForArchive = (archive) => {
+  if (archive.includes("openclaw")) return "openclaw";
+  if (archive.includes("claude-code")) return "claude-code";
+  if (archive.includes("codex")) return "codex";
+  throw new Error(`Unknown adapter archive: ${archive}`);
+};
 fs.writeFileSync(path, `${JSON.stringify({
   product: "LightMem2",
   version,
@@ -60,13 +89,21 @@ fs.writeFileSync(path, `${JSON.stringify({
   dirty: dirty === "true",
   prerelease: version.includes("-"),
   presets: [{ id: "tokenpilot", version: "1" }],
-  artifacts: [{
-    package: "@lightmem2/openclaw-adapter",
-    file: archive,
-    runtimePluginId: "tokenpilot",
-  }],
+  artifacts: archives.map((file) => {
+    const host = hostForArchive(file);
+    return {
+      package: packageByFile[host],
+      file,
+      host,
+      ...(host === "openclaw" ? { runtimePluginId: "tokenpilot" } : {}),
+    };
+  }),
 }, null, 2)}\n`);
 NODE
+
+OPENCLAW_ARCHIVE="${ARCHIVE_NAMES[0]}"
+CODEX_ARCHIVE="${ARCHIVE_NAMES[1]}"
+CLAUDE_ARCHIVE="${ARCHIVE_NAMES[2]}"
 
 cat > "${OUTPUT_DIR}/RELEASE_NOTES.md" <<EOF
 # LightMem2 v${VERSION}
@@ -80,20 +117,23 @@ Dirty worktree: \`${DIRTY}\`
 
 ## Release Assets
 
-- \`${ARCHIVE_NAME}\`: bundled OpenClaw adapter with TokenPilot runtime compatibility
+- \`${OPENCLAW_ARCHIVE}\`: bundled OpenClaw adapter with TokenPilot runtime compatibility
+- \`${CODEX_ARCHIVE}\`: self-contained Codex adapter, installer, shared CLI, hooks, and recovery MCP
+- \`${CLAUDE_ARCHIVE}\`: self-contained Claude Code adapter, installer, shared CLI, hooks, and recovery MCP
 - \`SHA256SUMS\`: artifact checksum
 - \`release-manifest.json\`: machine-readable release metadata
 
 ## Installation Status
 
 - OpenClaw: bundled release artifact available
-- Codex: source installation in this release candidate
-- Claude Code: source installation in this release candidate
+- Codex: self-contained release artifact available
+- Claude Code: self-contained release artifact available
 
 ## Compatibility
 
 - OpenClaw plugin id remains \`tokenpilot\`
-- existing TokenPilot commands and state paths remain compatible
+- existing TokenPilot commands, config names, and state paths remain compatible
+- Codex and Claude Code installers preserve the existing \`tokenpilot-*\` host commands
 
 ## Known Limitations
 
@@ -102,4 +142,6 @@ Dirty worktree: \`${DIRTY}\`
 EOF
 
 printf 'Local release candidate created: %s\n' "${OUTPUT_DIR}"
-printf 'Artifact: %s\n' "${OUTPUT_DIR}/${ARCHIVE_NAME}"
+for archive_name in "${ARCHIVE_NAMES[@]}"; do
+  printf 'Artifact: %s\n' "${OUTPUT_DIR}/${archive_name}"
+done
