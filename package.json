@@ -15,7 +15,9 @@
         "component:pack:tokenpilot:openclaw": "npm --prefix components/adapters/openclaw run pack:release",
         "component:install:tokenpilot:openclaw": "npm --prefix components/adapters/openclaw run install:release",
         "plugin:pack:release": "npm --prefix components/adapters/openclaw run pack:release",
-        "plugin:install:release": "npm --prefix components/adapters/openclaw run install:release"
+        "plugin:install:release": "npm --prefix components/adapters/openclaw run install:release",
+        "release:verify": "node scripts/release/verify-version.mjs",
+        "release:build:local": "bash scripts/release/build-local.sh"
     },
     "devDependencies": {
         "typescript": "^5.9.3",
