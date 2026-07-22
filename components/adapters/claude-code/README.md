@@ -41,6 +41,18 @@ Current limitations:
 
 ## Install
 
+For a release archive, extract it and run the bundled installer directly:
+
+```bash
+node /path/to/package/dist/install-claude-code.js
+```
+
+The release archive is self-contained: its hooks, recovery MCP server,
+`lightmem2` command, and `tokenpilot-claude-code` command all run from the
+extracted package directory. Keep that directory in place after installation.
+
+For a source checkout, build the adapter first:
+
 Build the adapter:
 
 ```bash
