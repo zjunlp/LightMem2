@@ -18,6 +18,7 @@ import { startCodexResponsesProxy } from "../src/proxy-runtime.js";
 import {
   acquireCodexRebaseSessionLock,
   appendPendingCodexRebaseEpoch,
+  readCodexRebaseCapabilityJournal,
   readLatestCodexRebaseEpoch,
 } from "../src/context-rewrite/index.js";
 import {
@@ -47,6 +48,7 @@ async function reserveFetchPort(): Promise<number> {
 }
 
 async function startSequencedResponsesUpstream(params?: {
+  rejectChain?: boolean;
   rejectRebase?: boolean;
   responseStatus?: string;
 }): Promise<{
@@ -70,6 +72,14 @@ async function startSequencedResponsesUpstream(params?: {
     });
     const payload = JSON.parse(body) as JsonObject;
     requests.push(payload);
+    if (params?.rejectChain && "previous_response_id" in payload) {
+      res.statusCode = 400;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({
+        error: { code: "invalid_request_error", message: "previous_response_id is not supported" },
+      }));
+      return;
+    }
     const isRebase = !("previous_response_id" in payload) && requests.length > 1;
     if (params?.rejectRebase && isRebase) {
       res.statusCode = 400;
@@ -84,7 +94,11 @@ async function startSequencedResponsesUpstream(params?: {
       id,
       object: "response",
       status: params?.responseStatus,
-      previous_response_id: typeof payload.previous_response_id === "string" ? payload.previous_response_id : undefined,
+      previous_response_id: typeof payload.previous_response_id === "string"
+        ? payload.previous_response_id
+        : params?.rejectChain
+          ? "provider-internal-unrelated-chain"
+          : undefined,
       output: [
         {
           type: "message",
@@ -425,6 +439,106 @@ test("CDR-06 proxy pipeline rebases a non-stream request from effective history"
     assert.equal("previous_response_id" in (upstream.requests[1] ?? {}), false);
     assert.doesNotMatch(inputText(upstream.requests[1]), /OLD_SENTINEL_PIPELINE/);
     assert.match(inputText(upstream.requests[1]), /CURRENT_SENTINEL_PIPELINE/);
+  } finally {
+    await runtime?.close();
+    await upstream.close();
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("CDR-06 proxy automatically replaces an unsupported response chain with stateless replay", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-codex-provider-chain-fallback-"));
+  const upstream = await startSequencedResponsesUpstream({ rejectChain: true });
+  let runtime: Awaited<ReturnType<typeof startCodexResponsesProxy>> | undefined;
+  try {
+    const sessionId = "codex-session-provider-chain-fallback";
+    const config = normalizeTokenPilotCodexConfig({
+      stateDir,
+      proxyPort: await reserveFetchPort(),
+      upstreamProvider: "provider-fixture",
+      upstream: {
+        name: "provider-fixture",
+        baseUrl: upstream.baseUrl,
+        wireApi: "responses",
+        requiresOpenAIAuth: false,
+      },
+      modules: { stabilizer: false, reduction: false },
+      contextRewrite: {
+        enabled: false,
+        providerCompatibilityProbe: "real_provider",
+      },
+    } as any);
+    runtime = await startCodexResponsesProxy({ config, logger: createConsoleLogger(false) });
+
+    const first = await fetch(`${runtime.baseUrl}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-fixture",
+        stream: false,
+        metadata: { tokenpilotSessionId: sessionId },
+        input: [{ role: "user", content: "CHAIN_ROOT_SENTINEL" }],
+      }),
+    });
+    assert.equal(first.status, 200);
+
+    const second = await fetch(`${runtime.baseUrl}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-fixture",
+        stream: false,
+        previous_response_id: "resp-pipeline-1",
+        metadata: { tokenpilotSessionId: sessionId },
+        input: [{ role: "user", content: "CHAIN_CURRENT_SENTINEL" }],
+      }),
+    });
+    assert.equal(second.status, 200);
+    assert.equal(upstream.requests.length, 3);
+    assert.equal(upstream.requests[1]?.previous_response_id, "resp-pipeline-1");
+    assert.equal("previous_response_id" in (upstream.requests[2] ?? {}), false);
+    assert.match(inputText(upstream.requests[2]), /CHAIN_ROOT_SENTINEL/);
+    assert.match(inputText(upstream.requests[2]), /CHAIN_CURRENT_SENTINEL/);
+    assert.deepEqual(
+      await loadCodexSessionSnapshot(stateDir, sessionId).then((snapshot) => ({
+        latestResponseId: snapshot?.latestResponseId,
+        previousResponseId: snapshot?.previousResponseId,
+      })),
+      { latestResponseId: "resp-pipeline-3", previousResponseId: "resp-pipeline-1" },
+    );
+
+    const journal = await readCodexRebaseCapabilityJournal(stateDir);
+    assert.equal(
+      journal.capabilities.find((entry) => entry.itemType === "previous_response_id")?.status,
+      "verified_unsupported",
+    );
+    assert.equal(
+      journal.capabilities.find((entry) => entry.itemType === "message")?.status,
+      "verified_supported",
+    );
+
+    const third = await fetch(`${runtime.baseUrl}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-fixture",
+        stream: false,
+        previous_response_id: "resp-pipeline-3",
+        metadata: { tokenpilotSessionId: sessionId },
+        input: [{ role: "user", content: "CHAIN_THIRD_SENTINEL" }],
+      }),
+    });
+    assert.equal(third.status, 200);
+    assert.equal(upstream.requests.length, 4);
+    assert.equal("previous_response_id" in (upstream.requests[3] ?? {}), false);
+    assert.match(inputText(upstream.requests[3]), /CHAIN_THIRD_SENTINEL/);
+    assert.deepEqual(
+      await loadCodexSessionSnapshot(stateDir, sessionId).then((snapshot) => ({
+        latestResponseId: snapshot?.latestResponseId,
+        previousResponseId: snapshot?.previousResponseId,
+      })),
+      { latestResponseId: "resp-pipeline-4", previousResponseId: "resp-pipeline-3" },
+    );
   } finally {
     await runtime?.close();
     await upstream.close();
@@ -1387,7 +1501,7 @@ test("CDR-06 mock smoke keeps five turns on the new response chain", async () =>
 
 test("CDR-06 proxy restart keeps the committed rebase response chain", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "lightmem2-codex-rebase-pipeline-restart-"));
-  const upstream = await startSequencedResponsesUpstream();
+  const upstream = await startSequencedResponsesUpstream({ rejectChain: true });
   let runtime: Awaited<ReturnType<typeof startCodexResponsesProxy>> | undefined;
   try {
     const sessionId = "codex-session-pipeline-restart";
@@ -1464,6 +1578,23 @@ test("CDR-06 proxy restart keeps the committed rebase response chain", async () 
     assert.equal("previous_response_id" in (upstream.requests[1] ?? {}), false);
     assert.doesNotMatch(inputText(upstream.requests[1]), new RegExp(evict));
     assert.match(inputText(upstream.requests[1]), new RegExp(keep));
+    (config as any).contextRewrite.mutationPlan = { operations: [] };
+
+    const beforeRestartContinuation = await fetch(`${runtime.baseUrl}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.4-mini",
+        stream: false,
+        previous_response_id: previousResponseId,
+        input: [{ role: "user", content: "TURN_3_PRE_RESTART" }],
+      }),
+    });
+    assert.equal(beforeRestartContinuation.status, 200);
+    previousResponseId = String((await beforeRestartContinuation.json() as JsonObject).id);
+    assert.equal(upstream.requests.length, 4);
+    assert.equal(upstream.requests[2]?.previous_response_id, "resp-pipeline-2");
+    assert.equal("previous_response_id" in (upstream.requests[3] ?? {}), false);
 
     await runtime.close();
     runtime = undefined;
@@ -1504,14 +1635,14 @@ test("CDR-06 proxy restart keeps the committed rebase response chain", async () 
         model: "gpt-5.4-mini",
         stream: false,
         previous_response_id: previousResponseId,
-        input: [{ role: "user", content: "TURN_3_restart_smoke" }],
+        input: [{ role: "user", content: "TURN_4_restart_smoke" }],
       }),
     });
     assert.equal(third.status, 200);
     const finalResponseId = String((await third.json() as JsonObject).id);
 
-    assert.equal(upstream.requests.length, 3);
-    assert.equal(upstream.requests[2]?.previous_response_id, previousResponseId);
+    assert.equal(upstream.requests.length, 5);
+    assert.equal("previous_response_id" in (upstream.requests[4] ?? {}), false);
     assert.equal(await resolveCodexSessionIdByResponseId(stateDir, finalResponseId), sessionId);
     const finalHistory = await buildCodexEffectiveHistory({
       stateDir,
@@ -1521,7 +1652,8 @@ test("CDR-06 proxy restart keeps the committed rebase response chain", async () 
     assert.equal(finalHistory.incomplete, false);
     assert.doesNotMatch(JSON.stringify(finalHistory.replayableItems), new RegExp(evict));
     assert.match(JSON.stringify(finalHistory.replayableItems), new RegExp(keep));
-    assert.match(JSON.stringify(finalHistory.replayableItems), /TURN_3_restart_smoke/);
+    assert.match(JSON.stringify(finalHistory.replayableItems), /TURN_3_PRE_RESTART/);
+    assert.match(JSON.stringify(finalHistory.replayableItems), /TURN_4_restart_smoke/);
   } finally {
     await runtime?.close();
     await upstream.close();

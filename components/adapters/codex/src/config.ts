@@ -200,7 +200,7 @@ export function normalizeTokenPilotCodexConfig(
       providerCompatibilityProbe: contextRewrite.providerCompatibilityProbe === "mock_fixture"
         || contextRewrite.providerCompatibilityProbe === "real_provider"
         ? contextRewrite.providerCompatibilityProbe
-        : "disabled",
+        : "real_provider",
       mutationPlan: sanitizeCodexMutationPlan(contextRewrite.mutationPlan),
     },
     reduction: {

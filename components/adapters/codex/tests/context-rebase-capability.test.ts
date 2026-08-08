@@ -127,7 +127,7 @@ test("CDR-05 Provider Compatibility binds decisions to provider, model, wire, AP
       { apiVersion: "responses/v2" },
       { wireMode: "chat_completions" },
       { endpointId: codexRebaseEndpointIdentity("https://other.example/v1") },
-      { itemSchemaVersion: "responses-item/v2" },
+      { itemSchemaVersion: "responses-item/v3" },
     ]) {
       const changed = await decisionsFor({
         stateDir,

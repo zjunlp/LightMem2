@@ -105,6 +105,86 @@ test("CDH-05 Replayability defers compaction without its exact encrypted payload
   assert.equal(isCodexDeferredItem(compaction), true);
 });
 
+test("CDH-05 Replayability recognizes the full Responses client-tool closure family", () => {
+  for (const type of [
+    "computer_call",
+    "computer_call_output",
+    "local_shell_call",
+    "local_shell_call_output",
+    "shell_call",
+    "shell_call_output",
+    "apply_patch_call",
+    "apply_patch_call_output",
+  ]) {
+    assertReplayability({ type, call_id: `call-${type}` }, "replayable", "tool_closure_required");
+  }
+});
+
+test("CDH-05 Replayability requires exact program replay state", () => {
+  assertReplayability({
+    type: "program",
+    call_id: "call-program",
+    code: "text('done')",
+    fingerprint: "opaque-program-state",
+  }, "replayable", "program_payload_required");
+  assertReplayability({
+    type: "program_output",
+    call_id: "call-program",
+    result: "done",
+    status: "completed",
+  }, "replayable", "program_payload_required");
+  assertReplayability({
+    type: "program",
+    call_id: "call-program",
+    code: "text('done')",
+  }, "deferred", "program_payload_missing");
+  assertReplayability({
+    type: "program_output",
+    call_id: "call-program",
+  }, "deferred", "program_payload_missing");
+});
+
+test("CDH-05 Replayability recognizes provider-produced Responses replay items", () => {
+  for (const type of [
+    "web_search_call",
+    "file_search_call",
+    "code_interpreter_call",
+    "image_generation_call",
+    "mcp_call",
+    "mcp_list_tools",
+    "mcp_approval_request",
+    "mcp_approval_response",
+    "tool_search_call",
+    "tool_search_output",
+    "additional_tools",
+  ]) {
+    assertReplayability({ type }, "replayable", "provider_output_replay");
+  }
+});
+
+test("CDH-05 Replayability requires client tool-search call/output ids but accepts hosted items", () => {
+  assertReplayability({
+    type: "tool_search_call",
+    execution: "client",
+    call_id: "search-1",
+  }, "replayable", "tool_closure_required");
+  assertReplayability({
+    type: "tool_search_output",
+    execution: "client",
+    call_id: "search-1",
+    tools: [],
+  }, "replayable", "tool_closure_required");
+  assertReplayability({
+    type: "tool_search_call",
+    execution: "client",
+  }, "deferred", "tool_call_id_missing");
+  assertReplayability({
+    type: "tool_search_call",
+    execution: "server",
+    call_id: null,
+  }, "replayable", "provider_output_replay");
+});
+
 test("CDH-05 Replayability separates exact encrypted payloads from malformed payloads", () => {
   for (const type of ["reasoning", "compaction"] as const) {
     assertReplayability(
@@ -129,14 +209,13 @@ test("CDH-05 Replayability defers unknown provider item types", () => {
   assert.equal(isCodexDeferredItem(item), true);
 });
 
-test("CDH-05 Replayability classifies provider observations as observation-only by default", () => {
-  for (const item of [
-    { type: "web_search_call", query: "provider-owned observation" },
-    { type: "event_msg", message: "runtime event" },
-  ]) {
-    assertReplayability(item, "observation_only", "provider_observation");
-    assert.equal(isCodexObservationOnlyItem(item), true);
-  }
+test("CDH-05 Replayability replays Responses output items but keeps runtime events observation-only", () => {
+  const webSearch = { type: "web_search_call", query: "provider-owned output" };
+  assertReplayability(webSearch, "replayable", "provider_output_replay");
+  assert.equal(isCodexObservationOnlyItem(webSearch), false);
+  const event = { type: "event_msg", message: "runtime event" };
+  assertReplayability(event, "observation_only", "provider_observation");
+  assert.equal(isCodexObservationOnlyItem(event), true);
   const turnContext = { type: "turn_context", content: "current turn metadata" };
   assertReplayability(turnContext, "observation_only", "turn_context_instruction");
   assert.equal(isCodexObservationOnlyItem(turnContext), true);

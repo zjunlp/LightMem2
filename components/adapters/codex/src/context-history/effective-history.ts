@@ -1,5 +1,5 @@
 import { readCodexContextHistoryJournalRecoveringTail } from "./journal-append.js";
-import { codexReplayabilityForItem } from "./replayability.js";
+import { codexReplayabilityForItem, codexReplayPairRef } from "./replayability.js";
 import { cloneJson, hashJson } from "./shared.js";
 import type {
   CodexContextHistoryJournalEntry,
@@ -25,6 +25,17 @@ type CommittedTurn = {
   response: IndexedResponse;
 };
 
+function findLastResponse(
+  responses: IndexedResponse[],
+  predicate: (response: IndexedResponse) => boolean,
+): IndexedResponse | undefined {
+  for (let index = responses.length - 1; index >= 0; index -= 1) {
+    const response = responses[index];
+    if (response && predicate(response)) return response;
+  }
+  return undefined;
+}
+
 function latestRequests(journal: CodexContextHistoryJournalEntry[]): Map<string, IndexedRequest> {
   const requests = new Map<string, IndexedRequest>();
   journal.forEach((entry, journalIndex) => {
@@ -33,11 +44,13 @@ function latestRequests(journal: CodexContextHistoryJournalEntry[]): Map<string,
   return requests;
 }
 
-function latestResponsesById(journal: CodexContextHistoryJournalEntry[]): Map<string, IndexedResponse> {
-  const responses = new Map<string, IndexedResponse>();
+function responsesById(journal: CodexContextHistoryJournalEntry[]): Map<string, IndexedResponse[]> {
+  const responses = new Map<string, IndexedResponse[]>();
   journal.forEach((entry, journalIndex) => {
     if (entry.kind === "response" && entry.responseId) {
-      responses.set(entry.responseId, { entry, journalIndex });
+      const occurrences = responses.get(entry.responseId) ?? [];
+      occurrences.push({ entry, journalIndex });
+      responses.set(entry.responseId, occurrences);
     }
   });
   return responses;
@@ -51,10 +64,10 @@ function isCommittedResponseEntry(entry: CodexResponseJournalEntry): boolean {
 }
 
 function committedResponses(
-  responses: Map<string, IndexedResponse>,
+  responses: Map<string, IndexedResponse[]>,
   requests: Map<string, IndexedRequest>,
 ): IndexedResponse[] {
-  return Array.from(responses.values())
+  return Array.from(responses.values()).flat()
     .filter(({ entry }) => {
       if (!isCommittedResponseEntry(entry) || !entry.requestId) return false;
       return requests.get(entry.requestId)?.entry.status === "completed";
@@ -78,18 +91,18 @@ function committedInputItems(turn: CommittedTurn): JsonObject[] {
 function buildCommittedChain(params: {
   headResponseId?: string;
   requests: Map<string, IndexedRequest>;
-  responses: Map<string, IndexedResponse>;
+  responses: Map<string, IndexedResponse[]>;
 }): { chain: CommittedTurn[]; complete: boolean } {
   const committed = committedResponses(params.responses, params.requests);
   const head = params.headResponseId
-    ? params.responses.get(params.headResponseId)
+    ? findLastResponse(committed, ({ entry }) => entry.responseId === params.headResponseId)
     : committed.at(-1);
   if (!head) {
     return { chain: [], complete: params.headResponseId === undefined && params.requests.size === 0 };
   }
 
   const chain: CommittedTurn[] = [];
-  const seenResponseIds = new Set<string>();
+  const seenJournalIndexes = new Set<number>();
   let cursor: IndexedResponse | undefined = head;
   while (cursor) {
     const responseId = cursor.entry.responseId;
@@ -97,8 +110,8 @@ function buildCommittedChain(params: {
     if (!responseId || !requestId || !isCommittedResponseEntry(cursor.entry)) {
       return { chain: [], complete: false };
     }
-    if (seenResponseIds.has(responseId)) return { chain: [], complete: false };
-    seenResponseIds.add(responseId);
+    if (seenJournalIndexes.has(cursor.journalIndex)) return { chain: [], complete: false };
+    seenJournalIndexes.add(cursor.journalIndex);
 
     const request = params.requests.get(requestId);
     if (!request || request.entry.status !== "completed") {
@@ -109,7 +122,10 @@ function buildCommittedChain(params: {
 
     const previousId = previousResponseId(turn);
     if (!previousId) break;
-    cursor = params.responses.get(previousId);
+    cursor = findLastResponse(committed, (candidate) => (
+      candidate.entry.responseId === previousId
+      && candidate.journalIndex < cursor!.journalIndex
+    ));
     if (!cursor) return { chain, complete: false };
   }
   return { chain, complete: true };
@@ -169,11 +185,9 @@ function unresolvedCallIds(items: CodexEffectiveHistoryItem[]): string[] {
   const calls = new Set<string>();
   const outputs = new Set<string>();
   for (const entry of items) {
-    const type = String(entry.item.type ?? "").toLowerCase();
-    if ((type === "function_call" || type === "custom_tool_call") && entry.callId) calls.add(entry.callId);
-    if ((type === "function_call_output" || type === "custom_tool_call_output") && entry.callId) {
-      outputs.add(entry.callId);
-    }
+    const ref = codexReplayPairRef(entry.item);
+    if (ref.side === "call" && ref.callId) calls.add(ref.callId);
+    if (ref.side === "output" && ref.callId) outputs.add(ref.callId);
   }
   return Array.from(calls).filter((callId) => !outputs.has(callId)).sort();
 }
@@ -345,7 +359,7 @@ export async function buildCodexEffectiveHistory(params: {
 }): Promise<CodexEffectiveHistory> {
   const journalRead = await readCodexContextHistoryJournalRecoveringTail(params.stateDir, params.sessionId);
   const requests = latestRequests(journalRead.entries);
-  const responses = latestResponsesById(journalRead.entries);
+  const responses = responsesById(journalRead.entries);
   const committedChain = buildCommittedChain({
     headResponseId: params.headResponseId,
     requests,

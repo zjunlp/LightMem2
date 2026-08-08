@@ -182,11 +182,17 @@ closure, response links, restart mapping, and provider usage gates all pass.
 Evidence contains only safe endpoint/model labels, an endpoint digest,
 booleans, counts, item types, payload length/digest, and provider usage totals.
 It never contains the API key, raw prompts, response IDs, encrypted payloads,
-headers, or raw provider error bodies. Authentication and schema failures are
-not retried; only 429 and 5xx receive two bounded retries. A provider that can
-return encrypted reasoning but rejects `previous_response_id` is recorded as a
-partial compatibility result and must not be described as a successful
-response-chain rebase.
+headers, or raw provider error bodies. Authentication and unrelated schema
+failures are not retried; only 429 and 5xx receive two bounded retries. If a
+provider explicitly rejects `previous_response_id`, the proxy retries once with
+journal-derived stateless history, forces `store: false`, requests encrypted
+reasoning state, and caches the transport decision by provider/model/endpoint.
+Later turns use stateless replay directly while preserving every supported
+response output item. A 2xx response that omits explicitly requested encrypted
+reasoning receives at most two transport-level repair retries. Journal parent
+links always follow the client request (including an explicit root), never an
+inconsistent provider echo. Reused provider response IDs remain ordered journal
+occurrences, so a restart does not collapse a valid logical chain.
 
 Context-history journal writers use a session-scoped cross-process lock. A
 successful append is one complete JSONL record followed by `sync`; concurrent
@@ -208,16 +214,18 @@ accept that item. Capability journal v2 keys observations by provider, model,
 Responses wire/API mode, a SHA-256 endpoint identity, item type, and item schema
 version, and expires observations after a bounded TTL.
 
-The default `contextRewrite.providerCompatibilityProbe` value is `disabled`.
-With that default, unknown, expired, verified-unsupported, payload-rejected, or
-untrusted capability state bypasses rebase before an epoch is opened and sends
-the original request. `mock_fixture` and `real_provider` are explicit probe
-modes. Mock evidence can drive mock tests but is never presented as real-provider
-verification. Explicit item-schema rejection is scoped to the named item type;
-encrypted-content lineage/expiry rejection is scoped to the exact payload
-digest; authentication, rate-limit, server, network, and ambiguous multi-item
-failures do not poison the capability cache. Doctor and session reports label
-the evidence source and whether each observation is active or expired.
+The default `contextRewrite.providerCompatibilityProbe` value is
+`real_provider`. Unknown item compatibility is learned from the actual
+rebased/stateless request; an explicit rejection is cached, while a successful
+replay records support. `disabled` keeps the conservative bypass behavior and
+`mock_fixture` is reserved for fixtures. Mock evidence can drive mock tests but
+is never presented as real-provider verification. Explicit item-schema
+rejection is scoped to the named item type; encrypted-content lineage/expiry
+rejection is scoped to the exact payload digest; authentication, rate-limit,
+server, network, and ambiguous multi-item failures do not poison the capability
+cache. `program`, `program_output`, and program-issued tool outputs retain their
+fingerprint, status, and exact `caller` relationship. Doctor and session reports
+label the evidence source and whether each observation is active or expired.
 
 If install finishes in degraded MCP mode, Codex stable-prefix and reduction remain usable; only the real `memory_fault_recover` tool path is unavailable until MCP startup succeeds.
 

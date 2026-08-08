@@ -93,6 +93,12 @@ export type CodexRebaseFallbackResult = {
   capability?: CodexRebaseCapabilityNotice;
 };
 
+export type CodexProviderContinuationResult = {
+  response: CodexUpstreamResponse;
+  outcome: "chained" | "stateless_replay" | "failed";
+  chainedResponse?: CodexUpstreamResponse;
+};
+
 export type CodexRebaseEpochStoreParams = {
   stateDir: string;
   oldPreviousResponseId: string;
@@ -129,7 +135,8 @@ export const CODEX_REBASE_CAPABILITY_LEGACY_SCHEMA = "lightmem2.codex.rebase-cap
 export const CODEX_REBASE_CAPABILITY_DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 export const CODEX_REBASE_WIRE_MODE = "responses";
 export const CODEX_REBASE_API_VERSION = "responses/v1";
-export const CODEX_REBASE_ITEM_SCHEMA_VERSION = "responses-item/v1";
+export const CODEX_REBASE_ITEM_SCHEMA_VERSION = "responses-item/v2";
+export const CODEX_RESPONSE_CHAIN_CAPABILITY_ITEM_TYPE = "previous_response_id";
 
 export type CodexRebaseCapabilityStatus =
   | "verified_supported"

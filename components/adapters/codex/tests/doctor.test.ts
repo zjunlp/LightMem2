@@ -467,12 +467,12 @@ test("inspectCodexDoctor reports cached rebase capabilities", async () => {
     });
 
     assert.deepEqual(report.rebaseCapabilityStatus, [
-      "OpenAI/gpt-5.4-mini responses responses/v1 reasoning@responses-item/v1 verified_supported evidence=real-provider state=active",
-      "OpenAI/gpt-5.4-mini responses responses/v1 web_search_call@responses-item/v1 verified_unsupported evidence=mock/fixture state=active",
+      "OpenAI/gpt-5.4-mini responses responses/v1 reasoning@responses-item/v2 verified_supported evidence=real-provider state=active",
+      "OpenAI/gpt-5.4-mini responses responses/v1 web_search_call@responses-item/v2 verified_unsupported evidence=mock/fixture state=active",
     ]);
     const formatted = formatCodexDoctorReport(report);
-    assert.match(formatted, /reasoning@responses-item\/v1 verified_supported evidence=real-provider/);
-    assert.match(formatted, /web_search_call@responses-item\/v1 verified_unsupported evidence=mock\/fixture/);
+    assert.match(formatted, /reasoning@responses-item\/v2 verified_supported evidence=real-provider/);
+    assert.match(formatted, /web_search_call@responses-item\/v2 verified_unsupported evidence=mock\/fixture/);
 
     await appendFile(codexRebaseCapabilityJournalPath(stateDir), "not-json\n", "utf8");
     const untrustedReport = await inspectCodexDoctor({

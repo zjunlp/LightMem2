@@ -25,6 +25,7 @@ import { resolveCodexSessionIdByResponseId } from "./session-state.js";
 
 export const CODEX_REBASE_PROVIDER_SMOKE_EVIDENCE_SCHEMA =
   "lightmem2.codex.context-rebase-provider-smoke-evidence/v2";
+const PROVIDER_SMOKE_MAX_OUTPUT_TOKENS = 2_048;
 
 export type ProviderUsageObservation = {
   inputTokens: number;
@@ -60,7 +61,7 @@ export type ProviderUsageEvidence = {
 
 export type ProviderCompatibilityMatrixEntry = {
   itemType: string;
-  structuralPolicy: "replay-candidate" | "closure-required" | "exact-payload" | "observation-only" | "deferred";
+  structuralPolicy: "transport" | "replay-candidate" | "closure-required" | "exact-payload" | "deferred";
   providerDecision: "real-pass" | "real-reject" | "mock" | "not-observed";
   evidence: "real-provider" | "mock-fixture" | "none";
   reason: string;
@@ -95,6 +96,7 @@ export type CodexRebaseProviderSmokeEvidence = {
     toolCallPresent: boolean;
     journalTrusted: boolean;
     realProviderVerifiedItemTypes: string[];
+    realProviderRejectedItemTypes: string[];
   };
   compatibilityMatrix: ProviderCompatibilityMatrixEntry[];
   rebase: {
@@ -161,6 +163,27 @@ type ProviderConversationResult = {
   setupUsage: ProviderUsageObservation[];
   continuationUsage: ProviderUsageObservation[];
 };
+
+async function replayDiagnostic(params: {
+  stateDir: string;
+  sessionId: string;
+  headResponseId: string;
+}): Promise<string> {
+  try {
+    const history = await buildCodexEffectiveHistory(params);
+    const deferredTypes = Array.from(new Set(history.deferredItems.map((entry) => (
+      typeof entry.item.type === "string" ? entry.item.type : "unknown"
+    )))).sort();
+    return [
+      `source=${history.source}`,
+      `incomplete=${history.incomplete}`,
+      `deferred=${deferredTypes.join(",") || "none"}`,
+      `unresolved=${history.unresolvedCallIds.length}`,
+    ].join(";");
+  } catch {
+    return "history-diagnostic-unavailable";
+  }
+}
 
 type ProviderRebaseResult = ProviderConversationResult & {
   capability: CodexRebaseProviderSmokeEvidence["capability"];
@@ -384,6 +407,10 @@ async function postProviderResponse(
     try {
       const parsed = JSON.parse(text) as JsonObject;
       responseId(parsed, phase);
+      const lifecycleStatus = typeof parsed.status === "string" ? parsed.status.toLowerCase() : undefined;
+      if (lifecycleStatus && lifecycleStatus !== "completed") {
+        throw new Error(`Provider smoke ${phase} returned response status ${lifecycleStatus}`);
+      }
       return parsed;
     } catch (error) {
       if (error instanceof SyntaxError) throw new Error(`Provider smoke ${phase} returned malformed JSON`);
@@ -420,7 +447,7 @@ function firstTurnPayload(params: {
     store: false,
     include: ["reasoning.encrypted_content"],
     reasoning: { effort: "medium", summary: "auto" },
-    max_output_tokens: 512,
+    max_output_tokens: PROVIDER_SMOKE_MAX_OUTPUT_TOKENS,
     metadata: { tokenpilotSessionId: params.sessionId },
     instructions: "Reason about the two synthetic records, then reply with the single word READY.",
     input: [
@@ -440,8 +467,8 @@ function continuationPayload(params: {
     stream: false,
     store: true,
     include: ["reasoning.encrypted_content"],
-    reasoning: { effort: "medium", summary: "auto" },
-    max_output_tokens: 512,
+    reasoning: { effort: "low", summary: "auto" },
+    max_output_tokens: PROVIDER_SMOKE_MAX_OUTPUT_TOKENS,
     tools: [toolDefinition()],
     tool_choice: "none",
     previous_response_id: params.previousResponseId,
@@ -463,8 +490,8 @@ function requiredToolCallPayload(params: {
     stream: false,
     store: false,
     include: ["reasoning.encrypted_content"],
-    reasoning: { effort: "medium", summary: "auto" },
-    max_output_tokens: 512,
+    reasoning: { effort: "low", summary: "auto" },
+    max_output_tokens: PROVIDER_SMOKE_MAX_OUTPUT_TOKENS,
     metadata: { tokenpilotSessionId: params.sessionId },
     tools: [toolDefinition()],
     tool_choice: { type: "function", name: "lookup_smoke_fixture" },
@@ -480,10 +507,12 @@ function storedRootPayload(params: {
   return {
     model: params.model,
     stream: false,
-    store: true,
+    // The provider smoke validates the stateless path, so every setup response
+    // must return the opaque reasoning state required by later replay.
+    store: false,
     include: ["reasoning.encrypted_content"],
-    reasoning: { effort: "medium", summary: "auto" },
-    max_output_tokens: 512,
+    reasoning: { effort: "low", summary: "auto" },
+    max_output_tokens: PROVIDER_SMOKE_MAX_OUTPUT_TOKENS,
     metadata: { tokenpilotSessionId: params.sessionId },
     tools: [toolDefinition()],
     tool_choice: "none",
@@ -506,6 +535,28 @@ function firstReasoning(response: JsonObject): {
   }
   if (!encryptedPayload) throw new Error("Provider response did not include encrypted reasoning content");
   return { reasoning, encryptedPayload };
+}
+
+async function postProviderEncryptedReasoningSample(params: {
+  runtime: CodexProxyRuntime;
+  payload: JsonObject;
+  phase: string;
+}): Promise<{ response: JsonObject; encryptedPayload: string }> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await postProviderResponse(params.runtime, params.payload, params.phase);
+    try {
+      return {
+        response,
+        encryptedPayload: firstReasoning(response).encryptedPayload,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Provider response did not include replayable encrypted reasoning");
 }
 
 function requiredToolCall(response: JsonObject): { call: JsonObject; callId: string } {
@@ -536,15 +587,20 @@ async function setupStoredRoot(params: {
   firstEncryptedPayload: string;
   toolResponse: JsonObject;
   toolOutputResponse: JsonObject;
+  historyInput: JsonObject[];
   previousResponseId: string;
 }> {
-  const first = await postProviderResponse(params.runtime, firstTurnPayload({
-    model: params.model,
-    sessionId: params.sessionId,
-    evictText: params.evictText,
-    keepText: params.keepText,
-  }), `${params.phase} setup turn 1`);
-  const firstOutput = firstReasoning(first);
+  const firstSample = await postProviderEncryptedReasoningSample({
+    runtime: params.runtime,
+    payload: firstTurnPayload({
+      model: params.model,
+      sessionId: params.sessionId,
+      evictText: params.evictText,
+      keepText: params.keepText,
+    }),
+    phase: `${params.phase} setup turn 1`,
+  });
+  const first = firstSample.response;
   const initialHistory = [
     { role: "user", content: params.evictText },
     { role: "user", content: params.keepText },
@@ -556,25 +612,27 @@ async function setupStoredRoot(params: {
     historyInput: initialHistory,
   }), `${params.phase} setup turn 2`);
   const toolCall = requiredToolCall(toolResponse);
+  const toolOutputHistory = [
+    ...initialHistory,
+    toolRequestItem(),
+    ...jsonItems(toolResponse.output),
+    {
+      type: "function_call_output",
+      call_id: toolCall.callId,
+      output: "retained synthetic tool result",
+    },
+  ];
   const toolOutputResponse = await postProviderResponse(params.runtime, storedRootPayload({
     model: params.model,
     sessionId: params.sessionId,
-    historyInput: [
-      ...initialHistory,
-      toolRequestItem(),
-      ...jsonItems(toolResponse.output),
-      {
-        type: "function_call_output",
-        call_id: toolCall.callId,
-        output: "retained synthetic tool result",
-      },
-    ],
+    historyInput: toolOutputHistory,
   }), `${params.phase} setup turn 3`);
   return {
     first,
-    firstEncryptedPayload: firstOutput.encryptedPayload,
+    firstEncryptedPayload: firstSample.encryptedPayload,
     toolResponse,
     toolOutputResponse,
+    historyInput: [...toolOutputHistory, ...jsonItems(toolOutputResponse.output)],
     previousResponseId: responseId(toolOutputResponse, `${params.phase} setup turn 3`),
   };
 }
@@ -604,15 +662,16 @@ async function runControlConversation(params: {
       ...values,
       phase: "control",
     });
-    let previousResponseId = setup.previousResponseId;
+    let historyInput = setup.historyInput;
     const continuationUsage: ProviderUsageObservation[] = [];
     for (let turn = 1; turn <= params.continuationTurns; turn += 1) {
-      const response = await postProviderResponse(runtime, continuationPayload({
-        model: params.model,
-        previousResponseId,
-        input: [{ role: "user", content: `Acknowledge continuation turn ${turn} with one word.` }],
-      }), `control continuation turn ${turn}`);
-      previousResponseId = responseId(response, `control continuation turn ${turn}`);
+      const currentInput = { role: "user", content: `Acknowledge continuation turn ${turn} with one word.` };
+      const response = await postProviderResponse(runtime, storedRootPayload({
+          model: params.model,
+          sessionId,
+          historyInput: [...historyInput, currentInput],
+        }), `control continuation turn ${turn}`);
+      historyInput = [...historyInput, currentInput, ...jsonItems(response.output)];
       continuationUsage.push(usageObservation(response));
     }
     return {
@@ -629,24 +688,53 @@ async function runControlConversation(params: {
   }
 }
 
-function compatibilityMatrix(realProviderVerifiedItemTypes: string[]): ProviderCompatibilityMatrixEntry[] {
+function compatibilityMatrix(
+  realProviderVerifiedItemTypes: string[],
+  realProviderRejectedItemTypes: string[],
+): ProviderCompatibilityMatrixEntry[] {
   const verified = new Set(realProviderVerifiedItemTypes);
+  const rejected = new Set(realProviderRejectedItemTypes);
   const real = (itemType: string, policy: ProviderCompatibilityMatrixEntry["structuralPolicy"]): ProviderCompatibilityMatrixEntry => ({
     itemType,
     structuralPolicy: policy,
-    providerDecision: verified.has(itemType) ? "real-pass" : "not-observed",
-    evidence: verified.has(itemType) ? "real-provider" : "none",
-    reason: verified.has(itemType) ? "provider_rebase_committed" : "not_observed_in_provider_smoke",
+    providerDecision: verified.has(itemType)
+      ? "real-pass"
+      : rejected.has(itemType) ? "real-reject" : "not-observed",
+    evidence: verified.has(itemType) || rejected.has(itemType) ? "real-provider" : "none",
+    reason: verified.has(itemType)
+      ? "provider_replay_succeeded"
+      : rejected.has(itemType) ? "provider_replay_rejected" : "not_observed_in_provider_smoke",
   });
   return [
+    real("previous_response_id", "transport"),
     real("message", "replay-candidate"),
     real("function_call", "closure-required"),
     real("function_call_output", "closure-required"),
     { itemType: "custom_tool_call", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
     { itemType: "custom_tool_call_output", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "computer_call", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "computer_call_output", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "local_shell_call", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "local_shell_call_output", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "shell_call", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "shell_call_output", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "apply_patch_call", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "apply_patch_call_output", structuralPolicy: "closure-required", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
     real("reasoning", "exact-payload"),
     { itemType: "compaction", structuralPolicy: "exact-payload", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
-    { itemType: "web_search_call", structuralPolicy: "observation-only", providerDecision: "not-observed", evidence: "none", reason: "server_owned_observation_not_replayed" },
+    { itemType: "program", structuralPolicy: "exact-payload", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "program_output", structuralPolicy: "exact-payload", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "web_search_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "file_search_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "code_interpreter_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "image_generation_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "mcp_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "mcp_list_tools", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "mcp_approval_request", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "mcp_approval_response", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "tool_search_call", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "tool_search_output", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
+    { itemType: "additional_tools", structuralPolicy: "replay-candidate", providerDecision: "not-observed", evidence: "none", reason: "not_emitted_by_provider" },
     { itemType: "unknown", structuralPolicy: "deferred", providerDecision: "not-observed", evidence: "none", reason: "unknown_items_require_explicit_adapter_support" },
   ];
 }
@@ -684,19 +772,31 @@ async function runRebaseConversation(params: {
       headResponseId: previousResponseId,
     });
     const evictedItem = beforeRebase.replayableItems.find((entry) => (
-      JSON.stringify(entry.item).includes(`EVICT_ME_${params.marker}`)
+      JSON.stringify(entry.item).includes(values.evictText)
+      || JSON.stringify(entry.item).includes("discardable provider smoke context")
     ));
-    if (!evictedItem) throw new Error("Provider smoke could not resolve the eviction target");
+    if (!evictedItem) {
+      const diagnostic = await replayDiagnostic({ stateDir, sessionId, headResponseId: previousResponseId });
+      throw new Error(
+        `Provider smoke could not resolve the eviction target; ${diagnostic}; replayable=${beforeRebase.replayableItems.length}`,
+      );
+    }
     config.contextRewrite.mutationPlan = {
       operations: [{ type: "evict", stableItemId: evictedItem.stableItemId }],
     };
 
     const continuationUsage: ProviderUsageObservation[] = [];
-    const rebaseResponse = await postProviderResponse(runtime, continuationPayload({
-      model: params.model,
-      previousResponseId,
-      input: [{ role: "user", content: currentInput }],
-    }), "rebase continuation turn 1");
+    let rebaseResponse: JsonObject;
+    try {
+      rebaseResponse = await postProviderResponse(runtime, continuationPayload({
+        model: params.model,
+        previousResponseId,
+        input: [{ role: "user", content: currentInput }],
+      }), "rebase continuation turn 1");
+    } catch (error) {
+      const diagnostic = await replayDiagnostic({ stateDir, sessionId, headResponseId: previousResponseId });
+      throw new Error(`${error instanceof Error ? error.message : String(error)}; ${diagnostic}`);
+    }
     const newRootResponseId = responseId(rebaseResponse, "rebase continuation turn 1");
     previousResponseId = newRootResponseId;
     continuationUsage.push(usageObservation(rebaseResponse));
@@ -719,11 +819,17 @@ async function runRebaseConversation(params: {
         restartPreserved = await resolveCodexSessionIdByResponseId(stateDir, headBeforeRestart) === sessionId;
       }
       expectedPreviousIds.push(previousResponseId);
-      const response = await postProviderResponse(runtime, continuationPayload({
-        model: params.model,
-        previousResponseId,
-        input: [{ role: "user", content: `Acknowledge continuation turn ${turn} with one word.` }],
-      }), `rebase continuation turn ${turn}`);
+      let response: JsonObject;
+      try {
+        response = await postProviderResponse(runtime, continuationPayload({
+          model: params.model,
+          previousResponseId,
+          input: [{ role: "user", content: `Acknowledge continuation turn ${turn} with one word.` }],
+        }), `rebase continuation turn ${turn}`);
+      } catch (error) {
+        const diagnostic = await replayDiagnostic({ stateDir, sessionId, headResponseId: previousResponseId });
+        throw new Error(`${error instanceof Error ? error.message : String(error)}; ${diagnostic}`);
+      }
       previousResponseId = responseId(response, `rebase continuation turn ${turn}`);
       continuationUsage.push(usageObservation(response));
     }
@@ -773,6 +879,14 @@ async function runRebaseConversation(params: {
         .filter((entry) => entry.status === "verified_supported" && entry.evidence === "real_provider")
         .map((entry) => entry.itemType),
     )).sort();
+    const realProviderRejectedItemTypes = Array.from(new Set(
+      capabilityJournal.capabilities
+        .filter((entry) => (
+          entry.evidence === "real_provider"
+          && (entry.status === "verified_unsupported" || entry.status === "payload_rejected")
+        ))
+        .map((entry) => entry.itemType),
+    )).sort();
 
     return {
       setupUsage: [
@@ -790,8 +904,12 @@ async function runRebaseConversation(params: {
         toolCallPresent: true,
         journalTrusted: !capabilityJournal.readError && capabilityJournal.malformedLineCount === 0,
         realProviderVerifiedItemTypes,
+        realProviderRejectedItemTypes,
       },
-      compatibilityMatrix: compatibilityMatrix(realProviderVerifiedItemTypes),
+      compatibilityMatrix: compatibilityMatrix(
+        realProviderVerifiedItemTypes,
+        realProviderRejectedItemTypes,
+      ),
       rebase: {
         committed: epoch?.status === "committed",
         oldChainReferenceRemoved: Boolean(committedRootResponse)
@@ -888,11 +1006,15 @@ function assertProviderEvidence(evidence: CodexRebaseProviderSmokeEvidence): voi
   const missingVerified = requiredVerified.filter((itemType) => (
     !evidence.capability.realProviderVerifiedItemTypes.includes(itemType)
   ));
+  const contradictoryCapabilities = evidence.capability.realProviderVerifiedItemTypes.filter((itemType) => (
+    evidence.capability.realProviderRejectedItemTypes.includes(itemType)
+  ));
   const checks: Array<[boolean, string]> = [
     [evidence.capability.responsesEndpointAccepted, "Responses endpoint was not accepted"],
     [evidence.capability.encryptedReasoningPresent, "Encrypted reasoning was not observed"],
     [evidence.capability.journalTrusted, "Capability journal was not trusted"],
     [missingVerified.length === 0, `Missing real-provider capability: ${missingVerified.join(",")}`],
+    [contradictoryCapabilities.length === 0, `Contradictory capability evidence: ${contradictoryCapabilities.join(",")}`],
     [evidence.rebase.committed, "Rebase epoch was not committed"],
     [evidence.rebase.oldChainReferenceRemoved, "Old chain reference remained on the new root"],
     [evidence.rebase.currentInputOccurrences === 1, "Current input was not replayed exactly once"],

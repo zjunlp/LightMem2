@@ -1,3 +1,7 @@
+import {
+  codexProgramCallerId,
+  codexReplayPairRef,
+} from "../context-history/replayability.js";
 import { cloneJson, stableInputKey } from "./shared.js";
 import type {
   CodexEffectiveHistory,
@@ -16,39 +20,45 @@ function evictedStableItemIds(plan: CodexMutationPlan): Set<string> {
   );
 }
 
-type ToolCallRef = {
-  callId?: string;
+type IndexedToolCallRef = ReturnType<typeof codexReplayPairRef> & {
   index?: number;
-  kind?: "function" | "custom";
-  side?: "call" | "output";
-  type?: string;
+  item: JsonObject;
 };
 
-function itemCallRef(item: JsonObject): ToolCallRef {
-  const type = String(item.type ?? "").toLowerCase();
-  const callId = typeof item.call_id === "string" && item.call_id.trim()
-    ? item.call_id.trim()
-    : undefined;
-  if (type === "function_call") return { callId, kind: "function", side: "call", type };
-  if (type === "function_call_output") return { callId, kind: "function", side: "output", type };
-  if (type === "custom_tool_call") return { callId, kind: "custom", side: "call", type };
-  if (type === "custom_tool_call_output") return { callId, kind: "custom", side: "output", type };
-  return {};
+function sameCaller(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function closureReasons(items: JsonObject[]): string[] {
-  const refs = new Map<string, { calls: ToolCallRef[]; outputs: ToolCallRef[] }>();
+  const refs = new Map<string, { calls: IndexedToolCallRef[]; outputs: IndexedToolCallRef[] }>();
+  const programs = new Map<string, number[]>();
+  const programOutputs = new Map<string, number[]>();
   const reasons: string[] = [];
   for (const [index, item] of items.entries()) {
-    const ref = { ...itemCallRef(item), index };
-    if (!ref.side) continue;
-    if (!ref.callId) {
-      reasons.push(`tool_call_id_missing:${ref.type}`);
-      continue;
+    const type = String(item.type ?? "").toLowerCase();
+    const callId = typeof item.call_id === "string" && item.call_id.trim()
+      ? item.call_id.trim()
+      : undefined;
+    if (type === "program" || type === "program_output") {
+      if (!callId) reasons.push(`program_call_id_missing:${type}`);
+      else {
+        const target = type === "program" ? programs : programOutputs;
+        const indexes = target.get(callId) ?? [];
+        indexes.push(index);
+        target.set(callId, indexes);
+      }
     }
-    const entry = refs.get(ref.callId) ?? { calls: [], outputs: [] };
-    entry[ref.side === "call" ? "calls" : "outputs"].push(ref);
-    refs.set(ref.callId, entry);
+
+    const ref: IndexedToolCallRef = { ...codexReplayPairRef(item), index, item };
+    if (ref.side) {
+      if (!ref.callId) {
+        reasons.push(`tool_call_id_missing:${ref.type}`);
+        continue;
+      }
+      const entry = refs.get(ref.callId) ?? { calls: [], outputs: [] };
+      entry[ref.side === "call" ? "calls" : "outputs"].push(ref);
+      refs.set(ref.callId, entry);
+    }
   }
   for (const [callId, entry] of refs) {
     if (entry.calls.length !== 1 || entry.outputs.length !== 1) {
@@ -65,6 +75,32 @@ function closureReasons(items: JsonObject[]): string[] {
     }
     if ((entry.outputs[0]?.index ?? -1) <= (entry.calls[0]?.index ?? -1)) {
       reasons.push(`tool_output_before_call:${callId}`);
+    }
+    const programCallerId = codexProgramCallerId(entry.calls[0]!.item);
+    const outputProgramCallerId = codexProgramCallerId(entry.outputs[0]!.item);
+    if (programCallerId) {
+      if (!programs.has(programCallerId)) {
+        reasons.push(`program_caller_missing:${programCallerId}`);
+      } else if ((programs.get(programCallerId)?.[0] ?? Number.MAX_SAFE_INTEGER) >= (entry.calls[0]?.index ?? -1)) {
+        reasons.push(`program_caller_before_program:${programCallerId}`);
+      }
+      if (!sameCaller(entry.calls[0]!.item.caller, entry.outputs[0]!.item.caller)) {
+        reasons.push(`program_caller_mismatch:${callId}`);
+      }
+    } else if (outputProgramCallerId) {
+      reasons.push(`program_caller_mismatch:${callId}`);
+    }
+  }
+  for (const [callId, indexes] of programs) {
+    if (indexes.length > 1) reasons.push(`program_duplicate:${callId}`);
+  }
+  for (const [callId, indexes] of programOutputs) {
+    if (indexes.length > 1) reasons.push(`program_output_duplicate:${callId}`);
+    const programIndexes = programs.get(callId);
+    if (!programIndexes || programIndexes.length === 0) {
+      reasons.push(`program_output_orphan:${callId}`);
+    } else if ((indexes[0] ?? -1) <= (programIndexes[0] ?? -1)) {
+      reasons.push(`program_output_before_program:${callId}`);
     }
   }
   return Array.from(new Set(reasons)).sort();
@@ -115,7 +151,11 @@ export function validateCodexRebaseRequest(params: {
 function stripServerOwnedResponsesFields(item: JsonObject): JsonObject {
   const next = cloneJson(item);
   delete next.id;
-  delete next.status;
+  // These status values are part of their input replay contracts, not merely
+  // response-envelope state.
+  if (!["program_output", "tool_search_call", "tool_search_output"].includes(
+    String(next.type ?? "").toLowerCase(),
+  )) delete next.status;
   delete next.created_at;
   return next;
 }

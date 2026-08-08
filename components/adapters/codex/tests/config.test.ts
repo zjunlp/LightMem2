@@ -53,9 +53,9 @@ test("normalizeTokenPilotCodexConfig preserves context rewrite plan revisions", 
   ]);
 });
 
-test("normalizeTokenPilotCodexConfig disables provider compatibility probing by default", () => {
+test("normalizeTokenPilotCodexConfig enables real-provider compatibility learning by default", () => {
   assert.equal(
     normalizeTokenPilotCodexConfig({}).contextRewrite.providerCompatibilityProbe,
-    "disabled",
+    "real_provider",
   );
 });

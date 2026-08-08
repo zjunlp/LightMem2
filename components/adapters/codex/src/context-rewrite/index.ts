@@ -2,6 +2,11 @@ export * from "./types.js";
 export { applyCodexContextRewrite } from "./disabled.js";
 export { executeCodexRebaseWithFallback } from "./fallback.js";
 export {
+  executeCodexProviderContinuationWithReplay,
+  resolveCodexProviderContinuationCompatibility,
+} from "./provider-continuation.js";
+export type { CodexProviderContinuationCompatibility } from "./provider-continuation.js";
+export {
   buildCodexRebaseRequest,
   validateCodexRebaseRequest,
   withCodexRebaseReplayAccountingInput,

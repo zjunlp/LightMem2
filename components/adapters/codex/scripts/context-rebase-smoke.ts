@@ -97,6 +97,7 @@ async function main(): Promise<void> {
       artifactSha256: result.artifactSha256,
       encryptedReasoningPresent: result.evidence.capability.encryptedReasoningPresent,
       verifiedItemTypes: result.evidence.capability.realProviderVerifiedItemTypes,
+      rejectedItemTypes: result.evidence.capability.realProviderRejectedItemTypes,
       rebaseCommitted: result.evidence.rebase.committed,
       sentinel: result.evidence.rebase.sentinel,
       continuationTurns: result.evidence.rebase.responseChain.continuationTurns,

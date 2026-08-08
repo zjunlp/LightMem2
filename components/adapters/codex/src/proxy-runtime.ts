@@ -77,11 +77,14 @@ import {
   acquireCodexRebaseSessionLock,
   buildCodexRebaseRequest,
   codexRebaseEndpointIdentity,
+  executeCodexProviderContinuationWithReplay,
   executeCodexRebaseWithFallback,
   failPendingCodexRebaseEpochsAfterRestart,
+  resolveCodexProviderContinuationCompatibility,
   withCodexRebaseReplayAccountingInput,
 } from "./context-rewrite/index.js";
 import type {
+  CodexRebaseCapabilityEvidence,
   CodexMutationPlan,
   CodexRebaseRequestResult,
 } from "./context-rewrite/types.js";
@@ -374,45 +377,54 @@ export async function startCodexResponsesProxy(params: {
 
       let rebaseRequest: CodexRebaseRequestResult | undefined;
       let rebasePlanId: string | undefined;
+      let continuationReplayRequest: CodexRebaseRequestResult | undefined;
       let rebaseAccounting = rebaseRequest?.accounting;
       const mutationPlan = activeMutationPlan(config);
+      let effectiveHistoryPromise: ReturnType<typeof buildCodexEffectiveHistory> | undefined;
+      const effectiveHistoryForHead = (): ReturnType<typeof buildCodexEffectiveHistory> => {
+        if (!requestJournalEntry || typeof originalPayload.previous_response_id !== "string") {
+          throw new Error("Codex effective history requires a journaled response-chain request");
+        }
+        effectiveHistoryPromise ??= buildCodexEffectiveHistory({
+          stateDir: config.stateDir,
+          sessionId,
+          headResponseId: originalPayload.previous_response_id,
+          currentRequestId: requestJournalEntry.requestId,
+          async rolloutParserBootstrap() {
+            const snapshot = await loadCodexSessionSnapshot(config.stateDir, sessionId);
+            if (!snapshot?.transcriptPath) return null;
+            const rollout = await parseCodexRollout(snapshot.transcriptPath);
+            if (!rollout) return null;
+            const validation = validateCodexRolloutBootstrap({
+              rollout,
+              // prompt_cache_key is an upstream cache namespace, not the
+              // Codex host session identity used by rollout metadata.
+              expectedCodexSessionId: snapshot.codexSessionId,
+              snapshotCodexSessionId: snapshot.codexSessionId,
+              sourceModel: snapshot.latestModel,
+              sourceUpstreamProvider: snapshot.latestUpstreamProvider,
+              currentModel: model,
+              currentCodexProvider: config.providerName,
+              currentUpstreamProvider: upstreamProviderName,
+            });
+            if (validation.rejectionReason) {
+              await appendTrace(config.stateDir, {
+                stage: "context_history_rollout_bootstrap_rejected",
+                sessionId,
+                reason: validation.rejectionReason,
+              });
+            }
+            return validation.history;
+          },
+        });
+        return effectiveHistoryPromise;
+      };
       if (canAttemptCodexRebase({ config, payload: originalPayload, requestEntry: requestJournalEntry })
         && mutationPlan
         && requestJournalEntry) {
         const planId = codexMutationPlanId(mutationPlan);
         try {
-          const effectiveHistory = await buildCodexEffectiveHistory({
-            stateDir: config.stateDir,
-            sessionId,
-            headResponseId: String(originalPayload.previous_response_id),
-            currentRequestId: requestJournalEntry.requestId,
-            async rolloutParserBootstrap() {
-              const snapshot = await loadCodexSessionSnapshot(config.stateDir, sessionId);
-              if (!snapshot?.transcriptPath) return null;
-              const rollout = await parseCodexRollout(snapshot.transcriptPath);
-              if (!rollout) return null;
-              const validation = validateCodexRolloutBootstrap({
-                rollout,
-                // prompt_cache_key is an upstream cache namespace, not the
-                // Codex host session identity used by rollout metadata.
-                expectedCodexSessionId: snapshot.codexSessionId,
-                snapshotCodexSessionId: snapshot.codexSessionId,
-                sourceModel: snapshot.latestModel,
-                sourceUpstreamProvider: snapshot.latestUpstreamProvider,
-                currentModel: model,
-                currentCodexProvider: config.providerName,
-                currentUpstreamProvider: upstreamProviderName,
-              });
-              if (validation.rejectionReason) {
-                await appendTrace(config.stateDir, {
-                  stage: "context_history_rollout_bootstrap_rejected",
-                  sessionId,
-                  reason: validation.rejectionReason,
-                });
-              }
-              return validation.history;
-            },
-          });
+          const effectiveHistory = await effectiveHistoryForHead();
           rebaseRequest = buildCodexRebaseRequest({
             sessionId,
             planId,
@@ -426,6 +438,32 @@ export async function startCodexResponsesProxy(params: {
         } catch (err) {
           await appendTrace(config.stateDir, {
             stage: "context_rewrite_rebase_deferred",
+            sessionId,
+            model,
+            reason: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      const canPrepareContinuationReplay = !rebaseRequest
+        && requestJournalEntry
+        && typeof originalPayload.previous_response_id === "string"
+        && config.contextRewrite.providerCompatibilityProbe !== "disabled";
+      if (canPrepareContinuationReplay) {
+        try {
+          const effectiveHistory = await effectiveHistoryForHead();
+          continuationReplayRequest = buildCodexRebaseRequest({
+            sessionId,
+            planId: "provider-continuation-replay",
+            baseRevision: effectiveHistory.revision,
+            originalPayload,
+            effectiveHistory,
+            currentInput: originalPayload.input,
+            mutationPlan: { baseRevision: effectiveHistory.revision, operations: [] },
+          });
+        } catch (err) {
+          await appendTrace(config.stateDir, {
+            stage: "provider_continuation_replay_deferred",
             sessionId,
             model,
             reason: err instanceof Error ? err.message : String(err),
@@ -511,6 +549,20 @@ export async function startCodexResponsesProxy(params: {
         syncPayloadFromEnvelope(fallbackPayload, fallbackPrepared.envelope, codec);
         normalizeResponsesInputForUpstream(fallbackPayload?.input);
       }
+      let continuationReplayPayload: JsonObject | undefined;
+      if (continuationReplayRequest) {
+        continuationReplayPayload = cloneJsonObject(continuationReplayRequest.payload);
+        const continuationEnvelope = codec.decodeRequest(continuationReplayPayload);
+        const continuationPrepared = await prepareBeforeCallWithReductionSummary<CodexReductionSummary>({
+          envelope: continuationEnvelope,
+          codec,
+          config: { mode: "normal" },
+          prepareStablePrefix: prepareStablePrefixForCodex,
+          applyBeforeCallReduction: applyBeforeCallReductionForCodex,
+        });
+        syncPayloadFromEnvelope(continuationReplayPayload, continuationPrepared.envelope, codec);
+        normalizeResponsesInputForUpstream(continuationReplayPayload?.input);
+      }
       const requestText = extractResponsesInputText(payload?.input);
       const cacheAuditSnapshot = buildCodexCacheAuditSnapshot({
         envelope: prepared.envelope,
@@ -544,6 +596,7 @@ export async function startCodexResponsesProxy(params: {
         promptCacheKey: prepared.envelope.metadata?.promptCacheKey ?? null,
         contextRewriteEnabled: config.contextRewrite.enabled,
         contextRewritePlanned: Boolean(rebaseRequest),
+        providerContinuationReplayPrepared: Boolean(continuationReplayPayload),
       });
 
       const authorization = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
@@ -553,6 +606,27 @@ export async function startCodexResponsesProxy(params: {
         inboundAuthorization: authorization,
         stateDir: config.stateDir,
       });
+      const acceptedEvidence: CodexRebaseCapabilityEvidence[] = params.allowMockFixtureEvidence
+        ? ["real_provider", "mock_fixture"]
+        : ["real_provider"];
+      const capabilityStore = {
+        stateDir: config.stateDir,
+        provider: upstreamProviderName,
+        model,
+        wireMode: CODEX_REBASE_WIRE_MODE,
+        apiVersion: CODEX_REBASE_API_VERSION,
+        endpointId: codexRebaseEndpointIdentity(upstream.baseUrl),
+        itemSchemaVersion: CODEX_REBASE_ITEM_SCHEMA_VERSION,
+        probeMode: config.contextRewrite.providerCompatibilityProbe,
+        acceptedEvidence,
+        evidenceSource: params.allowMockFixtureEvidence ? "mock_fixture" : "real_provider",
+      } as const;
+      const nativeStreamChainVerified = payload.stream === true
+        && continuationReplayPayload
+        && await resolveCodexProviderContinuationCompatibility({
+          chainedPayload: payload,
+          capabilityStore,
+        }) === "verified_supported";
       let contextRewriteOutcome: string | undefined;
       let contextHistoryJournalPersisted = false;
 
@@ -573,7 +647,11 @@ export async function startCodexResponsesProxy(params: {
           sessionId,
           requestId: requestJournalEntry.requestId,
           rawStreamText: paramsForJournal.rawStreamText,
-          previousResponseId: paramsForJournal.committed ? null : undefined,
+          previousResponseId: paramsForJournal.committed
+            ? null
+            : typeof originalPayload.previous_response_id === "string"
+              ? originalPayload.previous_response_id
+              : null,
           status,
           error,
         });
@@ -607,7 +685,11 @@ export async function startCodexResponsesProxy(params: {
           sessionId,
           requestId: requestJournalEntry.requestId,
           response: paramsForJournal.response,
-          previousResponseId: paramsForJournal.committed ? null : undefined,
+          previousResponseId: paramsForJournal.committed
+            ? null
+            : typeof originalPayload.previous_response_id === "string"
+              ? originalPayload.previous_response_id
+              : null,
           status,
           error,
         });
@@ -646,51 +728,55 @@ export async function startCodexResponsesProxy(params: {
         contextHistoryJournalPersisted = true;
       };
 
-      const sendRebasedOrCurrentPayload = () => rebaseRequest && requestJournalEntry && rebasePlanId
-        ? executeCodexRebaseWithFallback({
-          sessionId,
-          planId: rebasePlanId,
-          epochId: `epoch-${requestJournalEntry.requestId}`,
-          originalPayload: fallbackPayload,
-          rebasedPayload: payload,
-          sendUpstream,
-          beforeCommit: persistAcceptedRebaseResponse,
-          accounting: rebaseAccounting,
-          epochStore: {
-            stateDir: config.stateDir,
-            oldPreviousResponseId: String(originalPayload.previous_response_id),
-            oldRevision: rebaseRequest.oldRevision,
-            newRevision: rebaseRequest.rebaseRevision,
-          },
-          cooldownStore: {
-            stateDir: config.stateDir,
-            cooldownMs: config.contextRewrite.cooldownMs,
-          },
-          capabilityStore: {
-            stateDir: config.stateDir,
-            provider: upstreamProviderName,
-            model,
-            wireMode: CODEX_REBASE_WIRE_MODE,
-            apiVersion: CODEX_REBASE_API_VERSION,
-            endpointId: codexRebaseEndpointIdentity(upstream.baseUrl),
-            itemSchemaVersion: CODEX_REBASE_ITEM_SCHEMA_VERSION,
-            probeMode: config.contextRewrite.providerCompatibilityProbe,
-            acceptedEvidence: params.allowMockFixtureEvidence
-              ? ["real_provider", "mock_fixture"]
-              : ["real_provider"],
-            evidenceSource: params.allowMockFixtureEvidence ? "mock_fixture" : "real_provider",
-          },
-        }).then((result) => {
+      const sendRebasedOrCurrentPayload = async () => {
+        if (rebaseRequest && requestJournalEntry && rebasePlanId) {
+          const result = await executeCodexRebaseWithFallback({
+            sessionId,
+            planId: rebasePlanId,
+            epochId: `epoch-${requestJournalEntry.requestId}`,
+            originalPayload: fallbackPayload,
+            rebasedPayload: payload,
+            sendUpstream,
+            beforeCommit: persistAcceptedRebaseResponse,
+            accounting: rebaseAccounting,
+            epochStore: {
+              stateDir: config.stateDir,
+              oldPreviousResponseId: String(originalPayload.previous_response_id),
+              oldRevision: rebaseRequest.oldRevision,
+              newRevision: rebaseRequest.rebaseRevision,
+            },
+            cooldownStore: {
+              stateDir: config.stateDir,
+              cooldownMs: config.contextRewrite.cooldownMs,
+            },
+            capabilityStore,
+          });
           contextRewriteOutcome = result.outcome;
           if (result.outcome !== "committed") contextHistoryJournalPersisted = false;
           return result.response;
-        })
-        : sendUpstream(payload);
+        }
+        if (continuationReplayPayload) {
+          const result = await executeCodexProviderContinuationWithReplay({
+            chainedPayload: payload,
+            statelessReplayPayload: continuationReplayPayload,
+            sendUpstream,
+            capabilityStore,
+          });
+          contextRewriteOutcome = result.outcome;
+          return result.response;
+        }
+        return sendUpstream(payload);
+      };
       const recordStreamResponse = async (paramsForRecord: {
         status: number;
         rawStreamText: string;
       }): Promise<void> => {
         const snapshot = snapshotCodexResponsesStream(paramsForRecord.rawStreamText);
+        const logicalPreviousResponseId = contextRewriteOutcome === "committed"
+          ? undefined
+          : typeof originalPayload.previous_response_id === "string"
+            ? originalPayload.previous_response_id
+            : undefined;
         const collected = collectCodexResponseItemsFromStream(paramsForRecord.rawStreamText);
         const requestStatus = streamRequestStatus({
           httpStatus: paramsForRecord.status,
@@ -739,12 +825,12 @@ export async function startCodexResponsesProxy(params: {
           responseChars: paramsForRecord.rawStreamText.length,
           assistantChars: snapshot.assistantText.length,
           responseId: snapshot.responseId ?? null,
-          previousResponseId: snapshot.previousResponseId ?? null,
+          previousResponseId: logicalPreviousResponseId ?? null,
           contextRewriteOutcome: contextRewriteOutcome ?? null,
         });
         await upsertCodexSessionSnapshot(config.stateDir, sessionId, {
           latestResponseId: snapshot.responseId,
-          previousResponseId: snapshot.previousResponseId,
+          previousResponseId: logicalPreviousResponseId,
           latestModel: model,
           latestUpstreamProvider: upstreamProviderName,
           disclosedReadPaths: reductionSummary?.disclosedReadPaths,
@@ -755,7 +841,7 @@ export async function startCodexResponsesProxy(params: {
         await appendCodexRecentTurnBinding(config.stateDir, {
           sessionId,
           responseId: snapshot.responseId,
-          previousResponseId: snapshot.previousResponseId,
+          previousResponseId: logicalPreviousResponseId,
           model,
           requestChars: requestText.length,
           responseChars: paramsForRecord.rawStreamText.length,
@@ -765,7 +851,8 @@ export async function startCodexResponsesProxy(params: {
         });
       };
       if (payload.stream === true) {
-        if (rebaseRequest && requestJournalEntry) {
+        if ((rebaseRequest && requestJournalEntry)
+          || (continuationReplayPayload && !nativeStreamChainVerified)) {
           const upstreamResp = await sendRebasedOrCurrentPayload();
           res.statusCode = upstreamResp.status;
           setForwardResponseHeaders(res, upstreamResp.headers, "text/event-stream; charset=utf-8");
@@ -832,14 +919,21 @@ export async function startCodexResponsesProxy(params: {
 
       const upstreamResp = await sendRebasedOrCurrentPayload();
       const responseJson = parseJsonObject(upstreamResp.text);
-      let responseId: string | undefined;
-      let previousResponseId: string | undefined;
+      let responseId = typeof responseJson?.id === "string" && responseJson.id.trim()
+        ? responseJson.id
+        : undefined;
+      const previousResponseId = contextRewriteOutcome === "committed"
+        ? undefined
+        : typeof originalPayload.previous_response_id === "string"
+          ? originalPayload.previous_response_id
+          : undefined;
       let assistantChars = 0;
       let toolCallCount = 0;
       try {
         const decoded = codec.decodeResponse(responseJson ?? JSON.parse(upstreamResp.text), prepared.envelope);
-        responseId = typeof decoded.metadata?.responseId === "string" ? decoded.metadata.responseId : undefined;
-        previousResponseId = typeof decoded.metadata?.previousResponseId === "string" ? decoded.metadata.previousResponseId : undefined;
+        responseId = typeof decoded.metadata?.responseId === "string" && decoded.metadata.responseId
+          ? decoded.metadata.responseId
+          : responseId;
         assistantChars = decoded.assistantText?.length ?? 0;
         toolCallCount = decoded.toolCalls?.length ?? 0;
         await appendCodexCacheAuditRecord({

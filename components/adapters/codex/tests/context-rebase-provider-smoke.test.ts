@@ -168,8 +168,10 @@ test("provider smoke emits sanitized real-chain, capability v2, matrix, and usag
       "function_call",
       "function_call_output",
       "message",
+      "previous_response_id",
       "reasoning",
     ]);
+    assert.deepEqual(evidence.capability.realProviderRejectedItemTypes, []);
     assert.equal(evidence.rebase.committed, true);
     assert.equal(evidence.rebase.oldChainReferenceRemoved, true);
     assert.equal(evidence.rebase.currentInputOccurrences, 1);
@@ -183,13 +185,14 @@ test("provider smoke emits sanitized real-chain, capability v2, matrix, and usag
     assert.equal(evidence.usage.continuationTurns.length, 5);
     assert.ok(evidence.usage.observedSavedInputTokens > 0);
     assert.equal(evidence.compatibilityMatrix.find((entry) => entry.itemType === "reasoning")?.providerDecision, "real-pass");
+    assert.equal(evidence.compatibilityMatrix.find((entry) => entry.itemType === "previous_response_id")?.providerDecision, "real-pass");
     assert.equal(evidence.compatibilityMatrix.find((entry) => entry.itemType === "compaction")?.providerDecision, "not-observed");
     assert.equal(provider.authorizationPresent(), true);
     assert.match(result.artifactSha256, /^[a-f0-9]{64}$/u);
     assert.equal(JSON.parse(artifactText).schema, CODEX_REBASE_PROVIDER_SMOKE_EVIDENCE_SCHEMA);
     assert.doesNotMatch(artifactText, /EVICT_ME_|KEEP_ME_|CURRENT_INPUT_|opaque-provider-fixture-/u);
     assert.doesNotMatch(artifactText, /provider-smoke-test-key-not-secret|sk-credential-shaped-cli-label/u);
-    assert.doesNotMatch(artifactText, /previous_response_id|authorization|bearer/iu);
+    assert.doesNotMatch(artifactText, /authorization|bearer/iu);
   } finally {
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previousKey;

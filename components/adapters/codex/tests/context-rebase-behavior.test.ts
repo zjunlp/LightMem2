@@ -323,6 +323,236 @@ test("CDR-01 rejects malformed, duplicate, and protocol-mismatched tool closure"
   ], /tool_output_before_call:reversed/);
 });
 
+test("CDR-01 replays PTC program state and caller links exactly", () => {
+  const caller = { type: "program", caller_id: "call-program-1" };
+  const effectiveHistory: CodexEffectiveHistory = {
+    revision: "history-ptc-1",
+    replayableItems: [
+      {
+        stableItemId: "program-1",
+        nativeId: "prog-1",
+        item: {
+          id: "prog-server-1",
+          type: "program",
+          call_id: "call-program-1",
+          code: "const value = await tools.lookup({}); text(value);",
+          fingerprint: "opaque-program-fingerprint",
+        },
+      },
+      {
+        stableItemId: "program-call-1",
+        nativeId: "fc-program-1",
+        item: {
+          id: "fc-server-1",
+          type: "function_call",
+          call_id: "call-nested-1",
+          name: "lookup",
+          arguments: "{}",
+          caller,
+        },
+      },
+      {
+        stableItemId: "program-call-output-1",
+        nativeId: "fco-program-1",
+        item: {
+          type: "function_call_output",
+          call_id: "call-nested-1",
+          output: "value",
+          caller,
+        },
+      },
+      {
+        stableItemId: "program-output-1",
+        nativeId: "prog-out-1",
+        item: {
+          id: "prog-out-server-1",
+          type: "program_output",
+          call_id: "call-program-1",
+          result: "value",
+          status: "completed",
+        },
+      },
+    ],
+    observationOnlyItems: [],
+    deferredItems: [],
+    unresolvedCallIds: [],
+    source: "proxy_journal",
+    incomplete: false,
+  };
+  const originalPayload = { ...baseResponsesPayload(), input: [{ role: "user", content: "continue" }] };
+  const result = buildCodexRebaseRequest({
+    sessionId: "codex-session-ptc",
+    planId: "plan-ptc",
+    baseRevision: effectiveHistory.revision,
+    originalPayload,
+    effectiveHistory,
+    currentInput: originalPayload.input,
+    mutationPlan: { operations: [] },
+  });
+  const input = result.payload.input as JsonObject[];
+  const program = input.find((item) => item.type === "program");
+  const call = input.find((item) => item.type === "function_call");
+  const output = input.find((item) => item.type === "function_call_output");
+  const programOutput = input.find((item) => item.type === "program_output");
+  assert.equal(program?.id, undefined);
+  assert.equal(program?.fingerprint, "opaque-program-fingerprint");
+  assert.deepEqual(call?.caller, caller);
+  assert.deepEqual(output?.caller, caller);
+  assert.equal(programOutput?.id, undefined);
+  assert.equal(programOutput?.status, "completed");
+});
+
+test("CDR-01 rejects broken PTC program dependencies and changed caller payloads", () => {
+  const program = {
+    stableItemId: "program-1",
+    nativeId: "prog-1",
+    item: {
+      type: "program",
+      call_id: "call-program-1",
+      code: "const value = await tools.lookup({}); text(value);",
+      fingerprint: "opaque-program-fingerprint",
+    },
+  };
+  const call = {
+    stableItemId: "program-call-1",
+    nativeId: "fc-program-1",
+    callId: "call-nested-1",
+    item: {
+      type: "function_call",
+      call_id: "call-nested-1",
+      name: "lookup",
+      arguments: "{}",
+      caller: { type: "program", caller_id: "call-program-1" },
+    },
+  };
+  const effectiveHistory: CodexEffectiveHistory = {
+    revision: "history-ptc-broken",
+    replayableItems: [program, call],
+    observationOnlyItems: [],
+    deferredItems: [],
+    unresolvedCallIds: ["call-nested-1"],
+    source: "proxy_journal",
+    incomplete: false,
+  };
+  const mismatchedOutput = [{
+    type: "function_call_output",
+    call_id: "call-nested-1",
+    output: "value",
+    caller: { type: "program", caller_id: "different-program" },
+  }];
+  assert.throws(() => buildCodexRebaseRequest({
+    sessionId: "codex-session-ptc",
+    planId: "plan-ptc-caller-mismatch",
+    baseRevision: effectiveHistory.revision,
+    originalPayload: { ...baseResponsesPayload(), input: mismatchedOutput },
+    effectiveHistory,
+    currentInput: mismatchedOutput,
+    mutationPlan: { operations: [] },
+  }), /program_caller_mismatch:call-nested-1/);
+
+  const exactOutput = [{
+    type: "function_call_output",
+    call_id: "call-nested-1",
+    output: "value",
+    caller: { type: "program", caller_id: "call-program-1" },
+  }];
+  assert.throws(() => buildCodexRebaseRequest({
+    sessionId: "codex-session-ptc",
+    planId: "plan-ptc-evict-program",
+    baseRevision: effectiveHistory.revision,
+    originalPayload: { ...baseResponsesPayload(), input: exactOutput },
+    effectiveHistory,
+    currentInput: exactOutput,
+    mutationPlan: { operations: [{ type: "evict", stableItemId: "program-1" }] },
+  }), /program_caller_missing:call-program-1/);
+
+  assert.throws(() => buildCodexRebaseRequest({
+    sessionId: "codex-session-ptc",
+    planId: "plan-ptc-orphan-output",
+    baseRevision: "history-empty",
+    originalPayload: baseResponsesPayload(),
+    effectiveHistory: {
+      revision: "history-empty",
+      replayableItems: [],
+      observationOnlyItems: [],
+      deferredItems: [],
+      unresolvedCallIds: [],
+      source: "proxy_journal",
+      incomplete: false,
+    },
+    currentInput: [{
+      type: "program_output",
+      call_id: "call-orphan-program",
+      result: "done",
+      status: "completed",
+    }],
+    mutationPlan: { operations: [] },
+  }), /program_output_orphan:call-orphan-program/);
+});
+
+test("CDR-01 preserves client tool-search closure and replay status", () => {
+  const toolSearchInput = [
+    {
+      id: "tool-search-server-call",
+      type: "tool_search_call",
+      call_id: "tool-search-1",
+      execution: "client",
+      status: "completed",
+      query: "weather tool",
+    },
+    {
+      id: "tool-search-server-output",
+      type: "tool_search_output",
+      call_id: "tool-search-1",
+      execution: "client",
+      status: "completed",
+      tools: [{ type: "function", name: "weather" }],
+    },
+  ];
+  const effectiveHistory: CodexEffectiveHistory = {
+    revision: "history-tool-search",
+    replayableItems: toolSearchInput.map((item, index) => ({
+      stableItemId: `tool-search-${index}`,
+      nativeId: `tool-search-native-${index}`,
+      callId: "tool-search-1",
+      item,
+    })),
+    observationOnlyItems: [],
+    deferredItems: [],
+    unresolvedCallIds: [],
+    source: "proxy_journal",
+    incomplete: false,
+  };
+  const result = buildCodexRebaseRequest({
+    sessionId: "codex-session-tool-search",
+    planId: "plan-tool-search",
+    baseRevision: effectiveHistory.revision,
+    originalPayload: { ...baseResponsesPayload(), input: [{ role: "user", content: "continue" }] },
+    effectiveHistory,
+    currentInput: [{ role: "user", content: "continue" }],
+    mutationPlan: { operations: [] },
+  });
+  const input = result.payload.input as JsonObject[];
+  assert.equal(input[0]?.id, undefined);
+  assert.equal(input[0]?.status, "completed");
+  assert.equal(input[1]?.id, undefined);
+  assert.equal(input[1]?.status, "completed");
+
+  const incompleteHistory = {
+    ...effectiveHistory,
+    replayableItems: [effectiveHistory.replayableItems[0]!],
+  };
+  assert.throws(() => buildCodexRebaseRequest({
+    sessionId: "codex-session-tool-search",
+    planId: "plan-tool-search-incomplete",
+    baseRevision: incompleteHistory.revision,
+    originalPayload: { ...baseResponsesPayload(), input: [{ role: "user", content: "continue" }] },
+    effectiveHistory: incompleteHistory,
+    currentInput: [{ role: "user", content: "continue" }],
+    mutationPlan: { operations: [] },
+  }), /tool_closure_incomplete:tool-search-1/);
+});
+
 test("CDR-04 retries the original request once when rebase replay is rejected upstream", async () => {
   const originalPayload = baseResponsesPayload();
   const rebasedPayload: ResponsesPayload = {

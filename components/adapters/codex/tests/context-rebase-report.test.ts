@@ -83,7 +83,7 @@ test("CDR-07 Codex session report renders rebase state", async () => {
     assert.match(report, /rebase epochs: committed=1, rolled_back=0, failed=0, pending=0/i);
     assert.match(report, /latest rebase epoch: committed epoch-report old=resp-old new=resp-new/i);
     assert.match(report, /rebase cooldowns: active=1\/1 latest=rebase_upstream_rejected/i);
-    assert.match(report, /web_search_call@responses-item\/v1 verified_unsupported evidence=mock\/fixture/i);
+    assert.match(report, /web_search_call@responses-item\/v2 verified_unsupported evidence=mock\/fixture/i);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

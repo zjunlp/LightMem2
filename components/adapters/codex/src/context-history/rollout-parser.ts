@@ -6,7 +6,7 @@ import {
   hashJson,
   sanitizeValue,
 } from "./shared.js";
-import { codexReplayabilityForItem } from "./replayability.js";
+import { codexReplayabilityForItem, codexReplayPairRef } from "./replayability.js";
 import type {
   CodexEffectiveHistory,
   CodexEffectiveHistoryItem,
@@ -32,8 +32,7 @@ function itemCallId(item: JsonObject): string | undefined {
 }
 
 function isToolOutput(item: JsonObject): boolean {
-  const type = itemType(item);
-  return type === "function_call_output" || type === "custom_tool_call_output";
+  return codexReplayPairRef(item).side === "output";
 }
 
 type RolloutAccumulator = {
@@ -60,10 +59,8 @@ function createAccumulator(): RolloutAccumulator {
 }
 
 function expectedOutputType(item: JsonObject): string | undefined {
-  const type = itemType(item);
-  if (type === "function_call") return "function_call_output";
-  if (type === "custom_tool_call") return "custom_tool_call_output";
-  return undefined;
+  const ref = codexReplayPairRef(item);
+  return ref.side === "call" ? `${ref.type}_output` : undefined;
 }
 
 function createEffectiveItem(

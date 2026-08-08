@@ -2,6 +2,7 @@
 import { readJsonFile, writeJsonFileAtomic } from "@lightmem2/host-adapter";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { collectCodexResponseItemsFromStream } from "./context-history/sse-item-collector.js";
 import type { CodexProviderConfig } from "./config.js";
 
 export type UpstreamHttpResponse = {
@@ -71,6 +72,31 @@ function unsupportedOptionalFieldFromText(text: string): OptionalResponsesField 
     return "prompt_cache_key";
   }
   return undefined;
+}
+
+function encryptedReasoningRequested(payload: any): boolean {
+  return Array.isArray(payload?.include) && payload.include.includes("reasoning.encrypted_content");
+}
+
+function outputItemsFromResponse(text: string, contentType: string | null): any[] {
+  if (contentType?.toLowerCase().includes("text/event-stream") || /^event:\s*response\./mu.test(text)) {
+    return collectCodexResponseItemsFromStream(text).outputItems;
+  }
+  try {
+    const parsed = JSON.parse(text) as any;
+    return Array.isArray(parsed?.output) ? parsed.output : [];
+  } catch {
+    return [];
+  }
+}
+
+function requestedEncryptedReasoningMissing(payload: any, resp: Response, text: string): boolean {
+  if (!encryptedReasoningRequested(payload)) return false;
+  return outputItemsFromResponse(text, resp.headers.get("content-type")).some((item) => {
+    const type = String(item?.type ?? "").toLowerCase();
+    return (type === "reasoning" || type === "compaction")
+      && (typeof item?.encrypted_content !== "string" || !item.encrypted_content.trim());
+  });
 }
 
 function upstreamCapabilityPath(stateDir: string, upstream: CodexProviderConfig): string {
@@ -143,6 +169,14 @@ export async function requestUpstreamResponses(params: {
         text = await resp.text();
       }
     }
+  }
+  let encryptedRepairAttempts = 0;
+  while (resp.ok
+    && requestedEncryptedReasoningMissing(payload, resp, text)
+    && encryptedRepairAttempts < 2) {
+    encryptedRepairAttempts += 1;
+    resp = await send(payload);
+    text = await resp.text();
   }
   return {
     status: resp.status,

@@ -37,7 +37,13 @@ export type CodexProviderReplayCompatibilityResult = {
 };
 
 export type CodexRebaseRejectionClassification = {
-  kind: "item_unsupported" | "payload_rejected" | "ambiguous" | "transient" | "unclassified";
+  kind:
+    | "chain_reference_unsupported"
+    | "item_unsupported"
+    | "payload_rejected"
+    | "ambiguous"
+    | "transient"
+    | "unclassified";
   itemTypes: string[];
   errorCode?: string;
 };
@@ -616,6 +622,14 @@ export function classifyCodexRebaseCapabilityRejection(params: {
   }
 
   const text = responseErrorText(params.response);
+  const chainReferenceRejected = text.includes("previous_response_id") && (
+    detectedErrorCode === "invalid_request_error"
+    || detectedErrorCode === "unsupported_parameter"
+    || /(unsupported|not supported|unknown|invalid|unrecognized|does not exist|not found)/iu.test(text)
+  );
+  if (chainReferenceRejected) {
+    return { kind: "chain_reference_unsupported", itemTypes: [], errorCode: detectedErrorCode };
+  }
   const encryptedTypes = itemTypes.filter((itemType) => itemType === "reasoning" || itemType === "compaction");
   const namedEncryptedTypes = encryptedTypes.filter((itemType) => text.includes(itemType.toLowerCase()));
   const payloadSpecific = detectedErrorCode === "invalid_encrypted_content"

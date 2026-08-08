@@ -68,6 +68,48 @@ test("CDH-04 Effective History Builder marks an orphan incomplete response after
   });
 });
 
+test("CDH-04 Effective History Builder preserves ordered turns when a provider reuses response ids", async () => {
+  await withTempState(async (stateDir) => {
+    const sessionId = "codex-session-reused-response-id";
+    for (let turn = 1; turn <= 3; turn += 1) {
+      const requestId = `request-${turn}`;
+      await appendCodexRequestJournalEntry({
+        stateDir,
+        sessionId,
+        requestId,
+        turnOrdinal: turn,
+        payload: {
+          ...(turn > 1 ? { previous_response_id: "resp-provider-reused" } : {}),
+          input: [{ role: "user", content: `reused id turn ${turn}` }],
+        },
+        status: "completed",
+      });
+      await appendCodexResponseJournalEntry({
+        stateDir,
+        sessionId,
+        requestId,
+        response: {
+          id: "resp-provider-reused",
+          output: [{ type: "message", role: "assistant", content: `answer ${turn}` }],
+        },
+        previousResponseId: turn > 1 ? "resp-provider-reused" : null,
+        status: "completed",
+      });
+    }
+
+    const history = await buildCodexEffectiveHistory({
+      stateDir,
+      sessionId,
+      headResponseId: "resp-provider-reused",
+    });
+
+    assert.equal(history.incomplete, false);
+    assert.match(JSON.stringify(history.replayableItems), /reused id turn 1/);
+    assert.match(JSON.stringify(history.replayableItems), /reused id turn 2/);
+    assert.match(JSON.stringify(history.replayableItems), /reused id turn 3/);
+  });
+});
+
 test("CDH-04 Effective History Builder builds proxy journal history in strict order with replay and observation split", async () => {
   await withTempState(async (stateDir) => {
     await appendCodexRequestJournalEntry({
@@ -137,11 +179,10 @@ test("CDH-04 Effective History Builder builds proxy journal history in strict or
     assert.equal(history.source, "proxy_journal");
     assert.equal(history.incomplete, false);
     assert.equal(history.unresolvedCallIds.length, 0);
-    assert.equal(history.observationOnlyItems.length, 1);
-    assert.equal(history.observationOnlyItems[0]?.item.type, "web_search_call");
+    assert.equal(history.observationOnlyItems.length, 0);
     assert.deepEqual(
       history.replayableItems.map((entry) => entry.item.type ?? entry.item.role),
-      ["developer", "user", "message", "function_call", "function_call_output", "user", "message"],
+      ["developer", "user", "message", "function_call", "web_search_call", "function_call_output", "user", "message"],
     );
     assert.match(history.revision, /^rev-[0-9a-f]+$/);
   });
